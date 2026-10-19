@@ -6,6 +6,7 @@
         :model-value="modelValue"
         :title="dialogTitle || label"
         :fallback-locale="fallbackLocale"
+        :reference-text="referenceText"
         @update:model-value="emit('update:modelValue', $event)"
       >
         <template #default="scope">
@@ -34,7 +35,10 @@ import { getLocale } from '@/i18n'
 import type { LocalizedUpdate } from '@/i18n/content'
 import { updateSource, withDefaultSource } from '@/i18n/contentEdit'
 
-// 表单里只编辑原文，译文在标签行右侧入口打开的翻译弹窗里编辑。
+// LocalizedEditor.vue combines source editing with the shared translation dialog.
+// Consumers can supply a custom field editor and a source-reference formatter
+// when stored strings encode structured content, while translation revisions and
+// language selection remain managed by the common localized content operations.
 const props = withDefaults(defineProps<{
   modelValue: LocalizedUpdate<T>
   label: string
@@ -46,6 +50,10 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   /** 加在默认输入控件上的类，例如链接用等宽字体。 */
   inputClass?: string
+  /** referenceText formats encoded source content for translators while keeping
+   * saved values unchanged; omit it when the source is ordinary display text.
+   */
+  referenceText?: (value: T) => string
   defaultSourceLocale?: string
 }>(), { rows: 1, labelClass: 'input-label mb-0' })
 const emit = defineEmits<{ 'update:modelValue': [value: LocalizedUpdate<T>] }>()

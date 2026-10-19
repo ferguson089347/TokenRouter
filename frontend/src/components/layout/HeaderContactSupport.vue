@@ -1,5 +1,5 @@
 <template>
-  <div v-if="contactEntries.length" class="relative" ref="dropdownRef">
+  <div v-if="hasContacts" ref="dropdownRef" class="relative">
     <button
       type="button"
       data-testid="contact-support-toggle"
@@ -11,38 +11,17 @@
     >
       <Icon name="chat" size="md" />
     </button>
-
-    <!-- 联系方式逐条成行：链接在新窗口打开，纯文本点击复制。 -->
-    <MotionTransition name="dropdown-fade">
-      <div v-if="isOpen" class="dropdown right-0 z-50 mt-2 w-72 origin-top-right py-0">
+    <MotionTransition name="dropdown-fade" persisted>
+      <div
+        v-show="isOpen"
+        class="dropdown right-0 z-modal-nested mt-2 w-72 origin-top-right py-0"
+        @keydown.esc.stop="closeDropdown"
+      >
         <div class="menu-section">
           <div class="menu-heading">{{ t('common.contactSupport') }}</div>
-          <template v-for="(entry, idx) in contactEntries" :key="idx">
-            <a
-              v-if="entry.url"
-              :href="entry.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="menu-item"
-              :title="entry.value"
-              @click="closeDropdown"
-            >
-              <span v-if="entry.label" class="shrink-0 font-normal text-primary-900/60 dark:text-dark-400">{{ entry.label }}</span>
-              <span class="ml-auto min-w-0 truncate">{{ formatContactUrl(entry.url) }}</span>
-              <Icon name="externalLink" size="sm" class="shrink-0" />
-            </a>
-            <button
-              v-else
-              type="button"
-              class="menu-item"
-              :title="t('common.copy')"
-              @click="copyContact(entry.value)"
-            >
-              <span v-if="entry.label" class="shrink-0 font-normal text-primary-900/60 dark:text-dark-400">{{ entry.label }}</span>
-              <span class="ml-auto min-w-0 truncate tabular-nums">{{ entry.value }}</span>
-              <Icon name="copy" size="sm" class="shrink-0" />
-            </button>
-          </template>
+          <div class="max-h-panel overflow-y-auto p-3">
+            <SupportContactList :value="appStore.contactInfo || ''" @activate="closeDropdown" />
+          </div>
         </div>
       </div>
     </MotionTransition>
@@ -54,80 +33,47 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MotionTransition from '@/components/common/MotionTransition.vue'
 import Icon from '@/components/icons/Icon.vue'
-import { useClipboard } from '@/composables/useClipboard'
-import { useAppStore } from '@/stores'
+import SupportContactList from '@/components/support/SupportContactList.vue'
+import { useAppStore } from '@/stores/app'
+import { parseSupportContacts, safeContactUrl } from '@/utils/supportContacts'
 
-interface ContactEntry {
-  label: string
-  value: string
-  url: string
-}
+// HeaderContactSupport.vue opens the site's labeled support methods from the
+// shared header. Text, links, and QR images use the same renderer as the profile.
+// The panel remains mounted while closed so a teleported image preview can finish
+// its dialog lifecycle after clicks outside the header close the menu.
 
+// Header state tracks menu visibility and the trigger container used to dismiss outside interactions after support methods are configured.
 const { t } = useI18n()
 const appStore = useAppStore()
-const { copyToClipboard } = useClipboard()
-
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const hasContacts = computed(() =>
+  parseSupportContacts(appStore.contactInfo || '').some(
+    (entry) => entry.value || safeContactUrl(entry.image, true)
+  )
+)
 
-// 联系客服是自由文本（如“闲聊群(QQ)：123，TG群：https://t.me/xxx”），
-// 按逗号、分号或换行拆条，再按冒号拆出“标签：值”，URL 渲染为可点击链接。
-const contactEntries = computed<ContactEntry[]>(() => {
-  const raw = appStore.contactInfo?.trim()
-  if (!raw) return []
-  return raw
-    .split(/[，,;；\n]+/)
-    .map(part => part.trim())
-    .filter(Boolean)
-    .map(part => {
-      // 找第一个不属于协议（://）的冒号作为“标签：值”分隔符。
-      let sep = -1
-      for (let i = 0; i < part.length; i++) {
-        const ch = part[i]
-        if (ch === '：') { sep = i; break }
-        if (ch === ':' && part.slice(i, i + 3) !== '://') { sep = i; break }
-      }
-      let label = ''
-      let value = part
-      if (sep > 0) {
-        label = part.slice(0, sep).trim()
-        value = part.slice(sep + 1).trim()
-      }
-      const url = /^https?:\/\/\S+$/.test(value) ? value : ''
-      return { label, value, url }
-    })
-    .filter(e => e.value)
-})
-
+/** toggleDropdown changes visibility for the header's support contact panel. */
 function toggleDropdown() {
   isOpen.value = !isOpen.value
 }
 
+/** closeDropdown hides the support panel after navigation or outside interaction. */
 function closeDropdown() {
   isOpen.value = false
 }
 
-// 面板宽度有限，链接只展示去掉协议和末尾斜杠后的地址。
-function formatContactUrl(url: string) {
-  return url.replace(/^https?:\/\//, '').replace(/\/$/, '')
-}
-
-async function copyContact(value: string) {
-  await copyToClipboard(value)
-  closeDropdown()
-}
-
+/** handleClickOutside dismisses support navigation when interaction leaves its header container.
+ * The shared contact list retains its mounted image dialog when the menu closes,
+ * allowing preview interactions to continue outside the header dropdown itself.
+ */
 function handleClickOutside(event: MouseEvent) {
-  if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
-    closeDropdown()
-  }
+  if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) closeDropdown()
 }
 
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-})
-
+onMounted(() => document.addEventListener('click', handleClickOutside))
 onBeforeUnmount(() => {
+  // Remove the global dismissal listener when the header leaves so future document clicks cannot update a retired support menu instance.
   document.removeEventListener('click', handleClickOutside)
 })
 </script>

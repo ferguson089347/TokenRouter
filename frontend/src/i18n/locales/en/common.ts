@@ -1,3 +1,8 @@
+// common.ts provides shared interface labels and feedback for this locale.
+// Feature components reuse these strings for buttons, navigation, validation, and
+// support contact editing so common actions keep consistent names across the
+// authenticated and public application pages.
+
 export default {
 // Common
   common: {
@@ -69,6 +74,21 @@ export default {
     verifying: 'Verifying...',
     processing: 'Processing...',
     contactSupport: 'Contact Support',
+    supportContacts: {
+      add: 'Add contact method',
+      empty: 'Add support QQ, a QQ group, a Telegram group, or a QR code.',
+      entry: 'Contact method #{index}',
+      label: 'Name',
+      labelPlaceholder: 'For example: Support QQ, QQ group, Telegram group',
+      value: 'Number or link (optional)',
+      valuePlaceholder: 'For example: 123456789 or https://t.me/example',
+      image: 'QR code or image (optional)',
+      upload: 'Upload QR code / image',
+      imageHint: 'Image files up to 300 KB each.',
+      imageUrl: 'Or enter an HTTP(S) image URL',
+      preview: 'View full image',
+      previewLabel: 'View image for {label}',
+    },
     add: 'Add',
     moveUp: 'Move up',
     moveDown: 'Move down',

@@ -263,6 +263,11 @@ import { sanitizeUrl } from '@/utils/url'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 
+// AppHeader.vue renders the shared brand, account menu, and user controls across
+// public and authenticated pages. Site settings determine navigation destinations,
+// support access, and optional account actions, while the current user supplies
+// identity and balance details displayed by the header.
+
 // 公开页面复用品牌和账户区，只省略侧栏开关并补充访客入口。
 withDefaults(defineProps<{ publicPage?: boolean }>(), {
   publicPage: false
@@ -292,7 +297,7 @@ interface MenuNavItem {
   icon: IconName
 }
 
-// 用户菜单导航分组：常用入口在前，账单相关在后；按功能开关过滤，与侧栏的显示条件一致。
+// menuNavGroups exposes workspace, support, and billing destinations permitted by the current public site settings and account feature flags.
 const menuNavGroups = computed(() => {
   const settings = appStore.cachedPublicSettings
   const paymentEnabled = settings?.payment_enabled === true
@@ -301,6 +306,7 @@ const menuNavGroups = computed(() => {
       key: 'workspace',
       items: [
         { path: '/profile', label: t('nav.profile'), icon: 'userCircle' },
+        !!appStore.contactInfo?.trim() && { path: '/profile#contact-support', label: t('common.contactSupport'), icon: 'chat' },
         { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' },
         { path: '/usage', label: t('nav.usage'), icon: 'chart' },
         { path: '/keys', label: t('nav.apiKeys'), icon: 'key' },

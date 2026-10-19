@@ -26,6 +26,7 @@
     :model-value="modelValue"
     :fallback-locale="fallbackLocale"
     :reference-fields="referenceFields"
+    :reference-text="referenceText"
     @close="open = false"
     @save="save"
   >
@@ -44,12 +45,21 @@ import { availableLocales } from '@/i18n/catalog'
 import type { LocalizedUpdate } from '@/i18n/content'
 import { translationSummary } from '@/i18n/contentEdit'
 
+// LocalizedTranslateButton.vue summarizes translation status and opens the shared
+// editor for the supplied content. Consumer editors and optional source-reference
+// formatting flow into that dialog, while saved updates retain their revision and
+// language metadata for the parent form's eventual submission.
+
 const props = defineProps<{
   modelValue: LocalizedUpdate<T>
   title: string
   fallbackLocale?: string
   /** 多字段内容在原文参照里逐个显示的字段。 */
   referenceFields?: { key: string; label: string }[]
+  /** referenceText supplies human-readable source content for the translation
+   * dialog when the stored value needs consumer-specific presentation rules.
+   */
+  referenceText?: (value: T) => string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: LocalizedUpdate<T>] }>()
 defineSlots<{ default(props: { value: T; update: (value: T) => void; locale: string | null; id: string }): unknown }>()

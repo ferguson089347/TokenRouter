@@ -1,3 +1,8 @@
+// settings.ts provides administrator settings labels and explanatory text for
+// this locale. The settings forms reuse these entries for site content, gateway
+// policy, identity controls, and public support configuration maintained by the
+// administrator through the shared settings interface.
+
 export default {
 // Settings
     settings: {
@@ -758,7 +763,7 @@ export default {
         },
         contactInfo: '客服联系方式',
         contactInfoPlaceholder: '例如：QQ: 123456789',
-        contactInfoHint: '填写客服联系方式，将展示在个人资料、顶部用户菜单等位置',
+        contactInfoHint: '可添加多条号码、群链接和二维码，展示在个人资料、顶部客服入口及用户菜单。',
         docUrl: '文档链接',
         docUrlHint: '文档网站的链接。留空则隐藏文档链接。',
         docUrlPlaceholder: 'https://docs.example.com',

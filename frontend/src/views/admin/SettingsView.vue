@@ -3844,7 +3844,11 @@
               </div>
               <div class="grid gap-4 md:grid-cols-2">
                 <div>
-                  <LocalizedEditor :label="t('admin.settings.site.contactInfo')" :placeholder="t('admin.settings.site.contactInfoPlaceholder')" v-model="form.site_texts.contact_info" :default-source-locale="getLocale()" />
+                  <LocalizedEditor :label="t('admin.settings.site.contactInfo')" :reference-text="supportContactReference" v-model="form.site_texts.contact_info" :default-source-locale="getLocale()">
+                    <template #default="{ value, update }">
+                      <SupportContactEditor :model-value="String(value || '')" @update:model-value="update" />
+                    </template>
+                  </LocalizedEditor>
                   <p class="input-hint">{{ t("admin.settings.site.contactInfoHint") }}</p>
                 </div>
                 <div>
@@ -5395,6 +5399,8 @@ import RuleListEditor from "@/components/common/RuleListEditor.vue";
 import Toggle from "@/components/common/Toggle.vue";
 import ProxySelector from "@/components/common/ProxySelector.vue";
 import ImageUpload from "@/components/common/ImageUpload.vue";
+import SupportContactEditor from "@/components/support/SupportContactEditor.vue";
+import { parseSupportContacts } from "@/utils/supportContacts";
 import BalanceIcon from "@/components/common/BalanceIcon.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
 import { useBalanceDisplay } from "@/composables/useBalanceDisplay";
@@ -5422,7 +5428,26 @@ import {
   parseRegistrationEmailSuffixWhitelistInput,
 } from "@/utils/registrationEmailPolicy";
 
+// SettingsView.vue edits site content, authentication, gateway policy, payments,
+// and operational preferences through the administrator settings interface.
+// Each settings section retains its own loaded baseline, and the save registry
+// submits changed sections through their owning API operations. Localized site
+// content carries source text and translation revisions so edits can be checked
+// against the configuration version originally loaded by the administrator.
+//
+// Support contacts use the same localized draft and save lifecycle as other site
+// content. The contact editor encodes multiple numbers, group links, and uploaded
+// images into that field, and successful settings publication supplies the selected
+// language to public header and profile consumers.
+
 const { t, locale } = useI18n();
+// supportContactReference shows labels, numbers, links, and image markers in the
+// translation reference. Uploaded image bytes remain stored with the source draft
+// while translators see the meaning of each configured contact method.
+function supportContactReference(value: string): string {
+  return parseSupportContacts(value).map(entry => [entry.label, entry.value, entry.image ? t("common.supportContacts.image") : ""].filter(Boolean).join(": ")).join("\n");
+}
+
 const route = useRoute();
 const appStore = useAppStore();
 // 关闭 step-up 开关是敏感操作：后端返回 STEP_UP_REQUIRED 时弹 TOTP 码重试

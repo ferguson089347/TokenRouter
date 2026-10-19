@@ -1,3 +1,8 @@
+// settings.ts provides administrator settings labels and explanatory text for
+// this locale. The settings forms reuse these entries for site content, gateway
+// policy, identity controls, and public support configuration maintained by the
+// administrator through the shared settings interface.
+
 export default {
 // Settings
     settings: {
@@ -768,7 +773,7 @@ export default {
         },
         contactInfo: 'Contact Info',
         contactInfoPlaceholder: 'e.g., QQ: 123456789',
-        contactInfoHint: 'Customer support contact info, displayed on the profile and header user menu.',
+        contactInfoHint: 'Add numbers, group links, and QR images for the profile, header support menu, and user menu.',
         docUrl: 'Documentation URL',
         docUrlPlaceholder: 'https://docs.example.com',
         docUrlHint: 'Link to your documentation site. Leave empty to hide the documentation link.',

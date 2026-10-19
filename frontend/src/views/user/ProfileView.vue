@@ -35,12 +35,18 @@
           />
         </template>
       </ProfileInfoCard>
+      <section v-if="appStore.contactInfo" id="contact-support" class="card mt-4 p-6">
+        <h2 class="mb-4 text-base font-semibold text-gray-900 dark:text-dark-50">{{ t('common.contactSupport') }}</h2>
+        <SupportContactList :value="appStore.contactInfo" />
+      </section>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import SupportContactList from '@/components/support/SupportContactList.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import ProfileBalanceNotifyCard from '@/components/user/profile/ProfileBalanceNotifyCard.vue'
 import ProfileInfoCard from '@/components/user/profile/ProfileInfoCard.vue'
@@ -51,6 +57,13 @@ import { isWeChatWebOAuthEnabled } from '@/api/auth'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
+// ProfileView.vue combines account identity, security controls, notification
+// preferences, and the site's support contacts. Public settings determine optional
+// controls and localized contact details; the support renderer shares its numbers,
+// links, and image previews with the global header.
+
+// Profile state reads the shared account and site settings while feature responses control available identity and security panels.
+const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)

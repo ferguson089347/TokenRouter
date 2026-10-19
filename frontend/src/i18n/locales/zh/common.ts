@@ -1,3 +1,8 @@
+// common.ts provides shared interface labels and feedback for this locale.
+// Feature components reuse these strings for buttons, navigation, validation, and
+// support contact editing so common actions keep consistent names across the
+// authenticated and public application pages.
+
 export default {
 // Common
   common: {
@@ -69,6 +74,21 @@ export default {
     verifying: '验证中...',
     processing: '处理中...',
     contactSupport: '联系客服',
+    supportContacts: {
+      add: '添加联系方式',
+      empty: '添加客服 QQ、QQ群、Telegram 群或二维码。',
+      entry: '联系方式 #{index}',
+      label: '名称',
+      labelPlaceholder: '例如：客服 QQ、QQ群、Telegram 群',
+      value: '号码或链接（可选）',
+      valuePlaceholder: '例如：123456789 或 https://t.me/example',
+      image: '二维码或图片（可选）',
+      upload: '上传二维码 / 图片',
+      imageHint: '支持图片文件，每张不超过 300 KB。',
+      imageUrl: '或填写图片的 HTTP(S) 地址',
+      preview: '点击查看大图',
+      previewLabel: '查看 {label} 的图片',
+    },
     add: '添加',
     moveUp: '上移',
     moveDown: '下移',

@@ -7,10 +7,12 @@ import type { LocalizedUpdate } from '@/i18n/content'
 
 let wrapper: VueWrapper | undefined
 
-// 受控父组件持有内容，表单输入和弹窗写回都经过同一个 v-model。
-function editor() {
+// editor mounts a controlled localized field with an optional source-reference
+// formatter. The parent retains draft content so tests can distinguish dialog
+// edits from confirmed updates and inspect translation revision changes.
+function editor(referenceText?: (value: string) => string) {
   const content = ref<LocalizedUpdate<string>>({ source: '原文', source_locale: 'zh-Hans', revision: 3, source_revision: 2, translations: { en: { value: 'English', source_revision: 2 } } })
-  const parent = defineComponent({ components: { LocalizedEditor }, setup: () => ({ content }), template: '<LocalizedEditor v-model="content" label="站点名称" />' })
+  const parent = defineComponent({ components: { LocalizedEditor }, setup: () => ({ content, referenceText }), template: '<LocalizedEditor v-model="content" :reference-text="referenceText" label="站点名称" />' })
   wrapper = mount(parent, { attachTo: document.body, global: { plugins: [createI18n({ legacy: false, locale: 'zh-Hans', missingWarn: false, fallbackWarn: false, messages: {} })] } })
   return { wrapper, content }
 }
@@ -85,4 +87,14 @@ describe('翻译编辑', () => {
     expect(content.value.reviewed_locales).toEqual(['en'])
     expect(wrapper.get('button').text()).not.toContain('localization.needsUpdate')
   })
+  // Structured support content needs a readable source reference during translation.
+  // Consumer formatting changes the preview while the saved source and translation remain intact.
+  it('formats structured source references for translation without changing saved content', async () => {
+    const { content } = editor(() => 'Support QQ: 123456')
+    await openDialog()
+    expect(dialog().querySelector('dl')?.textContent).toContain('Support QQ: 123456')
+    expect(content.value.source).toBe('原文')
+    expect(content.value.translations.en.value).toBe('English')
+  })
+
 })

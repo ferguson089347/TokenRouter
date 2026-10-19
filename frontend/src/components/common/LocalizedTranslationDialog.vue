@@ -166,6 +166,11 @@ import {
   type TranslationStatus,
 } from '@/i18n/contentEdit'
 
+// LocalizedTranslationDialog.vue edits source content and translations in a local
+// draft and returns confirmed updates to its parent. Language status and revision
+// operations share the content editing helpers, while optional reference formatting
+// lets encoded values appear as readable source content alongside translation fields.
+
 let dialogSequence = 0
 
 const props = defineProps<{
@@ -176,6 +181,10 @@ const props = defineProps<{
   fallbackLocale?: string
   /** 多字段内容在原文参照里逐个显示的字段；单个字段省略。 */
   referenceFields?: { key: string; label: string }[]
+  /** referenceText formats the source preview when supplied by a structured
+   * content editor; its result affects display and leaves saved values intact.
+   */
+  referenceText?: (value: T) => string
 }>()
 const emit = defineEmits<{ close: []; save: [value: LocalizedUpdate<T>] }>()
 defineSlots<{ default(props: { value: T; update: (value: T) => void; locale: string | null; id: string }): unknown }>()
@@ -206,9 +215,12 @@ const targets = computed(() => {
 })
 const current = computed(() => targets.value.find(item => item.code === selected.value))
 
-// 原文参照按字段展开，单个字段直接显示文本。
+// referenceEntries formats the source preview with consumer presentation, declared fields, or ordinary text in that order for the translator.
 const referenceEntries = computed(() => {
   const source = draft.value?.source as unknown
+  if (props.referenceText && draft.value) {
+    return [{ key: 'value', label: '', value: props.referenceText(draft.value.source) }]
+  }
   if (props.referenceFields && source && typeof source === 'object') {
     const values = source as Record<string, unknown>
     return props.referenceFields.map(field => ({ key: field.key, label: field.label, value: String(values[field.key] ?? '') }))
