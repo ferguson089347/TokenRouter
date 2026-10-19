@@ -5254,6 +5254,10 @@
         </div>
         <!-- /Tab: Email -->
 
+        <div v-show="activeTab === 'tickets'" v-content-reveal="activeTab === 'tickets'">
+          <TicketSettingsTab v-if="ticketSettingsVisited" />
+        </div>
+
         <!-- Tab: Backup -->
         <div v-show="activeTab === 'backup'" v-content-reveal="activeTab === 'backup'">
           <BackupSettings />
@@ -5402,6 +5406,7 @@ import ImageUpload from "@/components/common/ImageUpload.vue";
 import SupportContactEditor from "@/components/support/SupportContactEditor.vue";
 import { parseSupportContacts } from "@/utils/supportContacts";
 import BalanceIcon from "@/components/common/BalanceIcon.vue";
+import TicketSettingsTab from "@/views/admin/settings/TicketSettingsTab.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
 import { useBalanceDisplay } from "@/composables/useBalanceDisplay";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
@@ -5467,6 +5472,7 @@ type SettingsTab =
   | "gateway"
   | "payment"
   | "email"
+  | "tickets"
   | "backup";
 const settingsTabs = [
   { key: "general" as SettingsTab, icon: "home" as const },
@@ -5477,6 +5483,7 @@ const settingsTabs = [
   { key: "gateway" as SettingsTab, icon: "server" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
+  { key: "tickets" as SettingsTab, icon: "ticket" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
 // 允许通过路由参数直接定位到指定标签。
@@ -5485,6 +5492,12 @@ const initialSettingsTab = settingsTabKeys.has(route.query.tab as SettingsTab)
   ? (route.query.tab as SettingsTab)
   : "general";
 const activeTab = ref<SettingsTab>(initialSettingsTab);
+// Load ticket settings on first visit, then retain the form so pending edits
+// stay registered with the shared save bar when another tab becomes active.
+const ticketSettingsVisited = ref(initialSettingsTab === "tickets");
+watch(activeTab, (tab) => {
+  if (tab === "tickets") ticketSettingsVisited.value = true;
+});
 const settingsTabsScrollRef = ref<HTMLElement | null>(null);
 
 type GatewaySection =

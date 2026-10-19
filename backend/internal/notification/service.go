@@ -38,6 +38,11 @@ import (
 // while current preference and delivery identities also read legacy keys.
 
 const (
+	// Ticket events select localized support templates and share one recipient preference.
+	NotificationEmailEventTicketStaffReply = "ticket.staff_reply"
+	NotificationEmailEventTicketCompleted  = "ticket.completed"
+	NotificationEmailEventTicketCancelled  = "ticket.cancelled"
+
 	// Branding values identify current site copy and link bases used by
 	// rendering and unsubscribe URLs, with a built-in site name for missing copy.
 	defaultSiteName       = "TokenRouter"
@@ -108,6 +113,9 @@ var (
 	// notificationEmailEvents defines listing order, optional-event eligibility,
 	// and placeholder names; public metadata readers copy its slices before returning them.
 	notificationEmailEvents = []NotificationEmailEventInfo{
+		{Event: NotificationEmailEventTicketCancelled, Label: "Ticket withdrawn", Description: "Sent after a support action when ticket notifications are enabled.", Category: "ticket", Optional: true, Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "ticket_id", "ticket_title", "ticket_url", "unsubscribe_url")},
+		{Event: NotificationEmailEventTicketCompleted, Label: "Ticket completed", Description: "Sent after a support action when ticket notifications are enabled.", Category: "ticket", Optional: true, Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "ticket_id", "ticket_title", "ticket_url", "unsubscribe_url")},
+		{Event: NotificationEmailEventTicketStaffReply, Label: "Support reply", Description: "Sent after a support action when ticket notifications are enabled.", Category: "ticket", Optional: true, Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "ticket_id", "ticket_title", "ticket_url", "unsubscribe_url")},
 		{
 			Event:        NotificationEmailEventAuthVerifyCode,
 			Label:        "Email verification code",
@@ -245,6 +253,36 @@ var (
 	// notificationEmailOfficialTemplates supplies event/language defaults when
 	// stored overrides are absent, unreadable, malformed, or invalid for the selected event.
 	notificationEmailOfficialTemplates = map[string]map[string]notificationEmailOfficialTemplate{
+		NotificationEmailEventTicketCancelled: {
+			notificationEmailDefaultLocale: {
+				Subject: "[{{site_name}}] Ticket #{{ticket_id}} cancelled",
+				HTML:    notificationEmailCard("#64748b", "Support ticket cancelled", `<p>Hello {{recipient_name}},</p><p>Support staff have cancelled your ticket <strong>#{{ticket_id}}: {{ticket_title}}</strong>.</p><p>You can sign in to view the ticket and conversation history.</p><p>{{ticket_url}}</p><p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from ticket emails</a></p>`),
+			},
+			notificationEmailLocaleChinese: {
+				Subject: "[{{site_name}}] 工单 #{{ticket_id}} 已撤销",
+				HTML:    notificationEmailCard("#64748b", "工单已撤销", `<p>{{recipient_name}}，您好：</p><p>客服已撤销您的工单 <strong>#{{ticket_id}}：{{ticket_title}}</strong>。</p><p>您可以登录站点，查看工单和历史对话。</p><p>{{ticket_url}}</p><p class="muted"><a href="{{unsubscribe_url}}">退订工单邮件通知</a></p>`),
+			},
+		},
+		NotificationEmailEventTicketCompleted: {
+			notificationEmailDefaultLocale: {
+				Subject: "[{{site_name}}] Ticket #{{ticket_id}} completed",
+				HTML:    notificationEmailCard("#16a34a", "Support ticket completed", `<p>Hello {{recipient_name}},</p><p>Support staff have completed your ticket <strong>#{{ticket_id}}: {{ticket_title}}</strong>.</p><p>You can sign in to view the ticket and conversation history.</p><p>{{ticket_url}}</p><p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from ticket emails</a></p>`),
+			},
+			notificationEmailLocaleChinese: {
+				Subject: "[{{site_name}}] 工单 #{{ticket_id}} 已完成",
+				HTML:    notificationEmailCard("#16a34a", "工单已完成", `<p>{{recipient_name}}，您好：</p><p>客服已完成您的工单 <strong>#{{ticket_id}}：{{ticket_title}}</strong>。</p><p>您可以登录站点，查看工单和历史对话。</p><p>{{ticket_url}}</p><p class="muted"><a href="{{unsubscribe_url}}">退订工单邮件通知</a></p>`),
+			},
+		},
+		NotificationEmailEventTicketStaffReply: {
+			notificationEmailDefaultLocale: {
+				Subject: "[{{site_name}}] Reply to ticket #{{ticket_id}}",
+				HTML:    notificationEmailCard("#2563eb", "Support ticket update", `<p>Hello {{recipient_name}},</p><p>Staff have replied to your ticket <strong>#{{ticket_id}}: {{ticket_title}}</strong>.</p><p>Please sign in and open Support tickets to read and reply.</p><p>{{ticket_url}}</p><p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from ticket emails</a></p>`),
+			},
+			notificationEmailLocaleChinese: {
+				Subject: "[{{site_name}}] 工单 #{{ticket_id}} 有新回复",
+				HTML:    notificationEmailCard("#2563eb", "工单有新回复", `<p>{{recipient_name}}，您好：</p><p>处理人员回复了您的工单 <strong>#{{ticket_id}}：{{ticket_title}}</strong>。</p><p>请登录站点，在工单页面查看并回复。</p><p>{{ticket_url}}</p><p class="muted"><a href="{{unsubscribe_url}}">退订工单邮件通知</a></p>`),
+			},
+		},
 		NotificationEmailEventTeamOwnershipTransfer: {
 			notificationEmailDefaultLocale: {
 				Subject: "[{{site_name}}] Team ownership transfer",
@@ -1219,6 +1257,13 @@ func (s *NotificationEmailService) sampleVariables(ctx context.Context, event, l
 func (s *NotificationEmailService) runtimeVariables(ctx context.Context, event, languageCode string, input NotificationEmailSendInput) map[string]string {
 	ctx = locale.WithLanguage(ctx, languageCode)
 	variables := s.sampleVariables(ctx, event, languageCode)
+	// Live support mail clears preview identifiers before applying committed event
+	// variables, so an incomplete caller cannot send a sample ticket destination.
+	if notificationEmailEventDefinitions[event].Category == "ticket" {
+		for _, key := range []string{"ticket_id", "ticket_title", "ticket_url"} {
+			variables[key] = ""
+		}
+	}
 	maps.Copy(variables, input.Variables)
 	if event == NotificationEmailEventOpsScheduledReport {
 		// Runtime reports can supply only detailed HTML. Clear unsupplied preview
@@ -1346,17 +1391,21 @@ func (s *NotificationEmailService) createUnsubscribeToken(ctx context.Context, e
 // returned event claims still require Unsubscribe's supported/optional-event checks.
 //
 // Signature comparison covers the encoded payload before JSON is interpreted,
-// tying the claim fields to the supplied signature. unsubscribeSecret can
-// initialize a missing secret during this lookup, so parsing may perform a
-// settings write before accepting or rejecting the token signature.
+// tying the claim fields to the supplied signature. Verification reads the
+// existing signing secret and rejects an absent value, so opening a preference
+// link cannot create configuration or change recipient preferences.
 func (s *NotificationEmailService) parseUnsubscribeToken(ctx context.Context, token string) (notificationEmailUnsubscribeClaims, error) {
 	parts := strings.Split(strings.TrimSpace(token), ".")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return notificationEmailUnsubscribeClaims{}, errors.New("invalid unsubscribe token")
 	}
-	secret, err := s.unsubscribeSecret(ctx)
+	secret, err := s.settingRepo.GetValue(ctx, notificationEmailUnsubscribeSecretKey)
 	if err != nil {
 		return notificationEmailUnsubscribeClaims{}, err
+	}
+	secret = strings.TrimSpace(secret)
+	if secret == "" {
+		return notificationEmailUnsubscribeClaims{}, errors.New("invalid unsubscribe token")
 	}
 	// Verify the supplied encoded payload before decoding its claims. This order
 	// ties every interpreted recipient, event, and expiry value to the successful signature comparison.
@@ -1606,6 +1655,7 @@ func notificationEmailTemplateKey(event, locale string) string {
 // the NUL component separator distinguishes the normalized event/address pair
 // from the older colon-separated preference representation read for compatibility.
 func notificationEmailPreferenceKey(event, email string) string {
+	event = notificationEmailPreferenceEvent(event)
 	if strings.TrimSpace(event) == "" || strings.TrimSpace(email) == "" {
 		return ""
 	}
@@ -1618,6 +1668,7 @@ func notificationEmailPreferenceKey(event, email string) string {
 // An empty normalized address still leaves the event's colon prefix in this
 // compatibility key, reproducing that format for legacy reads.
 func legacyNotificationEmailPreferenceKey(event, email string) string {
+	event = notificationEmailPreferenceEvent(event)
 	return notificationEmailPreferenceKeyPrefix + event + ":" + NotificationEmailHash(email)
 }
 
@@ -1735,6 +1786,9 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 			"site_name":           defaultSiteName,
 			"recipient_name":      "张三",
 			"recipient_email":     "user@example.com",
+			"ticket_id":           "1024",
+			"ticket_title":        "接口使用咨询",
+			"ticket_url":          "https://example.com/tickets/1024",
 			"verification_code":   "123456",
 			"expires_in_minutes":  "15",
 			"reset_url":           "https://example.com/reset-password?token=preview",
@@ -1789,6 +1843,9 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 	variables := map[string]string{
 		"site_name":           defaultSiteName,
 		"recipient_name":      "Alex",
+		"ticket_id":           "1024",
+		"ticket_title":        "API usage question",
+		"ticket_url":          "https://example.com/tickets/1024",
 		"recipient_email":     "user@example.com",
 		"verification_code":   "123456",
 		"expires_in_minutes":  "15",
@@ -2108,4 +2165,61 @@ func notificationEmailCard(accent, title, content string, language ...string) st
   </div>
 </body>
 </html>`
+}
+
+// PreviewUnsubscribe validates an unexpired signed token and returns its
+// optional event and recipient. It reads existing signing configuration and
+// performs no preference writes, allowing safe link previews before explicit
+// confirmation.
+func (s *NotificationEmailService) PreviewUnsubscribe(ctx context.Context, token string) (NotificationEmailUnsubscribeResult, error) {
+	claims, err := s.parseUnsubscribeToken(ctx, token)
+	if err != nil {
+		return NotificationEmailUnsubscribeResult{}, err
+	}
+	info, normalizedEvent, err := s.eventInfo(claims.Event)
+	if err != nil {
+		return NotificationEmailUnsubscribeResult{}, err
+	}
+	if !info.Optional {
+		return NotificationEmailUnsubscribeResult{}, fmt.Errorf("%s is transactional and cannot be unsubscribed", normalizedEvent)
+	}
+	return NotificationEmailUnsubscribeResult{Event: normalizedEvent, Email: claims.Email, Done: false}, nil
+}
+
+// ResubscribeTicketNotifications validates a signed ticket link and persists an
+// explicit subscribed preference. Other optional event tokens cannot authorize
+// this restoration, and invalid or expired tokens fail before writing settings.
+// The current hashed preference key takes precedence over historical unsubscribe
+// keys. Saving subscribed there restores all three support events together while
+// retaining unrelated notification preferences. The caller exposes this method
+// through an explicit POST confirmation; reading the token link alone leaves the
+// existing recipient choice intact.
+func (s *NotificationEmailService) ResubscribeTicketNotifications(ctx context.Context, token string) (NotificationEmailUnsubscribeResult, error) {
+	result, err := s.PreviewUnsubscribe(ctx, token)
+	if err != nil {
+		return NotificationEmailUnsubscribeResult{}, err
+	}
+	if notificationEmailPreferenceEvent(result.Event) != NotificationEmailEventTicketStaffReply {
+		return NotificationEmailUnsubscribeResult{}, errors.New("only ticket notifications can be restored with this action")
+	}
+	// The current hashed key overrides historical unsubscribe records, restoring
+	// the ticket category after confirmation without rewriting length-sensitive legacy keys.
+	if err := s.settingRepo.Set(ctx, notificationEmailPreferenceKey(NotificationEmailEventTicketStaffReply, result.Email), "subscribed"); err != nil {
+		return NotificationEmailUnsubscribeResult{}, err
+	}
+	result.Done = true
+	return result, nil
+}
+
+// notificationEmailPreferenceEvent maps closure mail to the shared ticket-reply
+// preference. Other event identifiers remain independent, keeping unsubscribe or
+// restoration scoped to the recipient notification category represented by the
+// signed token.
+func notificationEmailPreferenceEvent(event string) string {
+	switch event {
+	case NotificationEmailEventTicketCompleted, NotificationEmailEventTicketCancelled:
+		return NotificationEmailEventTicketStaffReply
+	default:
+		return event
+	}
 }

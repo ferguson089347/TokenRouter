@@ -22,6 +22,7 @@ import (
 	servermiddleware "github.com/TokenFlux/TokenRouter/internal/server/middleware"
 	sitehttp "github.com/TokenFlux/TokenRouter/internal/site/httpapi"
 	teamhttp "github.com/TokenFlux/TokenRouter/internal/team/httpapi"
+	tickethttp "github.com/TokenFlux/TokenRouter/internal/ticket/httpapi"
 	usagehttp "github.com/TokenFlux/TokenRouter/internal/usage/httpapi"
 )
 
@@ -146,6 +147,7 @@ func providePaymentRouteMount(user *paymenthttp.PaymentHandler, webhook *payment
 // group guards.
 func provideUserRouteMount(
 	eRemotePool *poolhttp.RemoteAccountPoolHandler,
+	eTickets *tickethttp.TicketHandler,
 	eUserPromotion *promotionhttp.UserHandler,
 	eSubscription *billinghttp.SubscriptionHandler,
 	eAnnouncement *sitehttp.AnnouncementHandler,
@@ -174,6 +176,7 @@ func provideUserRouteMount(
 		creativehttp.RegisterUserRoutes(authenticated, eCreative, security.Panel.Heavy())
 		sitehttp.RegisterUserRoutes(authenticated, eAnnouncement)
 		poolhttp.RegisterUserRoutes(authenticated, eRemotePool)
+		tickethttp.RegisterUserRoutes(authenticated, eTickets)
 		billinghttp.RegisterUserRoutes(authenticated, eRedeem, eSubscription)
 	}
 }

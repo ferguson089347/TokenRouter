@@ -23,6 +23,7 @@ const appStore = vi.hoisted(() => ({
   backendModeEnabled: false,
   publicSettingsLoaded: false,
   cachedPublicSettings: null as null | {
+    ticket_enabled?: boolean
     payment_enabled?: boolean
     risk_control_enabled?: boolean
     team_enabled?: boolean
@@ -149,6 +150,7 @@ describe('feature route guard', () => {
     ['team', { requiresTeam: true }, '/team'],
     ['usage ranking', { requiresUsageRanking: true }, '/usage-ranking'],
     ['creative', { requiresCreative: true }, '/creative'],
+    ['tickets', { requiresTickets: true }, '/tickets'],
   ])('does not treat a failed %s settings load as explicitly disabled', async (_name, meta, path) => {
     authStore.isAdmin = path.startsWith('/admin/')
     appStore.fetchPublicSettings.mockResolvedValue(null)
@@ -162,6 +164,8 @@ describe('feature route guard', () => {
   })
 
   it.each([
+    ['tickets', { requiresTickets: true }, { ticket_enabled: false }, '/dashboard', false],
+    ['tickets admin', { requiresTickets: true }, { ticket_enabled: false }, '/admin/settings?tab=tickets', true],
     ['payment', { requiresPayment: true }, { payment_enabled: false }, '/dashboard', false],
     [
       'risk control',

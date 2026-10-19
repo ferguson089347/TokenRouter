@@ -27,6 +27,7 @@ import (
 	routesettings "github.com/TokenFlux/TokenRouter/internal/settings/httpapi"
 	routesite "github.com/TokenFlux/TokenRouter/internal/site/httpapi"
 	"github.com/TokenFlux/TokenRouter/internal/team/httpapi"
+	tickethttp "github.com/TokenFlux/TokenRouter/internal/ticket/httpapi"
 	routeusageadmin "github.com/TokenFlux/TokenRouter/internal/usage/httpapi/admin"
 )
 
@@ -42,6 +43,7 @@ import (
 // audit, and terminology middleware first, then passes step-up into sensitive
 // module registrars and team transfer or dissolution routes.
 func provideAdminRouteMount(eRemotePool *poolhttp.RemoteAccountPoolHandler,
+	eTickets *tickethttp.TicketHandler,
 	eAdminTLSFingerprintProfile *routeegress.TLSFingerprintProfileHandler,
 	eAdminSchedulerDiagnostics *routescheduler.DiagnosticsHandler,
 	eAdminTLSFingerprintRouter *routeegress.TLSFingerprintRouterHandler,
@@ -105,6 +107,7 @@ func provideAdminRouteMount(eRemotePool *poolhttp.RemoteAccountPoolHandler,
 			// Provider and group forms share this read-only capability catalogue.
 			admin.GET("/protocol-capabilities", protocolCatalog)
 			poolhttp.RegisterAdminRoutes(admin, eRemotePool)
+			tickethttp.RegisterAdminRoutes(admin, eTickets)
 			// Dashboard routes.
 			{
 				routeusageadmin.RegisterDashboardRoutes(admin, eAdminDashboard)

@@ -5,6 +5,11 @@
 
 import 'vue-router'
 
+// meta.d.ts declares access requirements and page presentation metadata shared
+// by route definitions and navigation guards. Optional feature switches let
+// public settings control entry availability while authentication and role
+// requirements remain independent checks for every routed page.
+
 declare module 'vue-router' {
   interface RouteMeta {
     /**
@@ -66,6 +71,9 @@ declare module 'vue-router' {
      * @default false
      */
     requiresUsageRanking?: boolean
+
+    /** requiresTickets checks support availability before opening user or administrator pages. */
+    requiresTickets?: boolean
 
     /**
      * 是否要求创作台功能开关已启用

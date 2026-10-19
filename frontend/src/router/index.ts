@@ -28,6 +28,45 @@ initializeTfCliImportSession()
  * routes defines lazy page components, translated headings, and access requirements for public, user, and administrator destinations.
  */
 const routes: RouteRecordRaw[] = [
+  {
+    path: '/tickets',
+    name: 'Tickets',
+    component: () => import('@/views/tickets/TicketsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, requiresTickets: true, title: 'My Tickets', titleKey: 'tickets.title', descriptionKey: 'tickets.description' }
+  },
+  {
+    path: '/tickets/:id/attachments/:attachmentId/preview',
+    name: 'TicketAttachmentPreview',
+    component: () => import('@/views/tickets/TicketAttachmentPreviewView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, requiresTickets: true, title: 'Attachment preview', titleKey: 'tickets.preview.title', hidePageHeading: true }
+  },
+  {
+    path: '/tickets/:id',
+    name: 'TicketDetail',
+    component: () => import('@/views/tickets/TicketDetailView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, requiresTickets: true, title: 'Ticket', titleKey: 'tickets.conversation', hidePageHeading: true }
+  },
+  {
+    path: '/admin/tickets',
+    name: 'AdminTickets',
+    component: () => import('@/views/tickets/TicketsView.vue'),
+    props: { admin: true },
+    meta: { requiresAuth: true, requiresAdmin: true, requiresTickets: true, title: 'Ticket Management', titleKey: 'tickets.adminTitle', descriptionKey: 'tickets.adminDescription' }
+  },
+  {
+    path: '/admin/tickets/:id/attachments/:attachmentId/preview',
+    name: 'AdminTicketAttachmentPreview',
+    component: () => import('@/views/tickets/TicketAttachmentPreviewView.vue'),
+    props: { admin: true },
+    meta: { requiresAuth: true, requiresAdmin: true, requiresTickets: true, title: 'Attachment preview', titleKey: 'tickets.preview.title', hidePageHeading: true }
+  },
+  {
+    path: '/admin/tickets/:id',
+    name: 'AdminTicketDetail',
+    component: () => import('@/views/tickets/TicketDetailView.vue'),
+    props: { admin: true },
+    meta: { requiresAuth: true, requiresAdmin: true, requiresTickets: true, title: 'Ticket', titleKey: 'tickets.conversation', hidePageHeading: true }
+  },
   // ==================== Setup Routes ====================
   {
     path: '/setup',
@@ -931,6 +970,7 @@ router.beforeEach(async (to, _from, next) => {
     || to.meta.requiresTeam
     || to.meta.requiresUsageRanking
     || to.meta.requiresCreative
+    || to.meta.requiresTickets
   if (requiresPublicFeature && !appStore.publicSettingsLoaded) {
     try {
       await appStore.fetchPublicSettings()
@@ -983,6 +1023,11 @@ router.beforeEach(async (to, _from, next) => {
     appStore.cachedPublicSettings?.creative_enabled === false
   ) {
     next(authStore.isAdmin ? '/admin/settings' : '/dashboard')
+    return
+  }
+
+  if (to.meta.requiresTickets && appStore.publicSettingsLoaded && appStore.cachedPublicSettings?.ticket_enabled === false) {
+    next(authStore.isAdmin ? '/admin/settings?tab=tickets' : '/dashboard')
     return
   }
 

@@ -127,6 +127,7 @@ func (h *PublicHandler) GetPublicSettings(c *gin.Context) {
 		TeamEnabled:                         settings.TeamEnabled,
 		TeamSelfServiceEnabled:              settings.TeamSelfServiceEnabled,
 		CreativeEnabled:                     settings.CreativeEnabled,
+		TicketEnabled:                       settings.TicketEnabled,
 		Version:                             h.version,
 		ServerTimezone:                      zone,
 		ServerUTCOffset:                     offset,

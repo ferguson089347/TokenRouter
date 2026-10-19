@@ -88,6 +88,20 @@ describe('useAppStore', () => {
     localStorage.clear()
   })
 
+  it('keeps a confirmed ticket switch when an earlier settings refresh finishes', async () => {
+    const store = useAppStore()
+    vi.mocked(getPublicSettings).mockResolvedValueOnce(createPublicSettings({ ticket_enabled: true }))
+    await store.fetchPublicSettings()
+    const deferred = createDeferred<PublicSettings>()
+    vi.mocked(getPublicSettings).mockReturnValueOnce(deferred.promise)
+    const refresh = store.fetchPublicSettings(true)
+    await store.syncTicketModuleEnabled(false)
+    deferred.resolve(createPublicSettings({ ticket_enabled: true }))
+    await refresh
+    expect(store.cachedPublicSettings?.ticket_enabled).toBe(false)
+    expect(window.__APP_CONFIG__?.ticket_enabled).toBe(false)
+  })
+
   // --- Toast 消息管理 ---
 
   describe('Toast 消息管理', () => {

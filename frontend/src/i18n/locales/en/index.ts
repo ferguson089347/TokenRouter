@@ -1,3 +1,4 @@
+import tickets from './tickets'
 import remotePool from './remotePool'
 import landing from './landing'
 import common from './common'
@@ -16,6 +17,7 @@ import requests from './requests'
 
 export default {
   ...remotePool,
+  ...tickets,
   requests,
   legal: {
     "login": "Log in",

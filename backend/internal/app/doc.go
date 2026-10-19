@@ -15,6 +15,7 @@
 //   - identity_*.go, apikey*.go, and team.go bind identity, API key, and team services.
 //   - billing.go, payment_*.go, and routing_*.go bind funds, payments, groups, and pricing.
 //   - tasks.go, task_storage.go, creative_*.go, and batch_image_*.go bind persistent tasks and image generation.
+//   - ticket.go binds support persistence, settings, notification delivery, and worker lifecycle.
 //   - settings_*.go, site_public.go, and http_*.go bind runtime settings, public site data, and HTTP handlers.
 //   - storage.go and scheduler*.go construct shared storage and scheduling resources.
 //   - runtime*.go registers subsystem lifecycle hooks and readiness dependencies.

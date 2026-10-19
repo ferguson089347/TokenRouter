@@ -96,6 +96,7 @@ export default {
         users: '用户默认值',
         gateway: '网关服务',
         email: '邮件设置',
+"tickets": "工单设置",
         backup: '数据备份',
         payment: '支付设置',
       },

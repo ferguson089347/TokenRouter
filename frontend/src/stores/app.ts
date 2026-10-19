@@ -14,6 +14,16 @@ import {
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
 
+// app.ts manages public site settings, navigation state, and transient user
+// feedback for the current browser. Public API requests are shared while in
+// flight, and successful settings resolution updates both reactive consumers
+// and the runtime configuration injected into the page.
+//
+// Dedicated ticket settings can finish while an earlier public-settings read
+// remains active. A revision records each confirmed switch update, and that
+// earlier read merges the confirmed switch before publishing its other values.
+// This keeps navigation consistent with an administrator save while allowing
+// later fresh reads to observe changes from other browser sessions or servers.
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
 
@@ -33,6 +43,8 @@ export const useAppStore = defineStore('app', () => {
   const apiBaseUrl = ref<string>('')
   const docUrl = ref<string>('')
   const cachedPublicSettings = ref<PublicSettings | null>(null)
+  let ticketSettingsRevision = 0
+  let lastSavedTicketEnabled: boolean | undefined
   let publicSettingsRequest: Promise<PublicSettings | null> | null = null
 
   // 版本信息缓存状态
@@ -329,8 +341,14 @@ export const useAppStore = defineStore('app', () => {
       return Promise.resolve(null)
     }
 
+    const ticketRevisionAtRequest = ticketSettingsRevision
     const request = apiRequest
       .then((data) => {
+        // A confirmed module update wins over a public GET that began before
+        // that update, keeping navigation consistent with the settings just saved.
+        if (ticketRevisionAtRequest !== ticketSettingsRevision && lastSavedTicketEnabled !== undefined) {
+          data = { ...data, ticket_enabled: lastSavedTicketEnabled }
+        }
         applySettings(data)
         return data
       })
@@ -368,6 +386,18 @@ export const useAppStore = defineStore('app', () => {
       return true
     }
     return false
+  }
+
+  // syncTicketModuleEnabled publishes a confirmed support-module setting to navigation.
+  // Settings requests can overlap this update, so the revision above protects
+  // the saved value until that earlier request has finished applying its result.
+  async function syncTicketModuleEnabled(enabled: boolean): Promise<void> {
+    const revision = ++ticketSettingsRevision
+    lastSavedTicketEnabled = enabled
+    const config = cachedPublicSettings.value ?? await fetchPublicSettings()
+    if (config && revision === ticketSettingsRevision) {
+      applySettings({ ...config, ticket_enabled: enabled })
+    }
   }
 
   // ==================== Return Store API ====================
@@ -426,6 +456,7 @@ export const useAppStore = defineStore('app', () => {
 
     // Public settings actions
     fetchPublicSettings,
+    syncTicketModuleEnabled,
     clearPublicSettingsCache,
     initFromInjectedConfig
   }

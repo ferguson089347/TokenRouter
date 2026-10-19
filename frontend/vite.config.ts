@@ -3,6 +3,11 @@ import vue from '@vitejs/plugin-vue'
 import checker from 'vite-plugin-checker'
 import { resolve } from 'path'
 
+// vite.config.ts configures frontend compilation, embedded asset delivery, and
+// local development requests. Bundled PDF workers share a fixed decoder resource
+// directory, while other assets use content hashes so deployments can cache
+// immutable frontend resources alongside the application binary.
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
     '&': '&amp;',
@@ -108,6 +113,13 @@ export default defineConfig(({ mode }) => {
     emptyOutDir: true,
     rolldownOptions: {
       output: {
+        // PDF workers load these bundled decoders by their documented filenames.
+        assetFileNames(assetInfo) {
+          if (assetInfo.names.some(name => ['openjpeg_nowasm_fallback.js', 'jbig2_nowasm_fallback.js'].includes(name))) {
+            return 'assets/pdfjs/[name][extname]'
+          }
+          return 'assets/[name]-[hash][extname]'
+        },
         strictExecutionOrder: true,
         codeSplitting: {
           groups: [{

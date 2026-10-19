@@ -80,6 +80,11 @@ var (
 	// auditBodyOmittedRoutes lists routes whose bodies contain credentials embedded in strings.
 	// Key-based redaction cannot safely inspect these values, so the entire body is omitted.
 	auditBodyOmittedRoutes = map[string]struct{}{
+		// Support text and private attachment payloads can contain credentials that
+		// have no recognizable JSON key, so audit retains route and actor metadata.
+		"POST /api/v1/tickets":                                       {},
+		"POST /api/v1/tickets/:id/replies":                           {},
+		"POST /api/v1/admin/tickets/:id/replies":                     {},
 		"PUT /api/v1/admin/remote-account-pool/settings":             {},
 		"POST /api/v1/auth/passkey/login/finish":                     {},
 		"POST /api/v1/user/passkeys/register/finish":                 {},

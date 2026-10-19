@@ -18,6 +18,9 @@ import (
 // calendarPublicSource supplies empty settings so the test exercises the injected calendar.
 type calendarPublicSource struct{}
 
+// ticketPublicSource supplies ticket availability for API and HTML comparison.
+type ticketPublicSource map[string]string
+
 // TestPublicCalendarMatchesAPIAndInjection supplies calendars with distinct zone names and display labels.
 // It verifies that API and HTML injection return the configured label and the
 // current UTC offset derived from the same injected calendar.
@@ -67,3 +70,40 @@ func (calendarPublicSource) LoadSitePublicInputs(context.Context) (site.PublicIn
 
 // PublicVersion returns the fixed source build label used by injection fixtures.
 func (calendarPublicSource) PublicVersion() string { return "calendar-contract" }
+
+// LoadSitePublicInputs returns the selected raw ticket setting for public resolution.
+func (s ticketPublicSource) LoadSitePublicInputs(context.Context) (site.PublicInputs, error) {
+	return site.PublicInputs{Values: s}, nil
+}
+
+// PublicVersion identifies the support availability fixture in public responses.
+func (ticketPublicSource) PublicVersion() string { return "ticket-test" }
+
+// TestTicketAvailabilityMatchesAPIAndInjection checks enabled defaults and an explicit
+// administrator disable. It verifies anonymous settings and injected HTML agree
+// while neither response exposes private ticket records.
+func TestTicketAvailabilityMatchesAPIAndInjection(t *testing.T) {
+	for _, value := range []string{"", "true", "false"} {
+		service := site.NewPublicService(ticketPublicSource{"ticket_enabled": value}, timezone.NewCalendar(time.UTC), "UTC")
+		handler := NewPublicHandler(service, "ticket-test")
+		response := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(response)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/settings/public", nil)
+		handler.GetPublicSettings(ctx)
+		require.Equal(t, 200, response.Code)
+		var envelope struct {
+			Data map[string]any `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &envelope))
+		injected, err := service.GetPublicSettingsForInjection(context.Background())
+		require.NoError(t, err)
+		encoded, err := json.Marshal(injected)
+		require.NoError(t, err)
+		var fields map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &fields))
+		for _, public := range []map[string]any{envelope.Data, fields} {
+			require.Equal(t, value != "false", public["ticket_enabled"])
+			require.NotContains(t, public, "tickets")
+		}
+	}
+}

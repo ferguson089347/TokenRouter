@@ -96,6 +96,7 @@ export default {
         users: 'Users',
         gateway: 'Gateway',
         email: 'Email',
+"tickets": "Tickets",
         backup: 'Backup',
         payment: 'Payment',
       },

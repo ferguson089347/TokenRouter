@@ -199,6 +199,8 @@ const groupExpandOverrides = ref<Map<string, boolean>>(new Map())
 
 // 批量图片入口还需要用户 API Key 和分组权限同时满足。
 const flagBatchImageAccess = () => canUseBatchImage.value
+// flagTicketAccess checks the confirmed public switch before showing support navigation.
+const flagTicketAccess = () => appStore.cachedPublicSettings?.ticket_enabled !== false
 // 创作台入口由功能开关控制（默认开），可用模型以页面内目录为准。
 const flagCreativeStudioAccess = () => appStore.cachedPublicSettings?.creative_enabled !== false
 const flagTeamAccess = () => appStore.cachedPublicSettings?.team_enabled !== false
@@ -210,6 +212,7 @@ const userNavItems = computed((): NavItem[] => {
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
     { path: '/models', label: t('nav.modelMarketplace'), icon: 'modelMarketplace' as const },
     { path: '/usage-ranking', label: t('nav.usageRanking'), icon: 'ranking' as const, featureFlag: flagUsageRankingAccess },
+    { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
     { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
@@ -263,6 +266,7 @@ const personalNavItems = computed((): NavItem[] => {
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
     { path: '/models', label: t('nav.modelMarketplace'), icon: 'modelMarketplace' as const },
     { path: '/usage-ranking', label: t('nav.usageRanking'), icon: 'ranking' as const, featureFlag: flagUsageRankingAccess },
+    { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
     { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
@@ -353,6 +357,7 @@ const adminNavItems = computed((): NavItem[] => {
           : []),
       ],
     },
+    { path: '/admin/tickets', label: t('tickets.adminTitle'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
     { path: '/admin/remote-account-pool', label: t('remotePool.settingsTitle'), icon: 'server' as const },
     { path: '/admin/providers', label: t('nav.providers'), icon: 'globe' as const },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: 'bell' as const },

@@ -3,6 +3,8 @@ package notification
 import (
 	"context"
 	"errors"
+	"mime"
+	"net/mail"
 	"strings"
 	"testing"
 
@@ -306,6 +308,9 @@ func TestNotificationEmailAuthTemplatesAreListedAndPreviewable(t *testing.T) {
 func TestNotificationEmailEventOrderAndCopies(t *testing.T) {
 	svc := NewNotificationEmailService(mailtest.NewMemorySettings(), nil)
 	want := []string{
+		NotificationEmailEventTicketCancelled,
+		NotificationEmailEventTicketCompleted,
+		NotificationEmailEventTicketStaffReply,
 		NotificationEmailEventAuthVerifyCode,
 		NotificationEmailEventAuthPasswordReset,
 		NotificationEmailEventNotificationEmailVerifyCode,
@@ -776,4 +781,210 @@ func (s *localeDelivery) SendEmail(ctx context.Context, _, subject, body string)
 	s.language, s.subject, s.body = locale.FromContext(ctx), subject, body
 	s.count++
 	return nil
+}
+
+// TestNotificationEmailTicketRepliesSendEachMessageOnce sends distinct replies
+// through SMTP with persistent source identities. It verifies separate messages
+// deliver independently and each replay is suppressed after successful delivery.
+func TestNotificationEmailTicketRepliesSendEachMessageOnce(t *testing.T) {
+	ctx := context.Background()
+	repo := mailtest.NewMemorySettings()
+	smtpServer := mailtest.StartSMTPServer(t)
+	require.NoError(t, repo.SetMultiple(ctx, smtpServer.Settings()))
+	svc := NewNotificationEmailService(repo, NewMailer(repo, smtp.New()))
+	messageIDs := make(map[string]bool)
+	for i, id := range []string{"101", "102", "103"} {
+		input := NotificationEmailSendInput{
+			Event: NotificationEmailEventTicketStaffReply, RecipientEmail: "user@example.com", UserID: 7,
+			SourceType: "support_ticket_message", SourceID: id,
+			Variables: map[string]string{"ticket_id": "10", "ticket_title": "连续回复", "ticket_url": "https://example.com/tickets/10"},
+		}
+		require.NoError(t, svc.Send(ctx, input))
+		require.EqualValues(t, i+1, smtpServer.MessageCount())
+		message, err := mail.ReadMessage(strings.NewReader(smtpServer.LastMessage()))
+		require.NoError(t, err)
+		messageID := message.Header.Get("Message-ID")
+		require.NotEmpty(t, messageID)
+		require.False(t, messageIDs[messageID], "不同消息不能复用SMTP Message-ID")
+		messageIDs[messageID] = true
+		require.NoError(t, svc.Send(ctx, input))
+		require.EqualValues(t, i+1, smtpServer.MessageCount(), "同消息重试必须去重")
+	}
+}
+
+// TestNotificationEmailTicketClosureTemplatesReachSMTP sends both terminal
+// support events in English and Chinese. It verifies template substitution,
+// escaping, and independent delivery identities for replies and closing actions.
+func TestNotificationEmailTicketClosureTemplatesReachSMTP(t *testing.T) {
+	ctx := context.Background()
+	repo := mailtest.NewMemorySettings()
+	smtpServer := mailtest.StartSMTPServer(t)
+	require.NoError(t, repo.SetMultiple(ctx, smtpServer.Settings()))
+	svc := NewNotificationEmailService(repo, NewMailer(repo, smtp.New()))
+	count := int64(0)
+	for _, locale := range []string{"en", "zh-Hans"} {
+		id := "201"
+		if locale == "zh-Hans" {
+			id = "202"
+		}
+		for _, tc := range []struct{ event, en, zh string }{
+			{NotificationEmailEventTicketCompleted, "completed", "已完成"},
+			{NotificationEmailEventTicketCancelled, "cancelled", "已撤销"},
+		} {
+			t.Run(locale+"/"+tc.event, func(t *testing.T) {
+				info, _, err := svc.eventInfo(tc.event)
+				require.NoError(t, err)
+				require.True(t, info.Optional)
+				input := NotificationEmailSendInput{
+					Event: tc.event, Locale: locale, RecipientEmail: "user@example.com", RecipientName: "用户", UserID: 7,
+					SourceType: "support_ticket", SourceID: id,
+					Variables: map[string]string{"ticket_id": id, "ticket_title": "订单 <script>alert(1)</script>", "ticket_url": "https://example.com/tickets/" + id},
+				}
+				require.NoError(t, svc.Send(ctx, input))
+				count++
+				require.Equal(t, count, smtpServer.MessageCount())
+				message, err := mail.ReadMessage(strings.NewReader(smtpServer.LastMessage()))
+				require.NoError(t, err)
+				subject, err := (&mime.WordDecoder{}).DecodeHeader(message.Header.Get("Subject"))
+				require.NoError(t, err)
+				want := tc.en
+				if locale == "zh-Hans" {
+					want = tc.zh
+				}
+				require.Contains(t, subject, want)
+				body := smtpServer.LastMessageBody(t)
+				require.Contains(t, body, want)
+				require.Contains(t, body, "https://example.com/tickets/"+id)
+				require.Contains(t, body, "&lt;script&gt;")
+				require.NotContains(t, body, "<script>")
+				require.NotContains(t, body, "{{")
+				require.NoError(t, svc.Send(ctx, input))
+				require.Equal(t, count, smtpServer.MessageCount())
+			})
+		}
+	}
+}
+
+// TestNotificationEmailTicketEventsShareUnsubscribePreference supplies current
+// and historical preference records. It verifies each support event observes
+// the shared recipient choice while unrelated optional mail stays subscribed.
+func TestNotificationEmailTicketEventsShareUnsubscribePreference(t *testing.T) {
+	ctx := context.Background()
+	events := []string{NotificationEmailEventTicketStaffReply, NotificationEmailEventTicketCompleted, NotificationEmailEventTicketCancelled}
+	for _, preferenceKind := range []string{"legacy", "current", "completed", "cancelled"} {
+		t.Run(preferenceKind, func(t *testing.T) {
+			repo := mailtest.NewMemorySettings()
+			smtpServer := mailtest.StartSMTPServer(t)
+			require.NoError(t, repo.SetMultiple(ctx, smtpServer.Settings()))
+			svc := NewNotificationEmailService(repo, NewMailer(repo, smtp.New()))
+			switch preferenceKind {
+			case "legacy":
+				require.NoError(t, repo.Set(ctx, legacyNotificationEmailPreferenceKey(NotificationEmailEventTicketStaffReply, "user@example.com"), "unsubscribed"))
+			case "current":
+				require.NoError(t, repo.Set(ctx, notificationEmailPreferenceKey(NotificationEmailEventTicketStaffReply, "user@example.com"), "unsubscribed"))
+			default:
+				event := NotificationEmailEventTicketCompleted
+				if preferenceKind == "cancelled" {
+					event = NotificationEmailEventTicketCancelled
+				}
+				token, err := svc.createUnsubscribeToken(ctx, "user@example.com", event)
+				require.NoError(t, err)
+				result, err := svc.Unsubscribe(ctx, token)
+				require.NoError(t, err)
+				require.True(t, result.Done)
+			}
+			for _, event := range events {
+				unsubscribed, err := svc.IsUnsubscribed(ctx, "USER@example.com", event)
+				require.NoError(t, err)
+				require.True(t, unsubscribed)
+				require.NoError(t, svc.Send(ctx, NotificationEmailSendInput{Event: event, RecipientEmail: "user@example.com", SourceType: "support_ticket", SourceID: "10"}))
+			}
+			require.Zero(t, smtpServer.MessageCount())
+			unsubscribed, err := svc.IsUnsubscribed(ctx, "user@example.com", NotificationEmailEventBalanceLow)
+			require.NoError(t, err)
+			require.False(t, unsubscribed, "工单退订不能影响无关邮件类别")
+		})
+	}
+}
+
+// TestNotificationEmailPreviewUnsubscribeIsReadOnly opens invalid and valid signed
+// support links. It verifies previewing leaves signing configuration and recipient
+// preferences unchanged before a user submits an explicit confirmation.
+func TestNotificationEmailPreviewUnsubscribeIsReadOnly(t *testing.T) {
+	ctx := context.Background()
+	repo := mailtest.NewMemorySettings()
+	svc := NewNotificationEmailService(repo, nil)
+	_, err := svc.PreviewUnsubscribe(ctx, "payload.signature")
+	require.Error(t, err)
+	settings, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	require.Empty(t, settings)
+	token, err := svc.createUnsubscribeToken(ctx, "user@example.com", NotificationEmailEventTicketCompleted)
+	require.NoError(t, err)
+	before, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	preview, err := svc.PreviewUnsubscribe(ctx, token)
+	require.NoError(t, err)
+	require.False(t, preview.Done)
+	require.Equal(t, NotificationEmailEventTicketCompleted, preview.Event)
+	after, err := repo.GetAll(ctx)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+	for _, event := range []string{NotificationEmailEventTicketStaffReply, NotificationEmailEventTicketCompleted, NotificationEmailEventTicketCancelled} {
+		unsubscribed, err := svc.IsUnsubscribed(ctx, "user@example.com", event)
+		require.NoError(t, err)
+		require.False(t, unsubscribed)
+	}
+}
+
+// TestNotificationEmailTicketResubscribeRequiresExplicitTicketAction begins with
+// a historical unsubscribe record. It verifies a valid support token restores
+// the shared category while invalid and unrelated event tokens cannot authorize it.
+func TestNotificationEmailTicketResubscribeRequiresExplicitTicketAction(t *testing.T) {
+	ctx := context.Background()
+	repo := mailtest.NewMemorySettings()
+	smtpServer := mailtest.StartSMTPServer(t)
+	require.NoError(t, repo.SetMultiple(ctx, smtpServer.Settings()))
+	svc := NewNotificationEmailService(repo, NewMailer(repo, smtp.New()))
+	require.NoError(t, repo.Set(ctx, legacyNotificationEmailPreferenceKey(NotificationEmailEventTicketStaffReply, "user@example.com"), "unsubscribed"))
+	token, err := svc.createUnsubscribeToken(ctx, "user@example.com", NotificationEmailEventTicketStaffReply)
+	require.NoError(t, err)
+	_, err = svc.PreviewUnsubscribe(ctx, token)
+	require.NoError(t, err)
+	unsubscribed, err := svc.IsUnsubscribed(ctx, "user@example.com", NotificationEmailEventTicketCompleted)
+	require.NoError(t, err)
+	require.True(t, unsubscribed)
+	otherToken, err := svc.createUnsubscribeToken(ctx, "user@example.com", NotificationEmailEventBalanceLow)
+	require.NoError(t, err)
+	_, err = svc.ResubscribeTicketNotifications(ctx, otherToken)
+	require.Error(t, err)
+	_, err = svc.ResubscribeTicketNotifications(ctx, "tampered.token")
+	require.Error(t, err)
+	result, err := svc.ResubscribeTicketNotifications(ctx, token)
+	require.NoError(t, err)
+	require.True(t, result.Done)
+	for i, event := range []string{NotificationEmailEventTicketStaffReply, NotificationEmailEventTicketCompleted, NotificationEmailEventTicketCancelled} {
+		unsubscribed, err = svc.IsUnsubscribed(ctx, "user@example.com", event)
+		require.NoError(t, err)
+		require.False(t, unsubscribed)
+		require.NoError(t, svc.Send(ctx, NotificationEmailSendInput{Event: event, RecipientEmail: "user@example.com", SourceType: "support_ticket", SourceID: "10", Variables: map[string]string{"ticket_id": "10", "ticket_title": "恢复测试", "ticket_url": "https://example.com/tickets/10"}}))
+		require.EqualValues(t, i+1, smtpServer.MessageCount())
+	}
+}
+
+// TestNotificationEmailTicketPreviewSamplesDoNotLeakIntoDelivery renders support
+// preview examples and prepares an incomplete live request. It verifies sample
+// ticket identities remain in previews while actual delivery starts with blank identifiers.
+func TestNotificationEmailTicketPreviewSamplesDoNotLeakIntoDelivery(t *testing.T) {
+	ctx := context.Background()
+	svc := NewNotificationEmailService(mailtest.NewMemorySettings(), nil)
+	for _, event := range []string{NotificationEmailEventTicketStaffReply, NotificationEmailEventTicketCompleted, NotificationEmailEventTicketCancelled} {
+		preview, err := svc.PreviewTemplate(ctx, NotificationEmailPreviewInput{Event: event, Locale: "zh-Hans"})
+		require.NoError(t, err)
+		require.Contains(t, preview.HTML, "接口使用咨询")
+		variables := svc.runtimeVariables(ctx, event, "zh-Hans", NotificationEmailSendInput{RecipientEmail: "user@example.com"})
+		for _, key := range []string{"ticket_id", "ticket_title", "ticket_url"} {
+			require.Empty(t, variables[key])
+		}
+	}
 }

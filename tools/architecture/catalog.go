@@ -22,7 +22,8 @@ go.uber.org/zap golang.org/x/term gopkg.in/yaml.v3`, Tests: `github.com/coder/we
 github.com/testcontainers/testcontainers-go/modules/postgres
 github.com/testcontainers/testcontainers-go/modules/redis github.com/tidwall/gjson
 go.uber.org/zap/zaptest/observer modernc.org/sqlite`},
-		"core": {Production: `github.com/alitto/pond/v2 github.com/cespare/xxhash/v2 github.com/dgraph-io/ristretto
+		"core": {Production: `github.com/pdfcpu/pdfcpu/pkg/pdfcpu github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types
+github.com/alitto/pond/v2 github.com/cespare/xxhash/v2 github.com/dgraph-io/ristretto
 github.com/go-webauthn/webauthn/protocol github.com/go-webauthn/webauthn/webauthn
 github.com/golang-jwt/jwt/v5 github.com/google/uuid github.com/patrickmn/go-cache
 github.com/pquerna/otp github.com/pquerna/otp/totp github.com/robfig/cron/v3
@@ -104,6 +105,7 @@ github.com/stretchr/testify/suite`},
 
 	// moduleDependencies records the permitted module collaborations for production files and their independently scoped test adapters.
 	moduleDependencies = map[string]dependencySet{
+		"internal/ticket":     {Production: `internal/ticket/... internal/pkg/apperror internal/identity/httpapi/authctx internal/server/httpx`, Tests: `internal/testutil/postgrescontainer migrations`},
 		"internal/remotepool": {Production: `internal/pkg/ internal/remotepool/... internal/routing internal/settings internal/apikey internal/identity/httpapi/authctx internal/server/httpx`, Tests: "internal/identity internal/testutil/postgrescontainer"},
 		"internal/requestlog": {Production: `internal/requestlog/... internal/infra/telemetry/... internal/identity/httpapi/authctx internal/server/httpx`, Tests: `internal/testutil/postgrescontainer migrations`},
 		"internal/modelcatalog": {Production: `internal/pkg/locale internal/modelcatalog internal/modelcatalog/provider internal/billing/pricing
@@ -405,6 +407,7 @@ internal/upstream/zhipu/...`, Tests: ""},
 
 	// 窄权限属于指定文件，不能由相邻文件或目标子包继承。
 	filePermissions = []filePermission{
+		{Scope: "internal/ticket", Imports: "github.com/pdfcpu/pdfcpu/pkg/pdfcpu github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types", Files: "attachment_pdf.go"},
 		{Scope: "internal/gateway", Imports: "internal/modelcatalog/testkit", Files: "httpapi/grok_media_execution_test.go httpapi/helpers_test.go provider/creative_catalog_test.go provider/googleforward/gemini_attempts_external_test.go provider/googleforward/gemini_openai_external_test.go provider/googleforward/helpers_external_test.go provider/grok_codec_test.go provider/model_attributes_test.go provider/model_qualification_test.go provider/selection/candidate_policy_test.go testkit/runtime_settings.go ws/httpapi/openai_ws_http_bridge_test.go"},
 		// Protocol-event inspection is confined to the performance observer and its existing HTTP fixture.
 		{Scope: "internal/infra", Imports: "github.com/tidwall/gjson", Files: "telemetry/timing/events.go telemetry/timing/performance.go httpclient/upstream_pool_test.go"},
@@ -492,6 +495,7 @@ internal/routing/testkit`,
 	}
 
 	permissionChildImports = map[string]string{
+		"internal/ticket":                  "github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types",
 		"internal/gateway/provider":        "internal/modelcatalog/provider internal/modelcatalog/testkit",
 		"internal/testutil/rediscontainer": "github.com/testcontainers/testcontainers-go/modules/redis github.com/testcontainers/testcontainers-go/wait",
 		"internal/gateway/clientmeta":      "net/http/httptest",

@@ -206,6 +206,16 @@ import { useSettingsSaveTarget } from "@/composables/useSettingsSaveRegistry";
 import { useAppStore } from "@/stores";
 import { extractApiErrorMessage } from "@/utils/apiError";
 
+// EmailTemplateEditor.vue edits localized notification subjects and HTML and
+// previews their rendered output for administrators. Event metadata explains
+// when mail is sent, and server-provided placeholders guide substitutions in
+// each template, including private ticket identifiers and conversation links.
+//
+// A selected event and locale identify the saved template, while editable text
+// and preview results occupy separate state. The settings save registry tracks
+// unsaved template edits and delegates persistence to the template API. Built-in
+// metadata supplies labels and timing descriptions for known events, while
+// server metadata remains available for events outside that display catalog.
 const { t, locale } = useI18n();
 const appStore = useAppStore();
 
@@ -228,6 +238,9 @@ const fallbackPlaceholders = [
   "{{recharge_url}}",
   "{{recharge_amount}}",
   "{{order_id}}",
+  "{{ticket_id}}",
+  "{{ticket_title}}",
+  "{{ticket_url}}",
   "{{unsubscribe_url}}",
   "{{provider_id}}",
   "{{provider_name}}",
@@ -308,6 +321,22 @@ function localText(zh: string, en: string): string {
 }
 
 const eventDisplayMeta: Record<string, EventDisplayMeta> = {
+  "ticket.staff_reply": {
+    label: "工单回复通知",
+    timing: "客服每次提交新回复，且工单设置启用客服操作邮件通知时发送给工单用户。三类工单通知共用工单邮件退订偏好。",
+    categoryLabel: "工单",
+  },
+  "ticket.completed": {
+    label: "工单完成通知",
+    timing: "客服完成工单，且工单设置启用客服操作邮件通知时发送给工单用户；用户自行完成和自动过期不发送。三类工单通知共用工单邮件退订偏好。",
+    categoryLabel: "工单",
+  },
+  "ticket.cancelled": {
+    label: "工单撤销通知",
+    timing: "客服撤销工单，且工单设置启用客服操作邮件通知时发送给工单用户；用户自行撤销和自动过期不发送。三类工单通知共用工单邮件退订偏好。",
+    categoryLabel: "工单",
+  },
+
   "auth.verify_code": {
     label: "邮箱验证码",
     timing: "注册、绑定邮箱、OAuth 补全邮箱或 TOTP 邮箱校验时发送。",
@@ -386,6 +415,22 @@ const eventDisplayMeta: Record<string, EventDisplayMeta> = {
 };
 
 const eventDisplayMetaEn: Record<string, EventDisplayMeta> = {
+  "ticket.staff_reply": {
+    label: "Ticket Reply",
+    timing: "Sent to the ticket owner after every new support reply when support action email notifications are enabled. All three ticket notifications share the same unsubscribe preference.",
+    categoryLabel: "Tickets",
+  },
+  "ticket.completed": {
+    label: "Ticket Completed",
+    timing: "Sent to the ticket owner when support completes a ticket and support action email notifications are enabled. User-completed tickets and automatic expiry do not trigger this email. All three ticket notifications share the same unsubscribe preference.",
+    categoryLabel: "Tickets",
+  },
+  "ticket.cancelled": {
+    label: "Ticket Withdrawn",
+    timing: "Sent to the ticket owner when support withdraws a ticket and support action email notifications are enabled. User-withdrawn tickets and automatic expiry do not trigger this email. All three ticket notifications share the same unsubscribe preference.",
+    categoryLabel: "Tickets",
+  },
+
   "auth.verify_code": {
     label: "Email Verification Code",
     timing: "Sent for registration, email binding, OAuth pending email completion, or TOTP email verification.",
@@ -506,6 +551,7 @@ function formatCategory(category: string): string {
     admin: { zh: "管理告警", en: "Admin" },
     risk_control: { zh: "风控", en: "Risk Control" },
     ops: { zh: "运维", en: "Ops" },
+    ticket: { zh: "工单", en: "Tickets" },
   };
   const item = labels[normalized];
   return item ? localText(item.zh, item.en) : category;
