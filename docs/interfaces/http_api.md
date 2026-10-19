@@ -391,3 +391,7 @@ Grok 请求缓存开关使用 `X-TokenRouter-Grok-Client-Tool-Cache`，没有新
 ## SystemOne
 
 `POST /v1/systemone` 使用网关 API Key 认证，支持普通 Key 和复合 Key。分组开放 `systemone` 后，调度到已启用该协议的 Jev API Key 提供商。请求字段、成功响应和用量异常处理见 [Jev 与 SystemOne](jev_upstream.md)。
+
+## 远端号池列表
+
+用户通过 `GET /api/v1/account-pool` 和 `/account-pool/options` 查看绑定到可用本地分组的账号摘要。管理员后台只提供号池配置，通过 `/api/v1/admin/remote-account-pool/settings` 读取或保存 RT 和分组绑定，通过 `/source-groups` 读取远端绑定目录。两组路由沿用各自的认证、面板限流和审计。列表和选项按当前本地权限过滤，RT 失效时返回最近完整快照及提醒。字段、同步和权限规则见[远端号池](remote_account_pool.md)。

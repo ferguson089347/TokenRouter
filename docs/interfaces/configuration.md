@@ -133,6 +133,8 @@ setup 的数据库和 Redis 连接测试由精简版 bootstrap 执行，输入�
 
 usage、audit 和 ops 的静态参数，由 app 整理成各模块的 Options；动态的 Ops 设置和日志配置，由数据库里的键控制。统一的预聚合控制器在 `settings/preaggregation`，带十五秒缓存和更新通知。运行日志按"应用、持久化失败时回滚、清理 Reload"的顺序处理。
 
+`remote_account_pool` 保存远端号池配置、加密会话和最近完整快照，由专用号池页面维护。凭据持久化要求固定的 `TOTP_ENCRYPTION_KEY`，配置请求正文从审计记录中省略。具体的刷新、快照和本地权限规则见[远端号池](remote_account_pool.md)。
+
 ### 模块读取器
 
 创作台的运行开关和模型列表，由 app 直接注入 `creative.RuntimeSettings`，每次即时读取；路由容量使用同一个 `provider.QuotaSettingsCache`。各个读取器共用已经装配好的缓存实例。`settings/composite` 负责综合设置的组合、准备顺序和提交后的应用；`settings/httpapi` 负责扁平的请求绑定、权限、审计和响应。

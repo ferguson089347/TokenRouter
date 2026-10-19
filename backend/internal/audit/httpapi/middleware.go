@@ -80,6 +80,7 @@ var (
 	// auditBodyOmittedRoutes lists routes whose bodies contain credentials embedded in strings.
 	// Key-based redaction cannot safely inspect these values, so the entire body is omitted.
 	auditBodyOmittedRoutes = map[string]struct{}{
+		"PUT /api/v1/admin/remote-account-pool/settings":             {},
 		"POST /api/v1/auth/passkey/login/finish":                     {},
 		"POST /api/v1/user/passkeys/register/finish":                 {},
 		"POST /api/v1/admin/providers/import/codex-session":          {},

@@ -41,6 +41,10 @@ backend/
 │   ├── app/                                             应用装配、依赖绑定和运行资源登记
 │   │   ├── bootstrap/                                   数据库与 Redis 引导、迁移、密钥、时区及初始数据
 │   │   └── lifecycle/                                   分阶段启停、请求屏障、派生任务等待与重启
+│   ├── remotepool/                                      远端号池会话、完整快照与本地分组展示
+│   │   ├── httpapi/                                     用户查询和管理员号池配置
+│   │   ├── postgres/                                    settings 行锁与原子快照保存
+│   │   └── provider/                                    远端 JSON 请求与响应校验
 │   ├── requestlog/                                      请求摘要、内存批写与查询
 │   │   ├── httpapi/                                     管理员请求诊断详情
 │   │   └── postgres/                                    摘要、历史关联与归属查询
@@ -431,6 +435,7 @@ app/lifecycle 管理这些组件的启动和关闭。audit 独立记录操作审
 | requestlog | [请求 ID 与请求查询](../operations/request_lookup.md) |
 | usage、audit、ops | [数据生命周期](../operations/observability_and_data_lifecycle.md)、[监控告警](../operations/ops_monitoring_and_alerting.md)、[预聚合](../operations/pre_aggregation.md) |
 | backup | [备份与恢复](../operations/deployment_and_migrations.md#maintenance_execution) |
+| remotepool | [远端号池](../interfaces/remote_account_pool.md) |
 | settings、site | [配置](../interfaces/configuration.md)、[HTTP 与页面权限](../interfaces/http_api.md) |
 | idempotency | [面板命令幂等](../interfaces/http_api.md#write_idempotency) |
 | infra、pkg、testutil、cmd、ent、migrations、tests、scripts | [系统架构](system_architecture.md)、[开发验证](../operations/development_workflow.md)、[部署迁移](../operations/deployment_and_migrations.md) |

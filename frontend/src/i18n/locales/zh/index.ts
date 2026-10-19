@@ -1,3 +1,4 @@
+import remotePool from './remotePool'
 import landing from './landing'
 import common from './common'
 import dashboard from './dashboard'
@@ -8,7 +9,13 @@ import misc from './misc'
 import team from './team'
 import requests from './requests'
 
+// index.ts assembles the locale catalog used throughout the authenticated and
+// public frontend. Feature dictionaries share one language namespace so navigation,
+// page headings, forms, and status messages resolve consistently through the same
+// translation instance for this locale.
+
 export default {
+  ...remotePool,
   requests,
   legal: {
     "login": "登录",

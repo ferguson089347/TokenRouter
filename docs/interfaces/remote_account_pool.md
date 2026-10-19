@@ -1,0 +1,50 @@
+# 远端号池
+
+本文描述从另一台 TokenRouter 实例读取号池摘要时的认证、持久快照、本地分组展示和页面权限。本地分组决定展示权限、名称和倍率；网关的提供商管理和实际计费规则见[路由与结算](../domains/routing_and_billing.md)。
+
+<a id="configuration_security"></a>
+## 配置与凭据
+
+管理员在 `/admin/remote-account-pool` 配置远端站点、RT 和分组绑定，配置保存在 `settings.remote_account_pool`，不需要迁移。默认地址是 `https://aishenji.top`；也接受带部署路径前缀或以 `/api/v1` 结尾的地址。配置只允许 HTTP(S)，禁止 URL 凭据、查询参数和片段，外部请求不跟随重定向。
+
+RT 和取得的 AT 一并使用应用注入的 `SecretEncryptor` 加密保存，要求部署配置固定的 `TOTP_ENCRYPTION_KEY`；配置响应仅返回是否已配置及到期时间。审计记录不保存该配置请求的正文。系统不保存邮箱密码，也不调用远端登录接口。RT 留空表示保留原值；填写新 RT 清除旧 AT 和失效标记，但保留同一站点的最近成功快照。更换远端站点则清除原会话和快照。
+
+配置接口和远端分组目录仅限管理员：
+
+| 方法与路径 | 契约 |
+| --- | --- |
+| `GET /api/v1/admin/remote-account-pool/settings` | 脱敏配置、绑定、令牌状态、失效提醒和快照时间 |
+| `PUT /api/v1/admin/remote-account-pool/settings` | `enabled`、`base_url`、只写的 `refresh_token`、`bindings` |
+| `GET /api/v1/admin/remote-account-pool/source-groups` | 远端分组的 ID 和名称，仅供配置绑定；不包含远端倍率 |
+
+`bindings` 的每项为 `{remote_group_id, local_group_id}`。远端分组 ID 必须为正整数、不能重复；本地分组必须存在。多个远端分组可以绑定同一个本地分组。未绑定分组默认不展示。
+
+<a id="remote_pool_session"></a>
+## RT/AT 与快照生命周期
+
+数据请求按需同步，每分钟至多尝试一次；页面打开时也按分钟发起刷新。后端使用 `POST /api/v1/auth/refresh` 和 `{"refresh_token":"..."}` 获取 AT，并保存轮换后的 RT。AT 在到期前 30 秒刷新，远端只读接口返回 401 时再刷新并重试一次。网络故障或限流不调用登录接口。
+
+远端刷新接口返回 400、401 或 403 后持久保存 `auth_invalid`，停止后续自动刷新；管理员配置页显示更新 RT 的提醒。该提醒通过配置 API 和页面呈现，不发送邮件。管理员补充新 RT 后恢复同步。
+
+`remotepool` 管理会话、快照和分组权限，`remotepool/provider` 执行远端 HTTP 请求，`remotepool/postgres` 用共享数据库连接锁定并保存 settings 行，`remotepool/httpapi` 接收用户与管理员请求。app 注入本地分组读取器和用户个人分组权限服务。
+
+服务按绑定的远端分组分页收集账号，每页 500、每组最多 100 页；只有全部成功才替换持久快照。相同账号 ID 去重。快照仅保留展示允许的字段、远端分组 ID，丢弃远端分组名称、倍率和未声明字段。远端分组目录另外保存供管理员绑定辨识。同步总预算 55 秒，事务整体预算 60 秒，HTTP 单次超时 20 秒；同步开始后不随浏览器取消而中断，以便保存已经消费的轮换 RT。设置事务行锁串行化多实例同步和 RT 消费；更新失败仍提交已轮换的会话和提醒，不把部分列表覆盖旧快照。
+
+RT 失效、网络错误或数据不完整时返回最后一份完整快照及 `stale`、`auth_invalid`、`warning`、`snapshot_at`。首次同步失败且无快照时列表为空。分页和筛选始终在完整快照上进行，因此旧数据仍支持翻页和筛选。快照无自动过期删除；停用功能保留数据，站点变更清除数据。
+
+<a id="group_projection"></a>
+## 本地分组与展示权限
+
+用户访问 `/account-pool`，通过 `GET /api/v1/account-pool` 和 `/account-pool/options` 读取列表和筛选选项。管理员后台的 `/admin/remote-account-pool` 只提供站点、RT 和分组绑定配置；管理员的个人导航也可进入用户列表。列表接口要求登录，管理员配置和来源分组接口使用管理员认证、面板限流和审计。
+
+每次输出数据都重新读取本地分组：
+
+- 只保留已绑定且当前启用的本地分组。普通用户还必须通过现有个人作用域的可用分组规则，包括独占分组权限。
+- 账号没有可见分组时整条隐藏；有多个分组时只返回可见的本地分组，并按本地 ID 去重。
+- 分组 ID、名称和倍率全部来自本地分组。账号级远端倍率也被覆盖，`account_rate_enabled` 固定为 `false`；页面按本地分组分别显示倍率。
+- 筛选 `group_id` 使用本地分组 ID；`total` 和套餐选项只统计按本地权限筛选后可见的账号。远端分组 ID、名称和倍率不进入列表或用户筛选接口。
+- 旧快照也重新执行同样的本地权限检查，停用、删除、取消绑定或收回本地权限立即影响后续展示；本地名称和倍率变更无需等待远端同步。
+
+列表额外支持 `page`、`page_size`（1 至 500）、`search`、`plan_type` 和 `status`。展示账号平台、认证类型、套餐、状态、并发占用、用量窗口和最近使用时间，字段来自远端摘要，不能视为本地可调度账号或本地容量承诺。倍率仅用于列表展示，不改变本地实际计费。
+
+相关文档：[配置边界](configuration.md)、[HTTP 接口边界](http_api.md)、[身份与租户](../domains/identity_and_tenancy.md)、[接口目录](index.md)。

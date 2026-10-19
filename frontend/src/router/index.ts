@@ -25,7 +25,7 @@ import { initializeTfCliImportSession } from '@/utils/tfCliImport'
 initializeTfCliImportSession()
 
 /**
- * Route definitions with lazy loading
+ * routes defines lazy page components, translated headings, and access requirements for public, user, and administrator destinations.
  */
 const routes: RouteRecordRaw[] = [
   // ==================== Setup Routes ====================
@@ -221,6 +221,30 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Dashboard',
       titleKey: 'dashboard.title'
+    }
+  },
+  {
+    path: '/account-pool',
+    name: 'AccountPool',
+    component: () => import('@/views/RemoteAccountPoolView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Account Pool',
+      titleKey: 'remotePool.title',
+      descriptionKey: 'remotePool.description'
+    }
+  },
+  {
+    path: '/admin/remote-account-pool',
+    name: 'AdminRemoteAccountPool',
+    component: () => import('@/views/admin/RemoteAccountPoolSettingsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Pool Settings',
+      titleKey: 'remotePool.settingsTitle',
+      descriptionKey: 'remotePool.settingsDescription'
     }
   },
   {

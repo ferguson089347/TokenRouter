@@ -239,6 +239,47 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
 
+// TestRemotePoolSettingsOmitsAuditBody submits a remote refresh token in settings.
+// The completed administrator request produces one audit event with the full-body
+// omission marker, keeping the supplied credential out of persistent audit storage.
+func TestRemotePoolSettingsOmitsAuditBody(t *testing.T) {
+	require.Contains(t, auditBodyOmittedRoutes, "PUT /api/v1/admin/remote-account-pool/settings")
+
+	repository := &auditCaptureRepository{}
+	auditService := audit.NewAuditLogService(repository, nil)
+	auditService.Start()
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(authctx.ContextKeyUser), authctx.AuthSubject{UserID: 77})
+		c.Set(string(authctx.ContextKeyUserRole), "admin")
+		c.Next()
+	})
+	router.Use(gin.HandlerFunc(NewAuditLogMiddleware(auditService, audit.NewRedactor(nil))))
+	router.PUT("/api/v1/admin/remote-account-pool/settings", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	request := httptest.NewRequest(http.MethodPut, "/api/v1/admin/remote-account-pool/settings",
+		bytes.NewBufferString(`{"refresh_token":"audit-canary-rt"}`))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	// Stop waits for the writer's final drain, making the captured collection complete
+	// before assertions inspect the completed audit events saved by the middleware.
+	auditService.Stop()
+
+	// Read through the repository's collection lock after the drain, keeping snapshot
+	// access consistent with the synchronization used by both synchronous and batch insert helpers.
+	repository.mu.Lock()
+	logs := append([]*audit.AuditLog(nil), repository.logs...)
+	repository.mu.Unlock()
+	require.Len(t, logs, 1)
+	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
+	require.NotContains(t, logs[0].RequestBody, "audit-canary")
+}
+
 // TestPasskeyFinishRoutesOmitAuditBody checks the login and registration finish route keys.
 // Both must remain in the full-body omission map so the middleware selects that
 // capture policy for those endpoints.

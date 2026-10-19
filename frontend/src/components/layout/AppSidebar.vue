@@ -156,6 +156,11 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import { sanitizeSvg } from '@/utils/sanitize'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 
+// AppSidebar.vue renders user and administrator navigation with the shared icon
+// and menu styles. Role checks and public feature settings determine available
+// destinations, while custom menu entries and grouped administrator links share
+// the same expansion and mobile dismissal behavior.
+
 interface NavItem {
   path: string
   label: string
@@ -199,12 +204,13 @@ const flagCreativeStudioAccess = () => appStore.cachedPublicSettings?.creative_e
 const flagTeamAccess = () => appStore.cachedPublicSettings?.team_enabled !== false
 const flagUsageRankingAccess = () => appStore.cachedPublicSettings?.usage_ranking_enabled !== false
 
-// 普通用户导航项。
+// userNavItems combines authenticated user destinations with public feature flags and administrator-configured custom menu entries.
 const userNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
     { path: '/models', label: t('nav.modelMarketplace'), icon: 'modelMarketplace' as const },
     { path: '/usage-ranking', label: t('nav.usageRanking'), icon: 'ranking' as const, featureFlag: flagUsageRankingAccess },
+    { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
     { path: '/batch-image', label: t('nav.batchImage'), icon: 'batchImage' as const, featureFlag: flagBatchImageAccess },
@@ -251,12 +257,13 @@ const userNavItems = computed((): NavItem[] => {
   return visibleItems
 })
 
-// 管理员“我的提供商”分组使用的个人导航项
+// personalNavItems exposes user resources to administrators through the personal account section, including the user account directory.
 const personalNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
     { path: '/models', label: t('nav.modelMarketplace'), icon: 'modelMarketplace' as const },
     { path: '/usage-ranking', label: t('nav.usageRanking'), icon: 'ranking' as const, featureFlag: flagUsageRankingAccess },
+    { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
     { path: '/batch-image', label: t('nav.batchImage'), icon: 'batchImage' as const, featureFlag: flagBatchImageAccess },
@@ -317,7 +324,7 @@ const customMenuItemsForAdmin = computed(() => {
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
-// Admin navigation items
+// adminNavItems groups administrator destinations and applies current feature settings before rendering the management navigation links.
 const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
@@ -346,6 +353,7 @@ const adminNavItems = computed((): NavItem[] => {
           : []),
       ],
     },
+    { path: '/admin/remote-account-pool', label: t('remotePool.settingsTitle'), icon: 'server' as const },
     { path: '/admin/providers', label: t('nav.providers'), icon: 'globe' as const },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: 'bell' as const },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: 'server' as const },

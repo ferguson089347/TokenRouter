@@ -17,6 +17,7 @@ import (
 	routeops "github.com/TokenFlux/TokenRouter/internal/ops/httpapi"
 	routepromotion "github.com/TokenFlux/TokenRouter/internal/promotion/httpapi"
 	routeprovider "github.com/TokenFlux/TokenRouter/internal/provider/httpapi"
+	poolhttp "github.com/TokenFlux/TokenRouter/internal/remotepool/httpapi"
 	routerouting "github.com/TokenFlux/TokenRouter/internal/routing/httpapi"
 	routingdto "github.com/TokenFlux/TokenRouter/internal/routing/httpapi/dto"
 	routescheduler "github.com/TokenFlux/TokenRouter/internal/scheduler/httpapi"
@@ -40,7 +41,8 @@ import (
 // using constructed handlers. The callback installs administrator, panel,
 // audit, and terminology middleware first, then passes step-up into sensitive
 // module registrars and team transfer or dissolution routes.
-func provideAdminRouteMount(eAdminTLSFingerprintProfile *routeegress.TLSFingerprintProfileHandler,
+func provideAdminRouteMount(eRemotePool *poolhttp.RemoteAccountPoolHandler,
+	eAdminTLSFingerprintProfile *routeegress.TLSFingerprintProfileHandler,
 	eAdminSchedulerDiagnostics *routescheduler.DiagnosticsHandler,
 	eAdminTLSFingerprintRouter *routeegress.TLSFingerprintRouterHandler,
 	eAdminProviderCodexImport *routeprovider.CodexImportHandler,
@@ -102,6 +104,7 @@ func provideAdminRouteMount(eAdminTLSFingerprintProfile *routeegress.TLSFingerpr
 		{
 			// Provider and group forms share this read-only capability catalogue.
 			admin.GET("/protocol-capabilities", protocolCatalog)
+			poolhttp.RegisterAdminRoutes(admin, eRemotePool)
 			// Dashboard routes.
 			{
 				routeusageadmin.RegisterDashboardRoutes(admin, eAdminDashboard)
