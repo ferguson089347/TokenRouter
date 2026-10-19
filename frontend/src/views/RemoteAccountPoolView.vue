@@ -2,49 +2,96 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <form class="flex min-w-0 flex-1 items-center gap-2" @submit.prevent="applyFilters">
-            <div class="input-icon-wrap min-w-0 flex-1 sm:flex-none sm:w-64">
-              <Icon name="search" size="md" class="input-icon text-gray-400 dark:text-dark-400" />
-              <input
-                v-model="search"
-                type="search"
-                class="input input-has-icon"
-                :placeholder="t('remotePool.search')"
-                :aria-label="t('remotePool.search')"
-                @input="debouncedSearch"
-              />
-            </div>
-            <FilterDropdown :active-count="activeFilterCount" @reset="clearFilters">
-              <FilterField :label="t('remotePool.columns.groups')">
-                <Select
-                  v-model="groupID"
-                  :options="groupOptions"
-                  searchable
-                  @change="applyFilters"
-                />
-              </FilterField>
-              <FilterField :label="t('remotePool.allPlans')">
-                <Select v-model="planType" :options="planOptions" @change="applyFilters" />
-              </FilterField>
-              <FilterField :label="t('remotePool.columns.status')">
-                <Select v-model="status" :options="statusOptions" @change="applyFilters" />
-              </FilterField>
-            </FilterDropdown>
-          </form>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="btn btn-secondary btn-icon"
-              :title="t('common.refresh')"
-              :aria-label="t('common.refresh')"
-              :disabled="loading"
-              @click="refresh"
-            >
-              <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" />
-            </button>
+        <form class="flex flex-wrap items-center gap-2" @submit.prevent="applyFilters">
+          <div class="input-icon-wrap min-w-0 grow basis-full sm:basis-48 sm:max-w-64">
+            <Icon name="search" size="md" class="input-icon text-gray-400 dark:text-dark-400" />
+            <input
+              v-model="search"
+              type="search"
+              class="input input-has-icon"
+              :placeholder="t('remotePool.search')"
+              :aria-label="t('remotePool.search')"
+              @input="debouncedSearch"
+            />
           </div>
-        </div>
+          <Select
+            v-model="planType"
+            class="min-w-0 grow basis-40 sm:grow-0 sm:w-44"
+            :options="planOptions"
+            :aria-label="t('remotePool.accountType')"
+            searchable
+            @change="applyFilters"
+          >
+            <template #selected="{ option }">
+              <span
+                v-if="option?.value"
+                class="badge gap-1"
+                :class="planBadge(String(option.value), String(option.label)).classes"
+              >
+                <Icon
+                  :name="planBadge(String(option.value), String(option.label)).icon"
+                  size="xs"
+                  :animate-on-hover="false"
+                />{{ option.label }}
+              </span>
+              <span v-else>{{ t('remotePool.allTypes') }}</span>
+            </template>
+            <template #option="{ option, selected }">
+              <span
+                v-if="option.value"
+                class="badge gap-1"
+                :class="planBadge(String(option.value), String(option.label)).classes"
+              >
+                <Icon
+                  :name="planBadge(String(option.value), String(option.label)).icon"
+                  size="xs"
+                  :animate-on-hover="false"
+                />{{ option.label }}
+              </span>
+              <span v-else>{{ option.label }}</span>
+              <Icon
+                v-if="selected"
+                name="check"
+                size="sm"
+                class="ml-auto text-primary-500"
+                :animate-on-hover="false"
+              />
+            </template>
+          </Select>
+          <Select
+            v-model="status"
+            class="min-w-0 grow basis-36 sm:grow-0 sm:w-40"
+            :options="statusOptions"
+            :aria-label="t('remotePool.columns.status')"
+            @change="applyFilters"
+          />
+          <Select
+            v-model="groupID"
+            class="min-w-0 grow basis-44 sm:grow-0 sm:w-52"
+            :options="groupOptions"
+            :aria-label="t('remotePool.columns.groups')"
+            searchable
+            @change="applyFilters"
+          />
+          <button
+            v-if="activeFilterCount"
+            type="button"
+            class="btn btn-secondary"
+            @click="clearFilters"
+          >
+            <Icon name="x" size="sm" />{{ t('remotePool.clear') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-icon ml-auto"
+            :title="t('common.refresh')"
+            :aria-label="t('common.refresh')"
+            :disabled="loading"
+            @click="refresh"
+          >
+            <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" />
+          </button>
+        </form>
         <p v-if="snapshotStatus.snapshot_at" class="mt-2 text-xs text-gray-500 dark:text-dark-400">
           {{ t('remotePool.snapshotAt') }}: {{ formatTime(snapshotStatus.snapshot_at) }}
         </p>
@@ -77,7 +124,16 @@
           </template>
           <template #cell-platform="{ row }">
             <div>{{ row.platform }} · {{ row.auth_type }}</div>
-            <span class="badge badge-gray mt-1">{{ row.plan_label || row.plan_type || '—' }}</span>
+            <span
+              class="badge mt-1 gap-1"
+              :class="planBadge(row.plan_type, row.plan_label).classes"
+            >
+              <Icon
+                :name="planBadge(row.plan_type, row.plan_label).icon"
+                size="xs"
+                :animate-on-hover="false"
+              />{{ row.plan_label || row.plan_type || '—' }}
+            </span>
           </template>
           <template #cell-capacity="{ row }">
             <div class="tabular-nums">
@@ -154,9 +210,8 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select from '@/components/common/Select.vue'
-import FilterDropdown from '@/components/common/FilterDropdown.vue'
-import FilterField from '@/components/common/FilterField.vue'
 import Icon from '@/components/icons/Icon.vue'
+import type { IconName } from '@/components/icons/registry'
 import { SEARCH_DEBOUNCE_MS } from '@/constants/ui'
 import {
   remoteAccountPoolAPI,
@@ -176,6 +231,46 @@ import {
 // rows from the shared snapshot. Leaving the page cancels reads and stops minute
 // polling, while backend synchronization saves consumed refresh tokens independently.
 
+/** PlanBadge defines a source account tier's visual treatment in rows and choices. */
+interface PlanBadge {
+  classes: string // light and dark palette
+  icon: IconName // account tier identifying icon
+}
+
+// planBadges assigns distinct colors and symbols to source tiers while retaining the source's displayed labels and filter values.
+const planBadges: Record<string, PlanBadge> = {
+  promax: {
+    classes: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+    icon: 'sparkles'
+  },
+  pro: {
+    classes: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+    icon: 'sparkles'
+  },
+  plus: { classes: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', icon: 'plus' },
+  team: {
+    classes: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+    icon: 'users'
+  },
+  free: { classes: 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-dark-300', icon: 'user' },
+  go: {
+    classes: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    icon: 'bolt'
+  },
+  supergrok: {
+    classes: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+    icon: 'bolt'
+  },
+  max: {
+    classes: 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
+    icon: 'sparkles'
+  },
+  enterprise: {
+    classes: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-300',
+    icon: 'shield'
+  }
+}
+
 // Directory state tracks visible rows, snapshot freshness, local filters, and request ownership for the authenticated user's pool page.
 const { t } = useI18n()
 const loading = ref(true)
@@ -190,7 +285,7 @@ const options = ref<RemotePoolOptions>({
 const snapshotStatus = ref<RemotePoolSnapshotStatus>({ stale: false, auth_invalid: false })
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(50)
+const pageSize = ref(20)
 const search = ref('')
 const groupID = ref('')
 const planType = ref('')
@@ -219,7 +314,7 @@ const groupOptions = computed(() => [
   }))
 ])
 const planOptions = computed(() => [
-  { value: '', label: t('remotePool.allPlans') },
+  { value: '', label: t('remotePool.allTypes') },
   ...options.value.plan_types
 ])
 const statusOptions = computed(() => [
@@ -230,6 +325,17 @@ const activeFilterCount = computed(
   () => [groupID.value, planType.value, status.value].filter(Boolean).length
 )
 const debouncedSearch = useDebounceFn(applyFilters, SEARCH_DEBOUNCE_MS)
+
+/** planBadge resolves a source tier's row and filter styling consistently.
+ * Source values or labels may vary in casing, spacing, or separators. Unknown
+ * tiers use the neutral account treatment while retaining their supplied text.
+ */
+function planBadge(value: string, label = ''): PlanBadge {
+  const key = (value || '').toLowerCase().replace(/[\s_-]/g, '')
+  const labelKey = label.toLowerCase().replace(/[\s_-]/g, '')
+  // Source-specific identifiers can accompany a recognized display label. Use that label's visual treatment before assigning the neutral unknown-tier style.
+  return planBadges[key] || planBadges[labelKey] || { classes: 'badge-gray', icon: 'userCircle' }
+}
 
 /** statusLabel translates known states and displays unknown source states verbatim. */
 function statusLabel(value: string) {

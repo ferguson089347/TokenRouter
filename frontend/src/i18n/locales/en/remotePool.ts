@@ -22,6 +22,8 @@ export default {
     disabledHint: 'Enter a remote RT in settings and enable the pool.',
     search: 'Search account name or ID',
     allGroups: 'All groups',
+    accountType: 'Account type',
+    allTypes: 'All account types',
     allPlans: 'All plans',
     allStatuses: 'All statuses',
     filter: 'Filter',
@@ -29,7 +31,7 @@ export default {
     loadFailed: 'Unable to load the remote account pool. Check settings or try again later.',
     columns: {
       display_name: 'Account',
-      platform: 'Platform / Plan',
+      platform: 'Platform / Account type',
       capacity: 'Concurrency',
       status: 'Status',
       groups: 'Groups',

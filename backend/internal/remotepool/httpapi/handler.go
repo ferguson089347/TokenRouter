@@ -92,7 +92,7 @@ func (h *RemoteAccountPoolHandler) List(c *gin.Context) {
 		min      int    // smallest accepted parameter value
 		max      int    // largest accepted parameter value
 	}{
-		{"page", 1, 1, 1000000}, {"page_size", 50, 1, 500}, {"group_id", 0, 1, 1000000000},
+		{"page", 1, 1, 1000000}, {"page_size", 20, 1, 500}, {"group_id", 0, 1, 1000000000},
 	} {
 		value := param.fallback
 		if raw := c.Query(param.key); raw != "" {

@@ -20,7 +20,8 @@ import (
 // local group permissions. Refresh tokens can rotate during collection, so each
 // update holds the settings row lock until credentials and synchronization status
 // are saved. A complete account snapshot replaces the previous snapshot only after
-// every bound group and page succeeds. Failed collections retain the last complete
+// every bound group and page succeeds. Returned row counts track progress when a
+// source lowers the requested page size. Failed collections retain the last complete
 // snapshot together with the updated credentials and a warning.
 //
 // Source group identities remain in stored snapshots so every response can resolve
@@ -565,6 +566,7 @@ func (s *RemoteAccountPoolService) snapshot(ctx context.Context) (*remotePoolRec
 		accounts := map[int64]RemotePoolAccount{}
 		order := []int64{}
 		for _, binding := range r.Bindings {
+			var collected int64
 			for page := 1; page <= 100; page++ {
 				var result RemotePoolPage
 				query := url.Values{"page": {strconv.Itoa(page)}, "page_size": {"500"}, "group_id": {strconv.FormatInt(binding.RemoteGroupID, 10)}}
@@ -615,7 +617,10 @@ func (s *RemoteAccountPoolService) snapshot(ctx context.Context) (*remotePoolRec
 					}
 					accounts[account.ID] = account
 				}
-				if int64(page*500) >= result.Total {
+				// The source may cap page_size below our requested limit. Count returned
+				// rows before deciding completion so clamped pages cannot truncate the snapshot.
+				collected += int64(len(result.Items))
+				if collected >= result.Total {
 					break
 				}
 				if len(result.Items) == 0 || page == 100 {
@@ -719,7 +724,7 @@ func (s *RemoteAccountPoolService) project(ctx context.Context, r *remotePoolRec
 // List filters and paginates the complete snapshot after applying current
 // local access.
 // Query group IDs identify local groups. Missing pagination selects page one and
-// fifty items; page sizes outside one through five hundred use the default.
+// twenty items; page sizes outside one through five hundred use the default.
 func (s *RemoteAccountPoolService) List(ctx context.Context, query url.Values, allowed []routing.Group) (*RemotePoolPage, error) {
 	r, err := s.snapshot(ctx)
 	if err != nil {
@@ -758,7 +763,7 @@ func (s *RemoteAccountPoolService) List(ctx context.Context, query url.Values, a
 	}
 	size, _ := strconv.Atoi(query.Get("page_size"))
 	if size < 1 || size > 500 {
-		size = 50
+		size = 20
 	}
 	start := min((page-1)*size, len(filtered))
 	end := min(start+size, len(filtered))

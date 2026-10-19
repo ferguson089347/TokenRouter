@@ -22,6 +22,8 @@ export default {
     disabledHint: '请在配置中填写远端 RT 并启用号池。',
     search: '搜索账号名称或 ID',
     allGroups: '全部分组',
+    accountType: '账号类型',
+    allTypes: '全部账号类型',
     allPlans: '全部套餐',
     allStatuses: '全部状态',
     filter: '筛选',
@@ -29,7 +31,7 @@ export default {
     loadFailed: '无法获取远端号池，请检查配置或稍后重试',
     columns: {
       display_name: '账号',
-      platform: '平台 / 套餐',
+      platform: '平台 / 账号类型',
       capacity: '并发占用',
       status: '状态',
       groups: '所属分组',

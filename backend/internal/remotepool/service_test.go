@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -398,4 +399,43 @@ func TestRemotePoolMergesMembershipsBeforeFiltering(t *testing.T) {
 	require.Len(t, choices.Groups, 1)
 	require.EqualValues(t, 200, choices.Groups[0].ID)
 	require.Equal(t, []RemotePoolPlan{{Value: "pro", Label: "Pro"}}, choices.PlanTypes)
+}
+
+// TestRemotePoolCollectsSourceClampedPages models a source that caps requests at
+// one hundred rows despite a five-hundred-row request. All five hundred and one
+// accounts remain available, including the final account beyond the first two pages.
+func TestRemotePoolCollectsSourceClampedPages(t *testing.T) {
+	var reads atomic.Int32
+	s, _, _ := poolFixture(t, func(_ context.Context, _ string, path string, _ any, _ string) (any, error) {
+		switch path {
+		case "/auth/refresh":
+			return remotePoolTokens{AccessToken: "at", RefreshToken: "next", ExpiresIn: 3600}, nil
+		case "/account-pool/options":
+			return RemotePoolOptions{Groups: []RemotePoolGroup{}}, nil
+		default:
+			reads.Add(1)
+			parsed, err := url.Parse(path)
+			require.NoError(t, err)
+			require.Equal(t, "500", parsed.Query().Get("page_size"))
+			page, err := strconv.Atoi(parsed.Query().Get("page"))
+			require.NoError(t, err)
+			items := []RemotePoolAccount{}
+			for id := (page-1)*100 + 1; id <= min(page*100, 501); id++ {
+				items = append(items, RemotePoolAccount{ID: int64(id), DisplayName: strconv.Itoa(id), Groups: []RemotePoolGroup{{ID: 25}}})
+			}
+			return RemotePoolPage{Page: page, PageSize: 100, Pages: 6, Total: 501, Items: items}, nil
+		}
+	})
+	page, err := s.List(context.Background(), url.Values{}, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 501, page.Total)
+	require.Equal(t, 20, page.PageSize)
+	require.Len(t, page.Items, 20)
+	require.EqualValues(t, 6, reads.Load())
+	last, err := s.List(context.Background(), url.Values{"page": {"26"}}, nil)
+	require.NoError(t, err)
+	require.Len(t, last.Items, 1)
+	require.EqualValues(t, 501, last.Items[0].ID)
+	require.Equal(t, 26, last.Pages)
+	require.EqualValues(t, 6, reads.Load())
 }
