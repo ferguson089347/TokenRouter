@@ -206,13 +206,14 @@ const flagCreativeStudioAccess = () => appStore.cachedPublicSettings?.creative_e
 const flagTeamAccess = () => appStore.cachedPublicSettings?.team_enabled !== false
 const flagUsageRankingAccess = () => appStore.cachedPublicSettings?.usage_ranking_enabled !== false
 
-// userNavItems combines authenticated user destinations with public feature flags and administrator-configured custom menu entries.
+// userNavItems builds the regular user menu from public feature settings and
+// administrator-configured links. The ticket entry follows custom links so
+// support remains the final destination when the feature is enabled.
 const userNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
     { path: '/models', label: t('nav.modelMarketplace'), icon: 'modelMarketplace' as const },
     { path: '/usage-ranking', label: t('nav.usageRanking'), icon: 'ranking' as const, featureFlag: flagUsageRankingAccess },
-    { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
     { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
@@ -255,18 +256,20 @@ const userNavItems = computed((): NavItem[] => {
       icon: null,
       iconSvg: item.icon_svg,
     })),
+    { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
   ]
   const visibleItems = items.filter(item => item.featureFlag?.() !== false)
   return visibleItems
 })
 
-// personalNavItems exposes user resources to administrators through the personal account section, including the user account directory.
+// personalNavItems builds the administrator's personal account menu with the
+// public feature settings applied. Personal tickets follow the configured
+// custom links and appear last when ticket access is enabled.
 const personalNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
     { path: '/models', label: t('nav.modelMarketplace'), icon: 'modelMarketplace' as const },
     { path: '/usage-ranking', label: t('nav.usageRanking'), icon: 'ranking' as const, featureFlag: flagUsageRankingAccess },
-    { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
     { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
@@ -309,6 +312,7 @@ const personalNavItems = computed((): NavItem[] => {
       icon: null,
       iconSvg: item.icon_svg,
     })),
+    { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
   ]
   const visibleItems = items.filter(item => item.featureFlag?.() !== false)
   return visibleItems
@@ -328,7 +332,9 @@ const customMenuItemsForAdmin = computed(() => {
     .sort((a, b) => a.sort_order - b.sort_order)
 })
 
-// adminNavItems groups administrator destinations and applies current feature settings before rendering the management navigation links.
+// adminNavItems builds management navigation using the current feature settings.
+// Ticket management follows settings and administrator custom links, placing
+// support at the end of the management section when ticket access is enabled.
 const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
@@ -357,7 +363,6 @@ const adminNavItems = computed((): NavItem[] => {
           : []),
       ],
     },
-    { path: '/admin/tickets', label: t('tickets.adminTitle'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
     { path: '/admin/remote-account-pool', label: t('remotePool.settingsTitle'), icon: 'server' as const },
     { path: '/admin/providers', label: t('nav.providers'), icon: 'globe' as const },
     { path: '/admin/announcements', label: t('nav.announcements'), icon: 'bell' as const },
@@ -407,6 +412,9 @@ const adminNavItems = computed((): NavItem[] => {
   // Add admin custom menu items after settings
   for (const cm of customMenuItemsForAdmin.value) {
     visibleItems.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+  }
+  if (flagTicketAccess()) {
+    visibleItems.push({ path: '/admin/tickets', label: t('tickets.adminTitle'), icon: 'ticket' as const })
   }
   return visibleItems
 })
