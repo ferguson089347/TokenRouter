@@ -519,6 +519,18 @@ import {
   resolveProviderBrandKey,
 } from '@/utils/providerBrand'
 
+// HomeView.vue renders the public landing page from site copy, model groups,
+// and marketplace statistics. The default page resolves featured models and
+// provider brands from the public catalog, while configured content can select
+// an HTML page or external frame. The statistics section formats its counters
+// in the selected language and animates them after their source request finishes.
+//
+// Landing counters add fixed display baselines to valid statistics before
+// animation begins. Missing or invalid observations retain an unavailable
+// target, so a failed request cannot start a counter from its baseline alone.
+// Each counter tracks its own animation frame, and page cleanup cancels frames
+// together with the rotating provider icon timer.
+
 type HomeStatsKey = 'today-tokens' | 'total-tokens' | 'total-users' | 'supported-models'
 type HomeStatsIcon = 'bolt' | 'database' | 'users' | 'grid'
 type HomeStepIcon = 'userPlus' | 'grid' | 'key'
@@ -754,10 +766,22 @@ const featuredModels = computed<HomeFeaturedModel[]>(() => {
   return resolved
 })
 
+// Landing display baselines are added once to each valid observation before
+// its counter is animated or formatted in the selected browser language.
+const homeStatsDisplayBaselines = {
+  todayTokens: 100_000_000, // daily token display baseline
+  totalTokens: 2_000_000_000, // cumulative token display baseline
+  totalUsers: 100, // registered user display baseline
+} as const
+
+// homeStatAnimationTargets supplies available counter destinations after adding
+// the landing page display baselines. Loading sources remain unavailable until
+// their requests finish, and model counts use their catalog-derived target.
+// @project-doc docs/interfaces/model_catalog_and_marketplace.md#home_statistics
 const homeStatAnimationTargets = computed<Record<HomeStatsKey, number | null>>(() => ({
-  'today-tokens': homeStatsLoading.value ? null : normalizedHomeStatTarget(homeStats.value?.today_tokens),
-  'total-tokens': homeStatsLoading.value ? null : normalizedHomeStatTarget(homeStats.value?.total_tokens),
-  'total-users': homeStatsLoading.value ? null : normalizedHomeStatTarget(homeStats.value?.total_users),
+  'today-tokens': homeStatsLoading.value ? null : normalizedHomeStatTarget(homeStats.value?.today_tokens, homeStatsDisplayBaselines.todayTokens),
+  'total-tokens': homeStatsLoading.value ? null : normalizedHomeStatTarget(homeStats.value?.total_tokens, homeStatsDisplayBaselines.totalTokens),
+  'total-users': homeStatsLoading.value ? null : normalizedHomeStatTarget(homeStats.value?.total_users, homeStatsDisplayBaselines.totalUsers),
   'supported-models': homeMarketplaceLoading.value ? null : normalizedHomeStatTarget(totalModelCount.value),
 }))
 
@@ -1030,8 +1054,12 @@ function formatWholeNumber(value: number): string {
   }).format(Math.round(value))
 }
 
-function normalizedHomeStatTarget(value?: number): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : null
+// normalizedHomeStatTarget adds a display baseline to a valid nonnegative
+// counter observation. The baseline defaults to zero for catalog counts;
+// missing or nonfinite observations return null so loading failures remain
+// visible to the card formatter.
+function normalizedHomeStatTarget(value?: number, baseline = 0): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) + baseline : null
 }
 
 function startHomeStatAnimation(key: HomeStatsKey, target: number) {
