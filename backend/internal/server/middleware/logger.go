@@ -32,7 +32,7 @@ func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		startTime := time.Now()
 
-		path := c.Request.URL.Path
+		path := redactPreviewPath(c.Request.URL.Path)
 
 		c.Next()
 

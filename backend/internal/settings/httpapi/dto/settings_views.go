@@ -191,9 +191,11 @@ type SystemSettings struct {
 	CreativeModelSettings       []creative.CreativeModelSetting `json:"creative_model_settings"`         // Creative group/model operation selections
 	CreativeWorkerCount         int                             `json:"creative_worker_count"`           // configured Creative task worker count
 
-	DefaultConcurrency                   int                                      `json:"default_concurrency"`                     // default registration concurrency allowance
-	DefaultBalance                       float64                                  `json:"default_balance"`                         // default registration balance grant amount
-	TeamEnabled                          bool                                     `json:"team_enabled"`                            // team runtime availability switch
+	DefaultConcurrency  int     `json:"default_concurrency"`  // default registration concurrency allowance
+	DefaultBalance      float64 `json:"default_balance"`      // default registration balance grant amount
+	TeamEnabled         bool    `json:"team_enabled"`         // team runtime availability switch
+	IntelligenceEnabled bool    `json:"intelligence_enabled"` // model quality check availability
+
 	CreativeEnabled                      bool                                     `json:"creative_enabled"`                        // Creative Studio runtime access switch
 	RiskControlEnabled                   bool                                     `json:"risk_control_enabled"`                    // risk-center and auditing runtime switch
 	CyberSessionBlockEnabled             bool                                     `json:"cyber_session_block_enabled"`             // cyber-session blocking runtime switch

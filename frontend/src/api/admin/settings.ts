@@ -669,6 +669,7 @@ export interface SystemSettings {
   payment_enabled: boolean;
   // 页面功能开关
   team_enabled: boolean;
+  intelligence_enabled: boolean; // model quality availability
   creative_enabled: boolean;
   creative_model_settings: CreativeModelSetting[];
   creative_worker_count: number;
@@ -977,6 +978,7 @@ export interface UpdateSettingsRequest {
   payment_enabled?: boolean;
   // 页面功能开关
   team_enabled?: boolean;
+  intelligence_enabled?: boolean; // requested quality availability
   creative_enabled?: boolean;
   creative_worker_count?: number;
   risk_control_enabled?: boolean;

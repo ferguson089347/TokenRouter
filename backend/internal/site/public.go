@@ -55,6 +55,7 @@ const (
 	SettingKeyBalanceUnitSymbol                   = "balance_unit_symbol"
 	SettingKeyContactInfo                         = "contact_info"
 	SettingKeyTicketEnabled                       = "ticket_enabled"
+	SettingKeyIntelligenceEnabled                 = "intelligence_enabled"
 	SettingKeyCreativeEnabled                     = "creative_enabled"
 	SettingKeyCustomEndpoints                     = "custom_endpoints"
 	SettingKeyCustomMenuItems                     = "custom_menu_items"
@@ -270,6 +271,7 @@ func (s *PublicService) GetPublicSettings(ctx context.Context) (*PublicSettings,
 		TeamSelfServiceEnabled:      input.Auth.TeamSelfService,
 		CreativeEnabled:             settings[SettingKeyCreativeEnabled] != "false",
 		TicketEnabled:               settings[SettingKeyTicketEnabled] != "false",
+		IntelligenceEnabled:         settings[SettingKeyIntelligenceEnabled] == "true",
 		AffiliateEnabled:            settings[SettingKeyAffiliateEnabled] == "true",
 		TotpEnabled:                 settings[SettingKeyTotpEnabled] == "true",
 		PasskeyEnabled:              input.Auth.Passkey,
@@ -639,6 +641,7 @@ func (s *PublicService) GetPublicSettingsForInjection(ctx context.Context) (any,
 		PaymentEnabled                      bool                         `json:"payment_enabled"`                         // payment entry switch
 		TeamEnabled                         bool                         `json:"team_enabled"`                            // team feature availability
 		TeamSelfServiceEnabled              bool                         `json:"team_self_service_enabled"`               // team self-service availability
+		IntelligenceEnabled                 bool                         `json:"intelligence_enabled"`                    // model quality check availability
 		TicketEnabled                       bool                         `json:"ticket_enabled"`                          // support ticket availability
 		CreativeEnabled                     bool                         `json:"creative_enabled"`                        // creative studio availability
 		OIDCOAuthEnabled                    bool                         `json:"oidc_oauth_enabled"`                      // OIDC login availability
@@ -729,6 +732,7 @@ func (s *PublicService) GetPublicSettingsForInjection(ctx context.Context) (any,
 		TeamSelfServiceEnabled:              settings.TeamSelfServiceEnabled,
 		CreativeEnabled:                     settings.CreativeEnabled,
 		TicketEnabled:                       settings.TicketEnabled,
+		IntelligenceEnabled:                 settings.IntelligenceEnabled,
 		OIDCOAuthEnabled:                    settings.OIDCOAuthEnabled,
 		OIDCOAuthProviderName:               settings.OIDCOAuthProviderName,
 		GitHubOAuthEnabled:                  settings.GitHubOAuthEnabled,
@@ -975,5 +979,5 @@ func ParseTablePreferences(defaultPageSizeRaw, optionsRaw string) (int, []int) {
 // InputSource copies these keys from its larger storage batch before returning
 // Values, retaining public copy while credential settings stay inputs to authentication conversion.
 func PublicValueKeys() []string {
-	return []string{"balance_unit_name_localized", "oidc_connect_provider_name_localized", "balance_low_notify_recharge_url_localized", SettingKeySiteTexts, SettingKeyDefaultLocale, SettingKeyAPIBaseURL, SettingKeyProviderQuotaNotifyEnabled, SettingKeyAffiliateEnabled, SettingKeyAliyunCaptchaEnabled, SettingKeyAliyunCaptchaPrefix, SettingKeyAliyunCaptchaSceneID, SettingKeyAllowUserViewErrorRequests, SettingKeyBackendModeEnabled, SettingKeyBalanceIconSVG, SettingKeyBalanceLowNotifyEnabled, SettingKeyBalanceLowNotifyRechargeURL, SettingKeyBalanceLowNotifyThreshold, SettingKeyBalanceUnitName, SettingKeyBalanceUnitSymbol, SettingKeyContactInfo, SettingKeyTicketEnabled, SettingKeyCreativeEnabled, SettingKeyCustomEndpoints, SettingKeyCustomMenuItems, SettingKeyDocURL, SettingKeyEmailVerifyEnabled, SettingKeyFooterLinks, SettingKeyFooterText, SettingKeyForceEmailOnThirdPartySignup, SettingKeyHideCcsImportButton, SettingKeyHomeContent, SettingKeyHomeFeaturedModels, SettingKeyInvitationCodeEnabled, SettingKeyLoginAgreementDocuments, SettingKeyLoginAgreementEnabled, SettingKeyLoginAgreementMode, SettingKeyLoginAgreementUpdatedAt, SettingKeyPasswordResetEnabled, SettingKeyPromoCodeEnabled, SettingKeyPurchaseSubscriptionEnabled, SettingKeyPurchaseSubscriptionURL, SettingKeyRegistrationEmailDomainQuotaEnabled, SettingKeyRegistrationEnabled, SettingKeyRiskControlEnabled, SettingKeySiteLogo, SettingKeySiteName, SettingKeySiteSubtitle, SettingKeyTableDefaultPageSize, SettingKeyTablePageSizeOptions, SettingKeyTencentCaptchaAppID, SettingKeyTencentCaptchaEnabled, SettingKeyTotpEnabled, SettingKeyTurnstileEnabled, SettingKeyTurnstileSiteKey, SettingKeyUserEmailChangeEnabled, SettingPaymentEnabled}
+	return []string{"balance_unit_name_localized", "oidc_connect_provider_name_localized", "balance_low_notify_recharge_url_localized", SettingKeySiteTexts, SettingKeyDefaultLocale, SettingKeyAPIBaseURL, SettingKeyProviderQuotaNotifyEnabled, SettingKeyAffiliateEnabled, SettingKeyAliyunCaptchaEnabled, SettingKeyAliyunCaptchaPrefix, SettingKeyAliyunCaptchaSceneID, SettingKeyAllowUserViewErrorRequests, SettingKeyBackendModeEnabled, SettingKeyBalanceIconSVG, SettingKeyBalanceLowNotifyEnabled, SettingKeyBalanceLowNotifyRechargeURL, SettingKeyBalanceLowNotifyThreshold, SettingKeyBalanceUnitName, SettingKeyBalanceUnitSymbol, SettingKeyContactInfo, SettingKeyTicketEnabled, SettingKeyIntelligenceEnabled, SettingKeyCreativeEnabled, SettingKeyCustomEndpoints, SettingKeyCustomMenuItems, SettingKeyDocURL, SettingKeyEmailVerifyEnabled, SettingKeyFooterLinks, SettingKeyFooterText, SettingKeyForceEmailOnThirdPartySignup, SettingKeyHideCcsImportButton, SettingKeyHomeContent, SettingKeyHomeFeaturedModels, SettingKeyInvitationCodeEnabled, SettingKeyLoginAgreementDocuments, SettingKeyLoginAgreementEnabled, SettingKeyLoginAgreementMode, SettingKeyLoginAgreementUpdatedAt, SettingKeyPasswordResetEnabled, SettingKeyPromoCodeEnabled, SettingKeyPurchaseSubscriptionEnabled, SettingKeyPurchaseSubscriptionURL, SettingKeyRegistrationEmailDomainQuotaEnabled, SettingKeyRegistrationEnabled, SettingKeyRiskControlEnabled, SettingKeySiteLogo, SettingKeySiteName, SettingKeySiteSubtitle, SettingKeyTableDefaultPageSize, SettingKeyTablePageSizeOptions, SettingKeyTencentCaptchaAppID, SettingKeyTencentCaptchaEnabled, SettingKeyTotpEnabled, SettingKeyTurnstileEnabled, SettingKeyTurnstileSiteKey, SettingKeyUserEmailChangeEnabled, SettingPaymentEnabled}
 }

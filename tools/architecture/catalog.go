@@ -105,9 +105,10 @@ github.com/stretchr/testify/suite`},
 
 	// moduleDependencies records the permitted module collaborations for production files and their independently scoped test adapters.
 	moduleDependencies = map[string]dependencySet{
-		"internal/ticket":     {Production: `internal/ticket/... internal/pkg/apperror internal/identity/httpapi/authctx internal/server/httpx`, Tests: `internal/testutil/postgrescontainer migrations`},
-		"internal/remotepool": {Production: `internal/pkg/ internal/remotepool/... internal/routing internal/settings internal/apikey internal/identity/httpapi/authctx internal/server/httpx`, Tests: "internal/identity internal/testutil/postgrescontainer"},
-		"internal/requestlog": {Production: `internal/requestlog/... internal/infra/telemetry/... internal/identity/httpapi/authctx internal/server/httpx`, Tests: `internal/testutil/postgrescontainer migrations`},
+		"internal/intelligence": {Production: `internal/intelligence/... internal/apikey internal/routing internal/identity internal/identity/httpapi/authctx internal/settings internal/egress/urlpolicy internal/pkg/apperror internal/server/httpx`, Tests: `internal/testutil/postgrescontainer migrations`},
+		"internal/ticket":       {Production: `internal/ticket/... internal/pkg/apperror internal/identity/httpapi/authctx internal/server/httpx`, Tests: `internal/testutil/postgrescontainer migrations`},
+		"internal/remotepool":   {Production: `internal/pkg/ internal/remotepool/... internal/routing internal/settings internal/apikey internal/identity/httpapi/authctx internal/server/httpx`, Tests: "internal/identity internal/testutil/postgrescontainer"},
+		"internal/requestlog":   {Production: `internal/requestlog/... internal/infra/telemetry/... internal/identity/httpapi/authctx internal/server/httpx`, Tests: `internal/testutil/postgrescontainer migrations`},
 		"internal/modelcatalog": {Production: `internal/pkg/locale internal/modelcatalog internal/modelcatalog/provider internal/billing/pricing
 internal/egress internal/infra/httpclient/... internal/infra/telemetry/...`, Tests: `internal/billing internal/billing/provider
 internal/gateway/media internal/gateway/provider/modelidentity internal/routing/capability

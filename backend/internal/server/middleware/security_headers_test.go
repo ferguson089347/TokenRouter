@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TokenFlux/TokenRouter/internal/config"
+	"github.com/TokenFlux/TokenRouter/internal/server/httpconfig"
 )
 
 // CSP preparation connects a per-request nonce with configured browser source
@@ -547,4 +548,33 @@ func countDirectiveValue(policy, directive, value string) int {
 		return count
 	}
 	return 0
+}
+
+// TestIntelligencePreviewParentCSP loads the parent panel with a strict browser
+// policy. It permits the signed artifact path while retaining nonce-based parent
+// scripts and the default restriction against framing the panel itself.
+func TestIntelligencePreviewParentCSP(t *testing.T) {
+	router := gin.New()
+	router.Use(SecurityHeaders(httpconfig.CSPConfig{Enabled: true}, nil))
+	router.GET("/intelligence", func(c *gin.Context) { c.Status(http.StatusOK) })
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "https://gateway.example/intelligence", nil))
+	policy := recorder.Header().Get("Content-Security-Policy")
+	require.True(t, directiveHasValue(policy, "frame-src", "gateway.example/api/v1/intelligence-tests/preview-content/"))
+	require.False(t, directiveHasValue(policy, "frame-src", "'self'"))
+	require.False(t, directiveHasValue(policy, "script-src", "'unsafe-inline'"))
+	require.Contains(t, policy, "'nonce-")
+	require.Equal(t, "DENY", recorder.Header().Get("X-Frame-Options"))
+}
+
+// TestIntelligencePreviewFrameSourceRejectsPolicyInjection supplies hostile Host
+// headers and ordinary DNS, IPv4 and IPv6 origins. Only valid source-expression
+// hosts can become the dedicated signed-preview frame permission.
+func TestIntelligencePreviewFrameSourceRejectsPolicyInjection(t *testing.T) {
+	for _, host := range []string{"example.com; script-src *", "example.com/path", "example.com evil.test", "example.com\r\n", "*.example.com", "", "example.com:1:2"} {
+		require.Empty(t, intelligencePreviewFrameSource(host), host)
+	}
+	for _, host := range []string{"example.com", "localhost:3000", "127.0.0.1:8080", "[::1]:8080"} {
+		require.True(t, strings.HasPrefix(intelligencePreviewFrameSource(host), host+"/api/v1/"), host)
+	}
 }

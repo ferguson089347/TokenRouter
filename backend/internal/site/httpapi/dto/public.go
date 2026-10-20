@@ -95,9 +95,11 @@ type (
 		PaymentEnabled              bool                     `json:"payment_enabled"`                 // payment entry switch
 		TeamEnabled                 bool                     `json:"team_enabled"`                    // team feature availability
 		TeamSelfServiceEnabled      bool                     `json:"team_self_service_enabled"`       // team self-service availability
-		TicketEnabled               bool                     `json:"ticket_enabled"`                  // support ticket availability
-		CreativeEnabled             bool                     `json:"creative_enabled"`                // creative studio availability
-		Version                     string                   `json:"version"`                         // supplied build label
+		IntelligenceEnabled         bool                     `json:"intelligence_enabled"`            // model quality check availability
+
+		TicketEnabled   bool   `json:"ticket_enabled"`   // support ticket availability
+		CreativeEnabled bool   `json:"creative_enabled"` // creative studio availability
+		Version         string `json:"version"`          // supplied build label
 		// ServerTimezone and ServerUTCOffset come from the service's injected
 		// calendar and configured label. The offset is read at response time so
 		// daylight-saving changes in that calendar are reflected in browser settings.

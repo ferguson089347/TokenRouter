@@ -399,3 +399,7 @@ Grok 请求缓存开关使用 `X-TokenRouter-Grok-Client-Tool-Cache`，没有新
 ## 工单接口
 
 用户通过 `/api/v1/tickets` 创建、查询、回复、完成或撤销自己的工单。管理员通过 `/api/v1/admin/tickets` 处理所有工单，并使用 `/settings` 读取和更新工单配置。附件原件和 `/preview` 均要求同一工单访问权限；multipart 提交使用 JSON `payload` 和重复的 `files` 字段。具体状态、限制与开关规则见[工单](../domains/support_tickets.md)。
+
+## 降智检测接口
+
+`/api/v1/admin/intelligence-tests` 提供配置、手动执行和历史查询；`/api/v1/intelligence-tests` 为登录用户提供只读结果。`/api/v1/intelligence-tests/preview-content/:ticket` 使用短期作品票据，并重新校验当前权限。操作列表与隔离规则见[降智检测](../domains/intelligence_tests.md)。

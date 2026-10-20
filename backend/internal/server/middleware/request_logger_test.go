@@ -158,3 +158,21 @@ func TestRequestLoggerUnknownPathCanBeStored(t *testing.T) {
 		}
 	}
 }
+
+// TestRedactPreviewPath removes signed artwork credentials from request and access
+// metadata. Invalid ticket syntax is redacted too, while ordinary API paths remain
+// available for request diagnostics and route lookup.
+func TestRedactPreviewPath(t *testing.T) {
+	for _, path := range []string{
+		"/api/v1/intelligence-tests/preview-content/private.payload",
+		"/api/v1/intelligence-tests/preview-content/invalid-secret",
+	} {
+		if got := redactPreviewPath(path); got != "/api/v1/intelligence-tests/preview-content/:ticket" {
+			t.Fatalf("preview credential remains in path: %s", got)
+		}
+	}
+	const ordinary = "/api/v1/intelligence-tests/runs/iq_saved"
+	if got := redactPreviewPath(ordinary); got != ordinary {
+		t.Fatalf("ordinary path changed: %s", got)
+	}
+}

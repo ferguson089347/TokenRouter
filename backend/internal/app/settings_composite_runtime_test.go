@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"net/http"
 	"net/http/httptest"
@@ -439,7 +440,7 @@ func newCompositeSettingsHTTPFixture(repo settingscore.Repository, cfg *config.C
 }
 
 // TestSettingsFieldOwnership enumerates static participants and the flattened
-// update request type. It checks unique ownership, all 283 request fields are
+// update request type. It checks unique ownership, all 284 request fields are
 // represented, and no participant declares an extra field outside that request.
 func TestSettingsFieldOwnership(t *testing.T) {
 	defaults := scheduler.DefaultAdminSettingsDefaults()
@@ -472,7 +473,7 @@ func TestSettingsFieldOwnership(t *testing.T) {
 		delete(owners, name)
 		count++
 	}
-	require.Equal(t, 283, count, "HTTP 字段变化需要同步字段登记")
+	require.Equal(t, 284, count, "HTTP 字段变化需要同步字段登记")
 	require.Empty(t, owners, "参与者不应声明不存在的输入字段")
 }
 
@@ -2201,5 +2202,31 @@ func TestUpdateSettingsRejectsDeprecatedAdvancedSchedulerFields(t *testing.T) {
 			require.Contains(t, rec.Body.String(), "DEPRECATED_ADVANCED_SCHEDULER_SETTING")
 			require.Contains(t, rec.Body.String(), field)
 		})
+	}
+}
+
+// TestUpdateSettingsIntelligencePresence saves quality-check enablement through the
+// combined administrator handler. An omitted switch keeps the enabled stored
+// value, and an explicit false disables both persisted settings and response data.
+func TestUpdateSettingsIntelligencePresence(t *testing.T) {
+	h, repo := newStepUpSwitchTestHandler(t, map[string]string{"intelligence_enabled": "false"})
+	for _, tc := range []struct {
+		body    map[string]any // submitted administrator fields
+		enabled bool           // expected persisted availability
+	}{
+		{map[string]any{"intelligence_enabled": true}, true},
+		{map[string]any{"registration_enabled": true}, true},
+		{map[string]any{"intelligence_enabled": false}, false},
+	} {
+		rec := doUpdateSettings(t, h, tc.body, nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Equal(t, fmt.Sprint(tc.enabled), repo.values["intelligence_enabled"])
+		var envelope struct {
+			Data struct {
+				IntelligenceEnabled bool `json:"intelligence_enabled"`
+			} `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &envelope))
+		require.Equal(t, tc.enabled, envelope.Data.IntelligenceEnabled)
 	}
 }

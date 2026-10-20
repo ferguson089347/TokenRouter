@@ -390,9 +390,11 @@ type UpdateSettingsRequest struct {
 	PaymentAlipayForceQRCode             *bool `json:"payment_alipay_force_qrcode"`               // mobile Alipay QR-code preference
 	PaymentAlipayMobilePrecreateDeepLink *bool `json:"payment_alipay_mobile_precreate_deep_link"` // mobile Alipay precreation link preference
 
-	RiskControlEnabled *bool `json:"risk_control_enabled"` // risk-center and auditing runtime switch
-	TeamEnabled        *bool `json:"team_enabled"`         // team runtime availability switch
-	CreativeEnabled    *bool `json:"creative_enabled"`     // Creative Studio runtime access switch
+	RiskControlEnabled  *bool `json:"risk_control_enabled"` // risk-center and auditing runtime switch
+	TeamEnabled         *bool `json:"team_enabled"`         // team runtime availability switch
+	IntelligenceEnabled *bool `json:"intelligence_enabled"` // requested quality check availability
+
+	CreativeEnabled *bool `json:"creative_enabled"` // Creative Studio runtime access switch
 
 	CyberSessionBlockEnabled *bool `json:"cyber_session_block_enabled"` // cyber-session blocking runtime switch
 	// CyberSessionBlockTTLSeconds retains prior lifetime when nil. A supplied

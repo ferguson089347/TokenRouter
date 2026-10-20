@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -172,7 +173,7 @@ func RequestLogger(observers ...func(telemetry.RequestRecord)) gin.HandlerFunc {
 			zap.String("component", "http"),
 			zap.String("request_id", requestID),
 			zap.String("parent_request_id", parentID),
-			zap.String("path", c.Request.URL.Path),
+			zap.String("path", redactPreviewPath(c.Request.URL.Path)),
 			zap.String("method", c.Request.Method),
 		)
 
@@ -187,7 +188,7 @@ func RequestLogger(observers ...func(telemetry.RequestRecord)) gin.HandlerFunc {
 		// Unknown routes have no matched Gin pattern. Capture their requested path so
 		// rejected or missing endpoints still produce a diagnosable request summary.
 		if path == "" {
-			path = c.Request.URL.Path
+			path = redactPreviewPath(c.Request.URL.Path)
 		}
 		record := telemetry.RequestRecord{RequestID: requestID, StartedAt: started, Method: c.Request.Method, Path: path, State: "running"}
 		if parentID != "" {
@@ -271,4 +272,15 @@ func RequestLogger(observers ...func(telemetry.RequestRecord)) gin.HandlerFunc {
 		}()
 		c.Next()
 	}
+}
+
+// redactPreviewPath removes signed preview credentials before paths enter request
+// or access logs. Prefix matching also covers invalid tickets, keeping rejected
+// requests from revealing bearer credentials in diagnostic records.
+func redactPreviewPath(path string) string {
+	const prefix = "/api/v1/intelligence-tests/preview-content/"
+	if strings.HasPrefix(path, prefix) {
+		return prefix + ":ticket"
+	}
+	return path
 }

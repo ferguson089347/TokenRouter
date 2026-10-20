@@ -99,6 +99,9 @@ func DiffSettings(before *composite.Snapshot, after *composite.Snapshot, beforeA
 	if before.TeamEnabled != after.TeamEnabled {
 		changed = append(changed, "team_enabled")
 	}
+	if before.IntelligenceEnabled != after.IntelligenceEnabled {
+		changed = append(changed, "intelligence_enabled")
+	}
 	if before.CreativeEnabled != after.CreativeEnabled {
 		changed = append(changed, "creative_enabled")
 	}

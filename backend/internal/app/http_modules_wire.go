@@ -23,6 +23,7 @@ import (
 // so route registration receives services assembled from the shared application resources.
 var nativeHTTPProviders = wire.NewSet(
 	provideRemotePool,
+	provideIntelligence,
 	provideTicketConfig,
 	provideTickets,
 	provideTicketRuntime,

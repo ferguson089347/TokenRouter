@@ -74,6 +74,8 @@ declare module 'vue-router' {
 
     /** requiresTickets checks support availability before opening user or administrator pages. */
     requiresTickets?: boolean
+    /** requiresIntelligence checks the confirmed feature switch before opening user results. */
+    requiresIntelligence?: boolean
 
     /**
      * 是否要求创作台功能开关已启用

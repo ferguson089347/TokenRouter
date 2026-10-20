@@ -217,6 +217,9 @@ type Snapshot struct {
 	DefaultConcurrency int     // default registration concurrency allowance
 	DefaultBalance     float64 // default registration balance grant amount
 	TeamEnabled        bool    // team runtime availability switch
+	// IntelligenceEnabled requires the stored switch to equal true. Missing or
+	// invalid values leave paid submissions and user result access disabled.
+	IntelligenceEnabled bool // model quality check availability
 	// CreativeEnabled supplies the runtime access switch. Creative execution also
 	// requires the deployment creative.enabled capability before tasks can be admitted.
 	CreativeEnabled                      bool                                 // Creative Studio runtime access switch

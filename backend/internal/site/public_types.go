@@ -100,7 +100,9 @@ type (
 		PaymentEnabled           bool // payment entry switch
 		TeamEnabled              bool // team feature availability
 		TeamSelfServiceEnabled   bool // team self-service availability
-		TicketEnabled            bool // support ticket availability
+		IntelligenceEnabled      bool // model quality check availability
+
+		TicketEnabled bool // support ticket availability
 		// CreativeEnabled controls the frontend studio entry and route guard;
 		// the public reader enables it unless the stored setting is exactly false.
 		CreativeEnabled       bool   // creative studio availability

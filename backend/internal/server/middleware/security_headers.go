@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -97,49 +98,55 @@ const (
 	AirwallexDemoCheckoutDomain = "https://checkout-demo.airwallex.com"
 )
 
-// requiredCSPDirectiveValues lists the directive/source pairs granted by
-// runtime policy supplementation for application frontend integrations.
-var requiredCSPDirectiveValues = []struct {
-	// directive and value identify one required source permission together.
-	// enhanceCSPPolicy checks the pair against the first matching directive before
-	// inserting missing values into that policy.
-	directive string // exact CSP directive name
-	value     string // required source token
-}{
-	{"script-src", CloudflareInsightsDomain},
-	{"script-src", GoogleIdentityScriptURL},
-	{"frame-src", GoogleIdentityResourceURL},
-	{"connect-src", GoogleIdentityResourceURL},
-	{"style-src", GoogleIdentityStyleURL},
-	{"script-src", TencentCaptchaDomain},
-	{"frame-src", TencentCaptchaDomain},
-	{"style-src", TencentCaptchaStaticDomain},
-	{"script-src", TencentCaptchaCDNDomain},
-	{"script-src", TencentCaptchaGlobalDomain},
-	{"script-src", TencentCaptchaGlobalCDNDomain},
-	{"script-src", TencentCaptchaPrehandleDomain},
-	{"script-src", TencentCaptchaJQueryDomain},
-	{"connect-src", TencentCaptchaDomain},
-	{"connect-src", TencentCaptchaPrehandleDomain},
-	{"connect-src", TencentCaptchaRceDomain},
-	{"frame-src", TencentCaptchaGlobalDomain},
-	{"frame-src", TencentCaptchaPrehandleDomain},
-	{"worker-src", TencentCaptchaWorkerSource},
-	{"script-src", AliyunCaptchaStaticDomain},
-	{"style-src", AliyunCaptchaStaticDomain},
-	{"script-src", StripeDomain},
-	{"frame-src", StripeDomain},
-	{"script-src", AirwallexStaticDomain},
-	{"script-src", AirwallexCheckoutDomain},
-	{"style-src", AirwallexStaticDomain},
-	{"style-src", AirwallexCheckoutDomain},
-	{"frame-src", AirwallexCheckoutDomain},
-	{"script-src", AirwallexDemoStaticDomain},
-	{"script-src", AirwallexDemoCheckoutDomain},
-	{"style-src", AirwallexDemoStaticDomain},
-	{"style-src", AirwallexDemoCheckoutDomain},
-	{"frame-src", AirwallexDemoCheckoutDomain},
-}
+var (
+	// requiredCSPDirectiveValues lists the directive/source pairs granted by
+	// runtime policy supplementation for application frontend integrations.
+	requiredCSPDirectiveValues = []struct {
+		// directive and value identify one required source permission together.
+		// enhanceCSPPolicy checks the pair against the first matching directive before
+		// inserting missing values into that policy.
+		directive string // exact CSP directive name
+		value     string // required source token
+	}{
+		{"script-src", CloudflareInsightsDomain},
+		{"script-src", GoogleIdentityScriptURL},
+		{"frame-src", GoogleIdentityResourceURL},
+		{"connect-src", GoogleIdentityResourceURL},
+		{"style-src", GoogleIdentityStyleURL},
+		{"script-src", TencentCaptchaDomain},
+		{"frame-src", TencentCaptchaDomain},
+		{"style-src", TencentCaptchaStaticDomain},
+		{"script-src", TencentCaptchaCDNDomain},
+		{"script-src", TencentCaptchaGlobalDomain},
+		{"script-src", TencentCaptchaGlobalCDNDomain},
+		{"script-src", TencentCaptchaPrehandleDomain},
+		{"script-src", TencentCaptchaJQueryDomain},
+		{"connect-src", TencentCaptchaDomain},
+		{"connect-src", TencentCaptchaPrehandleDomain},
+		{"connect-src", TencentCaptchaRceDomain},
+		{"frame-src", TencentCaptchaGlobalDomain},
+		{"frame-src", TencentCaptchaPrehandleDomain},
+		{"worker-src", TencentCaptchaWorkerSource},
+		{"script-src", AliyunCaptchaStaticDomain},
+		{"style-src", AliyunCaptchaStaticDomain},
+		{"script-src", StripeDomain},
+		{"frame-src", StripeDomain},
+		{"script-src", AirwallexStaticDomain},
+		{"script-src", AirwallexCheckoutDomain},
+		{"style-src", AirwallexStaticDomain},
+		{"style-src", AirwallexCheckoutDomain},
+		{"frame-src", AirwallexCheckoutDomain},
+		{"script-src", AirwallexDemoStaticDomain},
+		{"script-src", AirwallexDemoCheckoutDomain},
+		{"style-src", AirwallexDemoStaticDomain},
+		{"style-src", AirwallexDemoCheckoutDomain},
+		{"frame-src", AirwallexDemoCheckoutDomain},
+	}
+
+	// intelligencePreviewHost restricts request hosts to source-expression characters so
+	// a supplied Host header cannot inject additional browser policy directives.
+	intelligencePreviewHost = regexp.MustCompile(`^(?:[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?|\[[A-Fa-f0-9:]+\])(?::[0-9]{1,5})?$`)
+)
 
 // GenerateNonce returns sixteen random bytes encoded as padded standard base64
 // text for CSP. With the selected Go 1.27.2 toolchain, crypto/rand.Read fills
@@ -194,6 +201,11 @@ func SecurityHeaders(cfg httpconfig.CSPConfig, getFrameSrcOrigins func() []strin
 
 	return func(c *gin.Context) {
 		finalPolicy := policy
+		// Permit signed drawing content at its dedicated path so the main page
+		// retains nonce-based scripts while sandboxed model drawings can execute.
+		if source := intelligencePreviewFrameSource(c.Request.Host); source != "" {
+			finalPolicy = addToDirective(finalPolicy, "frame-src", source)
+		}
 		if getFrameSrcOrigins != nil {
 			for _, origin := range getFrameSrcOrigins() {
 				if origin != "" {
@@ -234,8 +246,8 @@ func SecurityHeaders(cfg httpconfig.CSPConfig, getFrameSrcOrigins func() []strin
 }
 
 // isAPIRoutePath selects the gateway prefixes that skip CSP assignment: /v1/,
-// /v1beta/, /antigravity/, /responses, and /images. It returns false for
-// missing request data; other API paths are not covered by this predicate.
+// /v1beta/, /antigravity/, /responses, /images, and signed intelligence preview
+// content. Missing request data returns false; preview content applies its own CSP.
 func isAPIRoutePath(c *gin.Context) bool {
 	if c == nil || c.Request == nil || c.Request.URL == nil {
 		return false
@@ -245,7 +257,8 @@ func isAPIRoutePath(c *gin.Context) bool {
 		strings.HasPrefix(path, "/v1beta/") ||
 		strings.HasPrefix(path, "/antigravity/") ||
 		strings.HasPrefix(path, "/responses") ||
-		strings.HasPrefix(path, "/images")
+		strings.HasPrefix(path, "/images") ||
+		strings.HasPrefix(path, "/api/v1/intelligence-tests/preview-content/")
 }
 
 // enhanceCSPPolicy adds configured integration permissions and a script nonce
@@ -324,4 +337,14 @@ func addToDirective(policy, directive, value string) string {
 
 	insertPos := idx + endIdx
 	return policy[:insertPos] + " " + value + policy[insertPos:]
+}
+
+// intelligencePreviewFrameSource returns the dedicated drawing path for a valid host.
+// The source inherits the document scheme, supporting deployments whose HTTPS
+// termination occurs at a reverse proxy before the application receives HTTP.
+func intelligencePreviewFrameSource(host string) string {
+	if !intelligencePreviewHost.MatchString(host) {
+		return ""
+	}
+	return host + "/api/v1/intelligence-tests/preview-content/"
 }

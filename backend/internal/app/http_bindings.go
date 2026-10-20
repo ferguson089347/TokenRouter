@@ -14,6 +14,7 @@ import (
 	gatewayhttpapi "github.com/TokenFlux/TokenRouter/internal/gateway/httpapi"
 	identityhttp "github.com/TokenFlux/TokenRouter/internal/identity/httpapi"
 	redisinfra "github.com/TokenFlux/TokenRouter/internal/infra/redis"
+	intelligencehttp "github.com/TokenFlux/TokenRouter/internal/intelligence/httpapi"
 	"github.com/TokenFlux/TokenRouter/internal/ops"
 	"github.com/TokenFlux/TokenRouter/internal/protocol"
 	"github.com/TokenFlux/TokenRouter/internal/requestlog"
@@ -43,7 +44,7 @@ type httpRouteMount func(*gin.Engine, httpRouteSecurity, gin.HandlerFunc, func(*
 // and retains prior values when either settings refresh fails. Embedded
 // frontend construction can return an error after hooks have been registered;
 // the application rollback owns their cleanup.
-func provideRouterRuntime(requests *requestlog.Service, public *site.PublicService, pages *sitehttp.PageHandler, backendMode *admission.BackendMode, store *settings.Store, redisClient *redis.Client, manager *lifecycle.Manager, cfg *config.Config, mount httpRouteMount, panelSettings *runtimeconfig.PanelSettings, opsService *ops.OpsService, jwtAuth identityhttp.JWTAuthMiddleware, adminAuth identityhttp.AdminAuthMiddleware, auditLog middleware.AuditLogMiddleware, stepUpAuth identityhttp.StepUpAuthMiddleware,
+func provideRouterRuntime(requests *requestlog.Service, intelligence *intelligencehttp.IntelligenceHandler, public *site.PublicService, pages *sitehttp.PageHandler, backendMode *admission.BackendMode, store *settings.Store, redisClient *redis.Client, manager *lifecycle.Manager, cfg *config.Config, mount httpRouteMount, panelSettings *runtimeconfig.PanelSettings, opsService *ops.OpsService, jwtAuth identityhttp.JWTAuthMiddleware, adminAuth identityhttp.AdminAuthMiddleware, auditLog middleware.AuditLogMiddleware, stepUpAuth identityhttp.StepUpAuthMiddleware,
 ) (*server.RouterRuntime, error) {
 	// Seal update admission before waiting for HTTP handlers, then wait for
 	// accepted settings work so later settings subscribers and shared stores can close safely.
@@ -120,6 +121,7 @@ func provideRouterRuntime(requests *requestlog.Service, public *site.PublicServi
 	panelLimiter := middleware.NewPanelRateLimiter(panelCounter, panelSettings)
 	rt.Register = []func(*gin.Engine){func(r *gin.Engine) {
 		mount(r, httpRouteSecurity{JWT: gin.HandlerFunc(jwtAuth), Admin: gin.HandlerFunc(adminAuth), Audit: gin.HandlerFunc(auditLog), StepUp: gin.HandlerFunc(stepUpAuth), BackendAuth: identityhttp.BackendModeAuthGuard(backendMode), BackendUser: identityhttp.BackendModeUserGuard(backendMode), Panel: panelLimiter, AuthLimiter: authLimiter}, protocolCatalog, func(v1 *gin.RouterGroup) {
+			v1.GET("/intelligence-tests/preview-content/:ticket", panelLimiter.Global(), intelligence.PreviewContent)
 			pages.Register(v1, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth))
 			registerRequestLogRoutes(v1, requests, gin.HandlerFunc(adminAuth), gin.HandlerFunc(auditLog), panelLimiter.Heavy())
 		})

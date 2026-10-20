@@ -44,6 +44,11 @@ backend/
 │   ├── ticket/                                          工单规则、附件校验、设置与后台通知
 │   │   ├── httpapi/                                     个人工单、客服处理和私有附件接口
 │   │   └── postgres/                                    工单行锁、消息和附件原子持久化
+│   ├── intelligence/                                    分组模型质量检测、持久任务与结果授权
+│   │   ├── httpapi/                                     管理配置、用户结果与隔离作品预览
+│   │   ├── postgres/                                    配置、任务租约、摘要与正文持久化
+│   │   ├── provider/                                    固定 Manxue HTTP 客户端
+│   │   └── remote/                                      远端协议值与安全结果分类
 │   ├── remotepool/                                      远端号池会话、完整快照与本地分组展示
 │   │   ├── httpapi/                                     用户查询和管理员号池配置
 │   │   ├── postgres/                                    settings 行锁与原子快照保存
@@ -438,6 +443,7 @@ app/lifecycle 管理这些组件的启动和关闭。audit 独立记录操作审
 | requestlog | [请求 ID 与请求查询](../operations/request_lookup.md) |
 | usage、audit、ops | [数据生命周期](../operations/observability_and_data_lifecycle.md)、[监控告警](../operations/ops_monitoring_and_alerting.md)、[预聚合](../operations/pre_aggregation.md) |
 | backup | [备份与恢复](../operations/deployment_and_migrations.md#maintenance_execution) |
+| intelligence | [降智检测](../domains/intelligence_tests.md) |
 | remotepool | [远端号池](../interfaces/remote_account_pool.md) |
 | settings、site | [配置](../interfaces/configuration.md)、[HTTP 与页面权限](../interfaces/http_api.md) |
 | idempotency | [面板命令幂等](../interfaces/http_api.md#write_idempotency) |

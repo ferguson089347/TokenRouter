@@ -1664,6 +1664,12 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.TeamEnabled
 		}(),
+		IntelligenceEnabled: func() bool {
+			if req.IntelligenceEnabled != nil {
+				return *req.IntelligenceEnabled
+			}
+			return previousSettings.IntelligenceEnabled
+		}(),
 		CreativeEnabled: func() bool {
 			if req.CreativeEnabled != nil {
 				return *req.CreativeEnabled
@@ -2086,6 +2092,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	fields["cyber_session_block_enabled"], _ = json.Marshal(settings.CyberSessionBlockEnabled)
 	fields["cyber_session_block_ttl_seconds"], _ = json.Marshal(settings.CyberSessionBlockTTLSeconds)
 	fields["creative_enabled"], _ = json.Marshal(settings.CreativeEnabled)
+	fields["intelligence_enabled"], _ = json.Marshal(settings.IntelligenceEnabled)
 	fields["creative_worker_count"], _ = json.Marshal(settings.CreativeWorkerCount)
 	fields["creative_model_settings"], _ = json.Marshal(settings.CreativeModelSettings)
 	fields["api_key_acl_trust_forwarded_ip"], _ = json.Marshal(settings.APIKeyACLTrustForwardedIP)

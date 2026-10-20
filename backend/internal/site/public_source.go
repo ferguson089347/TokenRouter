@@ -165,6 +165,7 @@ func PublicInputKeys() []string {
 		"team_enabled",
 		"creative_enabled",
 		"ticket_enabled",
+		"intelligence_enabled",
 		"risk_control_enabled",
 		"allow_user_view_error_requests",
 	}

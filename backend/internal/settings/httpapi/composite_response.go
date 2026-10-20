@@ -169,6 +169,7 @@ func buildSystemSettingsResponse(
 		DefaultConcurrency:                               settings.DefaultConcurrency,
 		DefaultBalance:                                   settings.DefaultBalance,
 		TeamEnabled:                                      settings.TeamEnabled,
+		IntelligenceEnabled:                              settings.IntelligenceEnabled,
 		CreativeEnabled:                                  settings.CreativeEnabled,
 		CreativeModelSettings:                            settings.CreativeModelSettings,
 		CreativeWorkerCount:                              settings.CreativeWorkerCount,

@@ -111,6 +111,8 @@ Wire 构造完对象、登记完资源后，lifecycle 才启动后台工作，�
 
 billing 的余额和 Key 缓存队列、订阅过期提醒由 app 接入生命周期。提醒任务启动后立即执行第一轮，之后每分钟扫描一次，用 Redis 或数据库选出 leader；停止时取消并等待正在执行的操作。
 
+降智检测由 `app/intelligence.go` 装配，在 StartOrder 980 启动两个工作者，并在 StopOrder 20 取消后等待远端查询和结果写回。共享 SQL 在工作者结束后关闭；任务凭远端 ID 和 PostgreSQL 租约恢复，详见[降智检测](../domains/intelligence_tests.md)。
+
 ### 关闭顺序
 
 SIGINT、SIGTERM、监听失败和 Linux 上的手动重启走同一个关闭流程。HTTP 有五秒的优雅关闭预算，之后的后台清理有三十秒的总预算，两个预算分开计算。后台清理的顺序：

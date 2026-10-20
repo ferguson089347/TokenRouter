@@ -4299,6 +4299,17 @@
             </SettingsSection>
           </SettingsCard>
 
+          <SettingsCard :title="t('intelligence.title')">
+            <SettingsSection>
+              <SettingToggleRow
+                id="intelligence-enabled"
+                v-model="form.intelligence_enabled"
+                :label="t('intelligence.settings.enabled')"
+                :hint="t('intelligence.settings.hint')"
+              />
+            </SettingsSection>
+          </SettingsCard>
+
           <!-- 创作台 -->
           <SettingsCard
             :title="t('admin.settings.features.creative.title')"
@@ -6286,6 +6297,7 @@ const form = reactive<SettingsForm>({
   // 页面功能开关默认开启，兼容升级前行为。
   team_enabled: true,
   creative_enabled: true,
+  intelligence_enabled: false,
   creative_model_settings: [] as CreativeModelSetting[],
   creative_worker_count: 128,
   risk_control_enabled: false,
@@ -8494,6 +8506,7 @@ async function saveSettings(): Promise<boolean> {
       // 页面功能开关
       team_enabled: form.team_enabled,
       creative_enabled: form.creative_enabled,
+      intelligence_enabled: form.intelligence_enabled,
       creative_model_settings: normalizedCreativeModelSettings,
       creative_worker_count: normalizedCreativeWorkerCount,
       risk_control_enabled: form.risk_control_enabled,

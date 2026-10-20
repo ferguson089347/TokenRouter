@@ -1,3 +1,4 @@
+import intelligence from './intelligence'
 import tickets from './tickets'
 import remotePool from './remotePool'
 import landing from './landing'
@@ -16,6 +17,7 @@ import requests from './requests'
 // translation instance for this locale.
 
 export default {
+  ...intelligence,
   ...remotePool,
   ...tickets,
   requests,

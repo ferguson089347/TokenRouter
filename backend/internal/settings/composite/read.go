@@ -78,6 +78,7 @@ func Parse(settings map[string]string, options ReadOptions) *Snapshot {
 	prior := options.Forwarded()
 	forwarded := runtimeconfig.ReadForwardedSettings(settings, prior)
 	result := &Snapshot{
+		IntelligenceEnabled:       settings["intelligence_enabled"] == "true",
 		StoredValues:              maps.Clone(settings),
 		LocalizedSettings:         settingvalues.ReadLocalizedTexts(settings),
 		APIKeyACLTrustForwardedIP: forwarded.APIKeyACLTrustForwardedIP,

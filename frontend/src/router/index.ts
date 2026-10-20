@@ -24,6 +24,19 @@ import { resolveRouteDocumentTitle } from './title'
  */
 const routes: RouteRecordRaw[] = [
   {
+    path: '/intelligence',
+    name: 'Intelligence',
+    component: () => import('@/views/user/IntelligenceView.vue'),
+    meta: { requiresAuth: true, requiresIntelligence: true, hidePageHeading: true, title: 'Model quality checks', titleKey: 'intelligence.title' }
+  },
+  {
+    path: '/admin/intelligence-tests',
+    name: 'AdminIntelligenceTests',
+    component: () => import('@/views/admin/IntelligenceTestsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, hidePageHeading: true, title: 'Intelligence checks', titleKey: 'intelligence.adminTitle' }
+  },
+
+  {
     path: '/tickets',
     name: 'Tickets',
     component: () => import('@/views/tickets/TicketsView.vue'),
@@ -966,6 +979,7 @@ router.beforeEach(async (to, _from, next) => {
     || to.meta.requiresUsageRanking
     || to.meta.requiresCreative
     || to.meta.requiresTickets
+    || to.meta.requiresIntelligence
   if (requiresPublicFeature && !appStore.publicSettingsLoaded) {
     try {
       await appStore.fetchPublicSettings()
@@ -1018,6 +1032,11 @@ router.beforeEach(async (to, _from, next) => {
     appStore.cachedPublicSettings?.creative_enabled === false
   ) {
     next(authStore.isAdmin ? '/admin/settings' : '/dashboard')
+    return
+  }
+
+  if (to.meta.requiresIntelligence && appStore.cachedPublicSettings?.intelligence_enabled !== true) {
+    next(authStore.isAdmin ? '/admin/intelligence-tests' : '/dashboard')
     return
   }
 

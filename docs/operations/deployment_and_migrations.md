@@ -89,6 +89,8 @@ Apple container 的新栈使用 `org.tokenrouter.stack` 标签；已有的 `sub2
 - 从空数据库完整执行一遍，以及在已有的 schema 上重复执行；
 - `schema_migrations` 里的文件名符合预期，已有文件的 checksum 没有变。
 
+`304_intelligence_tests.sql` 创建独立的检测配置和任务表，包含活动任务唯一索引及轮询、历史索引。迁移为追加表结构，旧二进制可以继续使用既有表；功能默认关闭。回退应用前先关闭检测并等待在途任务结束，避免暂停远端结果的查询。凭据、权限、历史保留和恢复规则见[降智检测](../domains/intelligence_tests.md)。
+
 ## 升级与恢复
 
 ### 通用规则

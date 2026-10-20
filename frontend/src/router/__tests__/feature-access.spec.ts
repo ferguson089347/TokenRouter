@@ -24,6 +24,7 @@ const appStore = vi.hoisted(() => ({
   publicSettingsLoaded: false,
   cachedPublicSettings: null as null | {
     ticket_enabled?: boolean
+    intelligence_enabled?: boolean
     payment_enabled?: boolean
     risk_control_enabled?: boolean
     team_enabled?: boolean
@@ -190,6 +191,47 @@ describe('feature route guard', () => {
     expect(appStore.fetchPublicSettings).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith(target)
+  })
+
+  // Quality checks require affirmative enablement after the initial settings read.
+  // Administrators retain configuration access when user results are disabled.
+  it.each([false, true])(
+    'waits for quality-check settings before allowing results',
+    async (enabled) => {
+      const deferred = createDeferred<{ intelligence_enabled: boolean }>()
+      appStore.fetchPublicSettings.mockImplementation(async () => {
+        const settings = await deferred.promise
+        appStore.cachedPublicSettings = settings
+        appStore.publicSettingsLoaded = true
+        return settings
+      })
+      const { navigation, next } = runGuard(
+        { requiresIntelligence: true },
+        '/intelligence',
+      )
+      expect(next).not.toHaveBeenCalled()
+      deferred.resolve({ intelligence_enabled: enabled })
+      await navigation
+      expect(next).toHaveBeenCalledWith(...(enabled ? [] : ['/dashboard']))
+    },
+  )
+
+  // Disabled user results still leave administrator configuration reachable through its own route.
+  // An unavailable settings response cannot authorize quality-check user access.
+  it('keeps quality-check configuration accessible while user access is disabled', async () => {
+    authStore.isAdmin = true
+    appStore.publicSettingsLoaded = true
+    appStore.cachedPublicSettings = { intelligence_enabled: false }
+    const route = routerHarness.routes.find(
+      (route) => route.path === '/admin/intelligence-tests',
+    )
+    expect(route?.meta?.requiresAdmin).toBe(true)
+    const admin = runGuard(route?.meta ?? {}, '/admin/intelligence-tests')
+    await admin.navigation
+    expect(admin.next).toHaveBeenCalledWith()
+    const user = runGuard({ requiresIntelligence: true }, '/intelligence')
+    await user.navigation
+    expect(user.next).toHaveBeenCalledWith('/admin/intelligence-tests')
   })
 
   it('请求诊断只注册管理员路由，普通用户直接访问会被拦截', async () => {

@@ -272,8 +272,12 @@ export interface PublicSettings {
   payment_enabled: boolean
   team_enabled?: boolean
   team_self_service_enabled?: boolean
-  // 旧版公开设置可能缺少该字段，调用方应仅在明确为 false 时关闭创作台入口。
+  // intelligence_enabled requires confirmed true before quality-check navigation
+  // opens. Missing values keep the optional result feature disabled.
+  intelligence_enabled?: boolean // model quality availability
   ticket_enabled?: boolean
+  // Older public settings can omit creative_enabled; callers disable the studio
+  // entry only when the returned value is explicitly false.
   creative_enabled?: boolean
   table_default_page_size: number
   table_page_size_options: number[]

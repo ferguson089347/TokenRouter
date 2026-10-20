@@ -199,6 +199,8 @@ const groupExpandOverrides = ref<Map<string, boolean>>(new Map())
 
 // 批量图片入口还需要用户 API Key 和分组权限同时满足。
 const flagBatchImageAccess = () => canUseBatchImage.value
+// flagIntelligenceAccess reports whether quality checks are enabled in confirmed public settings.
+const flagIntelligenceAccess = () => appStore.cachedPublicSettings?.intelligence_enabled === true
 // flagTicketAccess checks the confirmed public switch before showing support navigation.
 const flagTicketAccess = () => appStore.cachedPublicSettings?.ticket_enabled !== false
 // 创作台入口由功能开关控制（默认开），可用模型以页面内目录为准。
@@ -256,6 +258,7 @@ const userNavItems = computed((): NavItem[] => {
       icon: null,
       iconSvg: item.icon_svg,
     })),
+    { path: '/intelligence', label: t('intelligence.title'), icon: 'ranking' as const, featureFlag: flagIntelligenceAccess },
     { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
   ]
   const visibleItems = items.filter(item => item.featureFlag?.() !== false)
@@ -312,6 +315,7 @@ const personalNavItems = computed((): NavItem[] => {
       icon: null,
       iconSvg: item.icon_svg,
     })),
+    { path: '/intelligence', label: t('intelligence.title'), icon: 'ranking' as const, featureFlag: flagIntelligenceAccess },
     { path: '/tickets', label: t('tickets.title'), icon: 'ticket' as const, featureFlag: flagTicketAccess },
   ]
   const visibleItems = items.filter(item => item.featureFlag?.() !== false)
@@ -337,6 +341,7 @@ const customMenuItemsForAdmin = computed(() => {
 // support at the end of the management section when ticket access is enabled.
 const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
+    { path: '/admin/intelligence-tests', label: t('intelligence.adminTitle'), icon: 'ranking' as const, featureFlag: flagIntelligenceAccess },
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
     ...(adminSettingsStore.opsMonitoringEnabled
       ? [{ path: '/admin/ops', label: t('nav.ops'), icon: 'chart' as const }]
