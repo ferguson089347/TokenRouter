@@ -213,51 +213,84 @@
               </div>
             </div>
 
-            <div class="grid min-w-0 grid-cols-1 items-start gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 md:p-5">
-              <!-- 窄屏使用单列和可收缩卡片，长定价内容在卡片内换行，大屏使用三列。 -->
-              <article
-                v-for="model in group.models"
-                :key="`${group.id}-${model.id}`"
-                class="group min-w-0 max-w-full rounded-surface border border-gray-100 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-sm dark:border-dark-700 dark:bg-dark-950/80 dark:hover:border-primary-500/50"
+            <div class="border-t border-gray-100 bg-primary-50/40 p-3 dark:border-dark-700 dark:bg-primary-500/5">
+              <button
+                :id="`marketplace-group-toggle-${group.id}`"
+                type="button"
+                class="btn btn-primary min-h-11 w-full justify-between gap-3 px-4"
+                data-testid="marketplace-group-toggle"
+                :aria-expanded="expandedGroupIds.has(group.id)"
+                :aria-controls="`marketplace-group-models-${group.id}`"
+                @click="toggleGroupModels(group.id)"
               >
-                <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                  <div class="flex min-w-0 flex-1 basis-32 items-center">
-                    <h3 class="min-w-0 truncate text-base font-semibold text-gray-950 dark:text-white">{{ model.display_name }}</h3>
-                    <!-- 模型属性和可用协议收进标题旁的信息图标，悬停或点击后以浮层展示，不占用卡片高度。 -->
-                    <ModelAttributeDetails
-                      v-if="model.attributes || marketplaceProtocols(model.protocols).length > 0"
-                      :model="model"
-                      class="shrink-0"
-                    />
-                  </div>
-                  <ModelCapabilityTags :model="model" />
-                </div>
-                <!-- ID 独占整行，右侧能力图标占用标题行。 -->
-                <ModelIdLabel :model-id="model.id" class="mt-1" />
-
-                <!-- 价格预览使用无边框列表。 -->
-                <div class="mt-4">
-                  <template v-if="compactPricingRows(model.pricing).length > 0">
-                    <dl class="space-y-2">
-                      <div
-                        v-for="row in compactPricingRows(model.pricing)"
-                        :key="row.key"
-                        class="flex items-baseline justify-between gap-3 text-sm"
-                      >
-                        <dt class="shrink-0 text-gray-500 dark:text-dark-400">{{ row.label }}</dt>
-                        <dd class="min-w-0 break-words text-right font-medium tabular-nums [overflow-wrap:anywhere] text-gray-900 dark:text-white">{{ row.value }}</dd>
-                      </div>
-                    </dl>
-                  </template>
-                  <p v-else class="text-sm text-gray-400 dark:text-dark-500">
-                    {{ t('marketplace.pricingUnavailable') }}
-                  </p>
-
-                  <!-- 完整定价使用卡片内抽屉浮窗，组件管理展开、收起、区间和 fast mode 切换。 -->
-                  <ModelPricingPanel :model="model" />
-                </div>
-              </article>
+                <span class="flex min-w-0 flex-wrap items-center gap-2">
+                  <span class="font-semibold">{{ t(expandedGroupIds.has(group.id) ? 'marketplace.collapseModels' : 'marketplace.expandModels') }}</span>
+                  <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium tabular-nums">
+                    {{ t('marketplace.groupModelCount', { count: group.model_count }) }}
+                  </span>
+                </span>
+                <Icon
+                  name="chevronDown"
+                  size="md"
+                  class="shrink-0 transition-transform duration-normal"
+                  :class="{ 'rotate-180': expandedGroupIds.has(group.id) }"
+                  :animate-on-hover="false"
+                />
+              </button>
             </div>
+
+            <Collapse
+              :id="`marketplace-group-models-${group.id}`"
+              :open="expandedGroupIds.has(group.id)"
+              :aria-labelledby="`marketplace-group-toggle-${group.id}`"
+              unmount-on-hide
+            >
+              <div class="grid min-w-0 grid-cols-1 items-start gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 md:p-5">
+                <!-- Narrow layouts keep cards in one column; the grid grows to three columns when space permits. -->
+                <article
+                  v-for="model in group.models"
+                  :key="`${group.id}-${model.id}`"
+                  class="group min-w-0 max-w-full rounded-surface border border-gray-100 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-sm dark:border-dark-700 dark:bg-dark-950/80 dark:hover:border-primary-500/50"
+                >
+                  <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                    <div class="flex min-w-0 flex-1 basis-32 items-center">
+                      <h3 class="min-w-0 truncate text-base font-semibold text-gray-950 dark:text-white">{{ model.display_name }}</h3>
+                      <!-- The information button groups attributes and protocols beside the model name, leaving card space for prices. -->
+                      <ModelAttributeDetails
+                        v-if="model.attributes || marketplaceProtocols(model.protocols).length > 0"
+                        :model="model"
+                        class="shrink-0"
+                      />
+                    </div>
+                    <ModelCapabilityTags :model="model" />
+                  </div>
+                  <!-- The model ID gets its own row so capability tags can share the title row. -->
+                  <ModelIdLabel :model-id="model.id" class="mt-1" />
+
+                  <!-- Price summaries use a borderless list of the quoted billing units. -->
+                  <div class="mt-4">
+                    <template v-if="compactPricingRows(model.pricing).length > 0">
+                      <dl class="space-y-2">
+                        <div
+                          v-for="row in compactPricingRows(model.pricing)"
+                          :key="row.key"
+                          class="flex items-baseline justify-between gap-3 text-sm"
+                        >
+                          <dt class="shrink-0 text-gray-500 dark:text-dark-400">{{ row.label }}</dt>
+                          <dd class="min-w-0 break-words text-right font-medium tabular-nums [overflow-wrap:anywhere] text-gray-900 dark:text-white">{{ row.value }}</dd>
+                        </div>
+                      </dl>
+                    </template>
+                    <p v-else class="text-sm text-gray-400 dark:text-dark-500">
+                      {{ t('marketplace.pricingUnavailable') }}
+                    </p>
+
+                    <!-- ModelPricingPanel manages detailed prices, context ranges, and fast-mode selection inside its card. -->
+                    <ModelPricingPanel :model="model" />
+                  </div>
+                </article>
+              </div>
+            </Collapse>
           </section>
         </div>
       </div>
@@ -288,6 +321,7 @@ import Select from '@/components/common/Select.vue'
 import FilterDropdown from '@/components/common/FilterDropdown.vue'
 import FilterField from '@/components/common/FilterField.vue'
 import ModelIdLabel from '@/components/common/ModelIdLabel.vue'
+import Collapse from '@/components/common/Collapse.vue'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 import { initTheme, useTheme } from '@/composables/useTheme'
 import { getMarketplaceModels } from '@/api/marketplace'
@@ -305,6 +339,12 @@ import { useAppStore, useAuthStore } from '@/stores'
 // while guests receive the public page. Model tooltips combine attributes and
 // protocols, with route differences shown after both sections. Video summaries
 // show the backend's group-scaled per-second quotes and retain free dimensions.
+//
+// Search and brand, pricing, and group filters determine the models retained in
+// each visible group. The model count follows that filtered list, while local
+// group IDs keep expansion choices separate from filter results. Group summaries
+// remain visible while model lists start collapsed. Collapse mounts model cards
+// when a visitor opens their group and releases them after the group closes.
 
 type VisibleMarketplaceGroup = MarketplaceGroup
 // PricingFilter selects the public quote category shown in marketplace results.
@@ -330,6 +370,9 @@ const search = ref('')
 const selectedBrand = ref<string | 'all'>('all')
 const selectedPricingMode = ref<PricingFilter>('all')
 const selectedGroupId = ref<number | 'all'>('all')
+// expandedGroupIds records each group's open state for this page visit; newly
+// encountered groups remain collapsed until the visitor chooses their model list.
+const expandedGroupIds = ref(new Set<number>())
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
@@ -436,6 +479,17 @@ const filteredGroups = computed<VisibleMarketplaceGroup[]>(() => {
 })
 
 const hasMarketplaceResults = computed(() => filteredGroups.value.length > 0)
+
+// toggleGroupModels toggles one group's model list for the current page visit.
+// Each group starts collapsed and keeps its own state while search and filters
+// change the displayed groups.
+function toggleGroupModels(groupId: number): void {
+  if (expandedGroupIds.value.has(groupId)) {
+    expandedGroupIds.value.delete(groupId)
+  } else {
+    expandedGroupIds.value.add(groupId)
+  }
+}
 
 function hasPositiveValue(value?: number | null): value is number {
   return typeof value === 'number' && value > 0

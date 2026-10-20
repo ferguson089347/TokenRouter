@@ -184,7 +184,10 @@ function marketplaceModel(id: string, displayName: string, pricing: MarketplaceM
   }
 }
 
-async function mountMarketplace() {
+// mountMarketplace opens fixture groups for model-content assertions unless disabled.
+// Tests of the initial folded state pass false, while pricing and capability
+// tests reach their cards through the visible group controls.
+async function mountMarketplace(expandGroups = true) {
   const wrapper = mount(ModelMarketplaceView, {
     global: {
       stubs: {
@@ -200,6 +203,12 @@ async function mountMarketplace() {
     },
   })
   await flushPromises()
+  if (expandGroups) {
+    for (const toggle of wrapper.findAll('[data-testid="marketplace-group-toggle"]')) {
+      await toggle.trigger('click')
+    }
+    await flushPromises()
+  }
   return wrapper
 }
 
@@ -232,7 +241,30 @@ describe('ModelMarketplaceView', () => {
     wrapper.unmount()
   })
 
-  it('默认按分组-模型展示', async () => {
+  // A fresh visit shows group summaries with every model list folded.
+  // Opening one group exposes its cards while neighboring groups remain folded.
+  it('starts groups folded and opens each model list independently', async () => {
+    const wrapper = await mountMarketplace(false)
+    const toggles = wrapper.findAll('[data-testid="marketplace-group-toggle"]')
+    const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
+    expect(toggles).toHaveLength(4)
+    expect(toggles.every(toggle => toggle.attributes('aria-expanded') === 'false')).toBe(true)
+    expect(wrapper.findAll('article')).toHaveLength(0)
+    expect(toggles[0].text()).toContain('marketplace.expandModels')
+    await toggles[0].trigger('click')
+    await flushPromises()
+    expect(toggles[0].attributes('aria-expanded')).toBe('true')
+    expect(sections[0].findAll('article')).toHaveLength(2)
+    expect(sections[1].findAll('article')).toHaveLength(0)
+    expect(toggles[1].attributes('aria-expanded')).toBe('false')
+    expect(toggles[0].text()).toContain('marketplace.collapseModels')
+    await toggles[0].trigger('click')
+    expect(toggles[0].attributes('aria-expanded')).toBe('false')
+    expect(sections[0].get('.motion-collapse').attributes('aria-hidden')).toBe('true')
+    wrapper.unmount()
+  })
+
+  it('renders the catalog as separate group sections', async () => {
     const wrapper = await mountMarketplace()
 
     expect(wrapper.findAll('[data-testid="marketplace-group-section"]')).toHaveLength(4)
