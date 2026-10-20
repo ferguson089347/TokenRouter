@@ -639,6 +639,8 @@ affiliate: {
     administrator: '管理员',
     user: '用户',
     username: '用户名',
+    userId: '用户 ID',
+    copyUserId: '复制用户 ID',
     email: '邮箱',
     status: '状态',
     role: '角色',

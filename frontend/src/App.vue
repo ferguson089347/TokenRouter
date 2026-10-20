@@ -10,6 +10,11 @@ import { getSetupStatus } from '@/api/setup'
 import { sanitizeUrl } from '@/utils/url'
 import { updateFavicon } from '@/utils/branding'
 
+// App.vue hosts routed pages, navigation progress, and account notifications.
+// Shared public settings refresh browser branding and page titles, while login
+// changes start or stop subscription polling and announcement reads for the
+// current authenticated browser session.
+
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
@@ -35,12 +40,18 @@ async function onLocaleChanged() {
   updateDocumentTitle()
 }
 
+// updateDocumentTitle applies the current route and public navigation settings to the browser tab.
 function updateDocumentTitle() {
   const customMenuItems = [
     ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
     ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
   ]
-  document.title = resolveRouteDocumentTitle(route, appStore.siteName, customMenuItems)
+  document.title = resolveRouteDocumentTitle(
+    route,
+    appStore.siteName,
+    customMenuItems,
+    appStore.cachedPublicSettings?.subscription_entry_enabled,
+  )
 }
 
 // Watch for site settings changes and update favicon/title
@@ -61,6 +72,7 @@ watch(
     () => route.meta.titleKey,
     () => appStore.siteName,
     () => appStore.cachedPublicSettings?.custom_menu_items,
+    () => appStore.cachedPublicSettings?.subscription_entry_enabled,
     () => authStore.isAdmin,
     () => adminSettingsStore.customMenuItems,
   ],

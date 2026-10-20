@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveDocumentTitle, resolveRouteDocumentTitle } from '@/router/title'
+import { resolveDocumentTitle, resolveRouteDocumentTitle, resolveRouteDisplayKeys } from '@/router/title'
 
 describe('resolveDocumentTitle', () => {
   it('路由存在标题时，使用“路由标题 - 站点名”格式', () => {
@@ -45,5 +45,37 @@ describe('resolveRouteDocumentTitle', () => {
         sort_order: 0
       }
     ])).toBe('提供商调度器 - EzouAPI')
+  })
+})
+
+// Purchase copy must follow navigation visibility across shared page and tab
+// title callers. Other routes retain their metadata when subscription entries hide.
+describe('purchase display keys', () => {
+  const purchaseRoute = {
+    name: 'PurchaseSubscription',
+    meta: { titleKey: 'nav.buySubscription', descriptionKey: 'purchase.description' },
+  }
+
+  // A purchase route can be visited after an administrator hides subscription
+  // entries. Its shared display keys must describe balance top-ups in that state.
+  it('selects recharge wording when subscription entries are hidden', () => {
+    expect(resolveRouteDisplayKeys(purchaseRoute, false)).toEqual({
+      titleKey: 'payment.rechargeAccount',
+      descriptionKey: 'purchase.rechargeDescription',
+    })
+  })
+
+  // Older public settings can omit the subscription visibility switch entirely.
+  // Omitted settings and enabled settings must both keep the combined purchase wording.
+  it('keeps combined purchase wording for enabled and omitted settings', () => {
+    expect(resolveRouteDisplayKeys(purchaseRoute)).toEqual(purchaseRoute.meta)
+    expect(resolveRouteDisplayKeys(purchaseRoute, true)).toEqual(purchaseRoute.meta)
+  })
+
+  // Subscription visibility applies to the purchase route's display text.
+  // A profile route keeps its configured heading and description when that setting is disabled.
+  it('keeps another route unchanged when subscription entries are hidden', () => {
+    const profileRoute = { name: 'Profile', meta: { titleKey: 'profile.title', descriptionKey: 'profile.description' } }
+    expect(resolveRouteDisplayKeys(profileRoute, false)).toEqual(profileRoute.meta)
   })
 })

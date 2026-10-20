@@ -37,6 +37,7 @@
                 <p class="truncate text-sm text-gray-600 dark:text-gray-300">
                   {{ primaryEmailDisplay }}
                 </p>
+                <UserIdBadge v-if="user" :user-id="user.id" />
                 <div
                   v-if="sourceHints.length"
                   class="flex flex-wrap gap-2 text-xs text-gray-500 dark:text-gray-400"
@@ -164,11 +165,23 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import UserIdBadge from '@/components/common/UserIdBadge.vue'
 import ProfileAvatarCard from '@/components/user/profile/ProfileAvatarCard.vue'
 import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
 import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 import type { User, UserAuthBindingStatus, UserAuthProvider, UserProfileSourceContext } from '@/types'
+
+// ProfileInfoCard.vue presents account identity, balance, membership information,
+// and linked profile sources. The overview displays the authenticated user's
+// numeric ID through the shared copy control, while editable profile details and
+// identity bindings use their dedicated child components.
+//
+// Profile source hints accept both structured provider metadata and legacy string
+// values. The structured profile_sources fields take precedence over individual
+// legacy source fields, and provider labels supply readable names for the hints.
+// Email binding state determines whether a synthetic OAuth address is presented
+// as contact information, keeping the overview consistent with the binding controls.
 
 const props = withDefaults(defineProps<{
   user: User | null

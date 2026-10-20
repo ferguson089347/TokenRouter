@@ -5,6 +5,18 @@ import { availableLocales, defaultLocale, normalizeLocale, type LocaleCode } fro
 export { availableLocales } from './catalog'
 export type { LocaleCode } from './catalog'
 
+// index.ts loads translation catalogs and applies the browser's selected language.
+// Language selection consults saved preferences, cookies, browser languages, and
+// the site default. Locale changes update document language, direction, cookies,
+// translated route titles, and the authenticated account preference through the
+// same normalized language codes used by catalog loading.
+//
+// Catalog loading and account writes can overlap when a user switches languages
+// repeatedly. A generation counter lets the latest selection publish browser
+// state, and queued account writes check that generation and account identity
+// before saving. Title resolution also receives public subscription visibility
+// so changing language keeps purchase wording consistent with the displayed controls.
+
 type LocaleMessages = Record<string, any>
 
 const LOCALE_KEY = 'tokenrouter_locale'
@@ -79,6 +91,13 @@ function applyDocumentLocale(locale: LocaleCode): void {
   document.cookie = `${LOCALE_KEY}=${locale}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`
 }
 
+// setLocale applies a supported language and optionally saves the account preference.
+// Unsupported input returns immediately, and a newer selection supersedes an
+// earlier call while catalogs or route dependencies load. Browser state publishes
+// before account persistence; the queued save checks both the active generation
+// and authenticated user so a delayed operation applies to its selected account.
+// Callers await completion to observe any account-save error after browser language
+// and route-title updates have taken effect.
 export async function setLocale(value: string, persistAccount = true): Promise<void> {
   const locale = normalizeLocale(value)
   if (!locale) {
@@ -107,7 +126,12 @@ export async function setLocale(value: string, persistAccount = true): Promise<v
     ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
     ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
   ]
-  document.title = resolveRouteDocumentTitle(route, appStore.siteName, customMenuItems)
+  document.title = resolveRouteDocumentTitle(
+    route,
+    appStore.siteName,
+    customMenuItems,
+    appStore.cachedPublicSettings?.subscription_entry_enabled,
+  )
   window.dispatchEvent(new CustomEvent('locale-changed', { detail: locale }))
   if (persistAccount && authStore.isAuthenticated) {
     const { apiClient } = await import('@/api/client')

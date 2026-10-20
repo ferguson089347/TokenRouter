@@ -634,6 +634,8 @@ affiliate: {
     administrator: 'Administrator',
     user: 'User',
     username: 'Username',
+    userId: 'User ID',
+    copyUserId: 'Copy user ID',
     email: 'Email',
     status: 'Status',
     role: 'Role',

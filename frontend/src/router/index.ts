@@ -909,7 +909,12 @@ router.beforeEach(async (to, _from, next) => {
     ...(appStore.cachedPublicSettings?.custom_menu_items ?? []),
     ...(authStore.isAdmin ? adminSettingsStore.customMenuItems : []),
   ]
-  document.title = resolveRouteDocumentTitle(to, appStore.siteName, customMenuItems)
+  document.title = resolveRouteDocumentTitle(
+    to,
+    appStore.siteName,
+    customMenuItems,
+    appStore.cachedPublicSettings?.subscription_entry_enabled,
+  )
 
   // Check if route requires authentication
   const requiresAuth = to.meta.requiresAuth !== false // Default to true

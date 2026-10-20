@@ -194,6 +194,7 @@ marketplace: {
   purchase: {
     title: '充值/订阅',
     description: '充值余额或订阅套餐',
+    rechargeDescription: '充值账户余额',
     openInNewTab: '新窗口打开',
     notEnabledTitle: '该功能未开启',
     notEnabledDesc: '管理员暂未开启充值/订阅入口，请联系管理员。',

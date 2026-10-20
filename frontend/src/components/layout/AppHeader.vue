@@ -155,6 +155,10 @@
                   <Icon name="cog" size="sm" class="shrink-0 text-primary-900/45 dark:text-dark-400" />
                 </router-link>
 
+                <div class="px-2.5 pt-2">
+                  <UserIdBadge :user-id="user.id" />
+                </div>
+
                 <!-- 窄屏顶栏不显示余额，放在账户卡下方。 -->
                 <div class="flex items-baseline justify-between gap-3 px-2.5 pb-1 pt-2 sm:hidden">
                   <span class="text-xs text-primary-900/60 dark:text-dark-400">{{ t('common.balance') }}</span>
@@ -255,6 +259,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
+import UserIdBadge from '@/components/common/UserIdBadge.vue'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import HeaderContactSupport from '@/components/layout/HeaderContactSupport.vue'
