@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* style.css defines shared layout tokens, component styles, and motion for the
+   frontend. Common controls use these rules across public pages and the console,
+   with responsive sizing and dark colors supplied alongside their default
+   appearance. */
+
 @layer base {
   :root {
     /* 动效时长只在这里定义；CSS 与命令式内容淡入读取同一组变量。 */
@@ -832,9 +837,24 @@
     @apply px-3;
   }
 
-  /* 顶栏工具区图标按钮:AppHeader 及其拆出的子组件(如联系客服)共用。 */
-  .header-status-icon-button {
+  /* Header controls share their hit area, hover colors, and keyboard focus treatment across components. */
+  .header-status-icon-button,
+  .header-status-action {
     @apply flex h-9 w-9 items-center justify-center rounded-control text-primary-900 transition-colors hover:bg-primary-100 dark:text-dark-100 dark:hover:bg-dark-700 dark:hover:text-white;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50;
+  }
+
+  /* Labels expand at md so smaller headers keep room for branding and account controls. */
+  .header-status-action {
+    @apply shrink-0 gap-2 whitespace-nowrap text-sm font-medium md:w-auto md:px-2 lg:px-3;
+  }
+
+  .header-status-action-label {
+    @apply hidden md:inline;
+  }
+
+  .header-status-action[aria-expanded='true'] {
+    @apply bg-primary-100 dark:bg-dark-700;
   }
 
   /* 内缩菜单:面板配 .dropdown py-0,内容按 .menu-section 分区,相邻分区自动加分隔线。

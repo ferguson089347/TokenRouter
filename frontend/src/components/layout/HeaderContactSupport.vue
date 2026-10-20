@@ -3,18 +3,19 @@
     <button
       type="button"
       data-testid="contact-support-toggle"
-      class="header-status-icon-button"
+      class="header-status-action"
       :aria-label="t('common.contactSupport')"
       :aria-expanded="isOpen"
       :title="t('common.contactSupport')"
       @click="toggleDropdown"
     >
       <Icon name="chat" size="md" />
+      <span class="header-status-action-label">{{ t('common.contactSupport') }}</span>
     </button>
     <MotionTransition name="dropdown-fade" persisted>
       <div
         v-show="isOpen"
-        class="dropdown right-0 z-modal-nested mt-2 w-72 origin-top-right py-0"
+        class="dropdown fixed inset-x-4 top-[var(--header-h)] z-modal-nested mt-2 origin-top-left py-0 md:absolute md:inset-x-auto md:left-0 md:top-auto md:w-72"
         @keydown.esc.stop="closeDropdown"
       >
         <div class="menu-section">
@@ -39,8 +40,9 @@ import { parseSupportContacts, safeContactUrl } from '@/utils/supportContacts'
 
 // HeaderContactSupport.vue opens the site's labeled support methods from the
 // shared header. Text, links, and QR images use the same renderer as the profile.
-// The panel remains mounted while closed so a teleported image preview can finish
-// its dialog lifecycle after clicks outside the header close the menu.
+// Narrow screens show the panel within the header's viewport width. The panel
+// remains mounted while closed so a teleported image preview can finish its
+// dialog lifecycle after clicks outside the header close the menu.
 
 // Header state tracks menu visibility and the trigger container used to dismiss outside interactions after support methods are configured.
 const { t } = useI18n()

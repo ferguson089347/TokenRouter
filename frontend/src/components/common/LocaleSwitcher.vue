@@ -1,21 +1,25 @@
 <template>
   <div class="relative" ref="dropdownRef">
     <button
+      type="button"
       @click="toggleDropdown"
       :disabled="switching"
       :class="triggerClass"
+      :aria-label="currentLocale?.name"
+      :aria-expanded="isOpen"
       :title="currentLocale?.name"
     >
-      <!-- 顶栏状态变体用语言图标（文/A 字形）与相邻图标按钮对齐，也避开国旗 emoji 在 Windows 上无法渲染的问题。 -->
+      <!-- The header uses a language icon so its trigger also renders on systems lacking flag emoji. -->
       <Icon v-if="variant === 'status'" name="languages" size="md" />
       <span v-else class="text-base leading-none">{{ currentLocale?.flag }}</span>
-      <span v-if="variant !== 'status'" class="hidden sm:inline">{{ currentLocale?.code.toUpperCase() }}</span>
+      <span :class="variant === 'status' ? 'header-status-action-label' : 'hidden sm:inline'">
+        {{ currentLocaleLabel }}
+      </span>
       <Icon
-        v-if="variant !== 'status'"
         name="chevronDown"
         size="xs"
         class="text-gray-400 transition-transform duration-normal"
-        :class="{ 'rotate-180': isOpen }"
+        :class="[variant === 'status' && 'hidden md:block', { 'rotate-180': isOpen }]"
         :animate-on-hover="false"
       />
     </button>
@@ -59,6 +63,11 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { setLocale, availableLocales } from '@/i18n'
 
+// LocaleSwitcher.vue displays the current language and opens the available
+// translations. Its header variant reveals the language code on wider screens,
+// while language changes use the shared locale loader and disable the trigger
+// until loading finishes.
+
 const props = withDefaults(defineProps<{
   variant?: 'default' | 'status'
 }>(), {
@@ -74,9 +83,19 @@ const switching = ref(false)
 const currentLocaleCode = computed(() => locale.value)
 const currentLocale = computed(() => availableLocales.find((l) => l.code === locale.value))
 const variant = computed(() => props.variant)
+
+// currentLocaleLabel shows the primary language tag in the header, where space
+// is shared with navigation; the menu presents each language's full name.
+const currentLocaleLabel = computed(() => {
+  const code = currentLocale.value?.code
+  return (variant.value === 'status' ? code?.split('-')[0] : code)?.toUpperCase()
+})
+
+// triggerClass applies shared header action sizing or the standalone selector's
+// compact appearance according to the requested variant.
 const triggerClass = computed(() => {
   if (variant.value === 'status') {
-    return 'flex h-9 w-9 items-center justify-center rounded-control text-primary-900 transition-colors hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-dark-100 dark:hover:bg-dark-700 dark:hover:text-white'
+    return 'header-status-action disabled:cursor-not-allowed disabled:opacity-60'
   }
   return 'flex items-center gap-1.5 rounded-control px-2 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-300 dark:hover:bg-dark-700'
 })
@@ -113,6 +132,3 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 </script>
-
-<style scoped>
-</style>

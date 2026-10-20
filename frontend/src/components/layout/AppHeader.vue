@@ -3,7 +3,7 @@
     <!-- 水平内边距与主内容区保持同一条链，两侧边缘在所有断点对齐。 -->
     <div class="flex h-[var(--header-h)] items-center justify-between gap-3 px-4 md:px-6 lg:px-8">
       <!-- 品牌展示在全局顶栏。 -->
-      <div class="flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
+      <div class="flex min-w-0 items-center gap-2 sm:gap-4">
         <button
           v-if="!publicPage && !isCreativeStudio"
           @click="appStore.toggleMobileSidebar()"
@@ -44,18 +44,10 @@
         </router-link>
       </div>
 
-      <!-- 右侧分为工具区和账户区：工具区是同尺寸图标按钮，账户区是余额按钮和头像。 -->
+      <!-- Utility links show labels from md upward; account controls follow as a separate group. -->
       <div class="header-status-actions">
         <div class="header-status-icon-group">
-          <router-link
-            v-if="publicPage"
-            to="/models"
-            class="header-status-icon-button hidden sm:flex"
-            :aria-label="t('nav.modelMarketplace')"
-            :title="t('nav.modelMarketplace')"
-          >
-            <Icon name="modelMarketplace" size="md" />
-          </router-link>
+          <HeaderContactSupport />
 
           <div v-if="user" class="hidden sm:block">
             <AnnouncementBell variant="status" />
@@ -66,14 +58,24 @@
             :href="docUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="header-status-icon-button hidden sm:flex"
+            class="header-status-action hidden sm:flex"
             :aria-label="t('nav.docs')"
             :title="t('nav.docs')"
           >
             <Icon name="book" size="md" />
+            <span class="header-status-action-label">{{ t('nav.docs') }}</span>
           </a>
 
-          <HeaderContactSupport />
+          <router-link
+            v-if="publicPage"
+            to="/models"
+            class="header-status-action hidden sm:flex"
+            :aria-label="t('nav.modelMarketplace')"
+            :title="t('nav.modelMarketplace')"
+          >
+            <Icon name="modelMarketplace" size="md" />
+            <span class="header-status-action-label">{{ t('nav.modelMarketplace') }}</span>
+          </router-link>
 
           <LocaleSwitcher variant="status" />
 
@@ -399,7 +401,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .header-status-actions {
-  @apply ml-auto flex min-w-0 shrink-0 items-center gap-2 sm:gap-5;
+  @apply ml-auto flex min-w-0 shrink-0 items-center gap-2 sm:gap-3;
 }
 
 .header-brand {

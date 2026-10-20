@@ -28,9 +28,11 @@ describe('AppHeader theme toggle', () => {
     expect(componentSource).toContain("{ mode: 'system', icon: 'monitor', label: t('nav.systemTheme') }")
   })
 
+  // Mobile headers reserve space for branding and account access. Secondary links
+  // remain hidden below sm while utility spacing stays compact.
   it('hides lower-priority header actions on mobile', () => {
     expect(componentSource).toContain('<div v-if="user" class="hidden sm:block">')
-    expect(componentSource).toContain('class="header-status-icon-button hidden sm:flex"')
+    expect(componentSource).toContain('class="header-status-action hidden sm:flex"')
     expect(componentSource).toContain('@apply flex items-center gap-1 sm:gap-2;')
   })
 })
