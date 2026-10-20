@@ -78,6 +78,7 @@
 - 深底的信息提示（`HelpTooltip`、表格悬停明细、状态说明等）用 `.tooltip-panel`：浅色模式是 `gray-900` 深底白字；深色模式是 `dark-900` 底色、`dark-100` 文字和 `dark-600` 描边。箭头用 `.tooltip-caret` 旋转方块，一半嵌进面板边缘；调用处补定位和朝外的两条边（向下 `border-b border-r`，向上 `border-l border-t`，向左 `border-b border-l`，向右 `border-r border-t`）。手写的 `dark:bg-gray-*` 面板和边框三角箭头，在深色配色调整时容易漏改，统一用这两个类。浮层内的分隔线在深色模式下用 `dark-600`。
 - 菜单项有两档：`.dropdown-item`（px-4）和紧凑档 `.dropdown-item-sm`（px-3）。配色、hover 和过渡都已包含，调用处只补 `gap-*`、`rounded-control` 这类布局类。基础配色是中性色。顶栏用户菜单、联系客服、语言切换这类导航型浮层，用内缩菜单样式：面板 `.dropdown py-0`，内容按 `.menu-section` 分区（`p-1.5` 留白，相邻分区之间自动加分隔线），分区标题 `.menu-heading`，菜单项 `.menu-item` 内缩并带 `rounded-control` 的悬停底色，悬停配色和 `.sidebar-link` 一致，图标继承文字颜色；危险操作再加 `.menu-item-danger`。
 - 顶栏工具区的纯图标按钮用全局的 `.header-status-icon-button`；客服、文档、模型广场和语言切换用 `.header-status-action`，文字用 `.header-status-action-label`，在 `md` 及以上显示，窄屏收为图标。客服和语言菜单展开时，触发按钮显示选中底色。
+- 个人资料和顶栏头像菜单共用 `UserIdBadge.vue` 展示用户 ID，显示值为实际存储 ID 加 `#` 前缀，复制按钮复制完整展示值。例如老用户 ID 为 1 时显示并复制 `#1`，新用户 ID 为 1000 时显示并复制 `#1000`。
 - 列表工具栏的漏斗筛选用 `FilterDropdown`，每个字段用 `FilterField` 包裹；按钮、面板和点击外部关闭的逻辑都由组件提供。
   - 面板外观和 `DateRangePicker` 一致：`rounded-surface`、淡描边和柔和阴影。头部、已选条件和字段区之间靠留白分层，中间没有分割线。
   - 头部是标题、条件数和「重置」，没有生效的条件时「重置」置灰。有生效条件时，头部下方列出已选条件标签（字段名、当前取值和 ×），顺序和字段一致，点 × 只移除这一项。再往下是可滚动的字段栅格。

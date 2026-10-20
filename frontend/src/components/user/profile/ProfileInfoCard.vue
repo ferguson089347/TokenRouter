@@ -174,7 +174,7 @@ import type { User, UserAuthBindingStatus, UserAuthProvider, UserProfileSourceCo
 
 // ProfileInfoCard.vue presents account identity, balance, membership information,
 // and linked profile sources. The overview displays the authenticated user's
-// numeric ID through the shared copy control, while editable profile details and
+// ID through the shared copy control, while editable profile details and
 // identity bindings use their dedicated child components.
 //
 // Profile source hints accept both structured provider metadata and legacy string

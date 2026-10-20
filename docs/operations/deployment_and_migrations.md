@@ -91,6 +91,8 @@ Apple container 的新栈使用 `org.tokenrouter.stack` 标签；已有的 `sub2
 
 `304_intelligence_tests.sql` 创建独立的检测配置和任务表，包含活动任务唯一索引及轮询、历史索引。迁移为追加表结构，旧二进制可以继续使用既有表；功能默认关闭。回退应用前先关闭检测并等待在途任务结束，避免暂停远端结果的查询。凭据、权限、历史保留和恢复规则见[降智检测](../domains/intelligence_tests.md)。
 
+`305_users_id_start_at_1000.sql` 推进新用户 ID 的分配序列，已有用户行和关联保持原值。锁等待、验证查询和回退规则见[新用户 ID 起点](upgrade_notes.md#user_id_start)。
+
 ## 升级与恢复
 
 ### 通用规则

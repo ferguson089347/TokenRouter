@@ -20,6 +20,8 @@
 
 用户资料、注册和绑定规则、会话、强认证和用户属性在 `internal/identity` 实现，团队在 `internal/team` 实现，Key 的生命周期和认证缓存在 `internal/apikey` 实现。各模块按需要使用 `postgres`、`rediscache`、`provider` 和 `httpapi` 子包处理存储、外部验证和 HTTP。用户实体和仓储接口都使用 identity 的类型，app 把同一个 `identity/postgres.UserStore` 交给用例和所有调用方。
 
+用户 ID 由 `users.id` 的数据库序列分配。迁移 305 将后续新用户的分配起点提高到至少 1000；已有用户 ID 保持原值，已有序列或手工导入的 ID 更大时继续从更大值之后分配。身份 API 返回数值 ID，个人资料和头像菜单显示并复制带 `#` 前缀的同一个 ID。升级规则见[新用户 ID 起点](../operations/upgrade_notes.md#user_id_start)。
+
 公告和 billing 各自读取自己需要的只读用户数据。七类身份、通用 pending 流程和 OAuth 回调的生产 HTTP 由 app 一次性组装；跨模块的 HTTP 测试使用 `identity/httpapi` 的同一组端点。微信支付 OAuth 由 `payment/httpapi` 调用身份 provider 的交换接口完成，它只用于支付授权，与登录身份无关。
 
 身份 HTTP 和调用方直接使用 `identity/httpapi/authctx`。Key 认证成功后的数据、认证失败时只给 Ops 读取的加载数据，以及强制平台字段，由 `apikey/httpapi` 提供；认证失败时加载出的数据不能作为准入依据。资金来源和订阅的读取由 gateway HTTP 负责，字段编码和读取时机由它决定。

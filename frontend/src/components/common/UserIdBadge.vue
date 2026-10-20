@@ -5,30 +5,34 @@
     :aria-label="t(copied ? 'common.copied' : 'profile.copyUserId')"
     :title="t('profile.copyUserId')"
     data-testid="user-id-copy"
-    @click.stop="copyToClipboard(String(userId))"
+    @click.stop="copyToClipboard(displayedUserId)"
   >
     <span class="shrink-0 text-xs">{{ t('profile.userId') }}</span>
-    <span class="min-w-0 truncate font-mono text-sm tabular-nums text-gray-900 dark:text-dark-100">{{ userId }}</span>
+    <span class="min-w-0 truncate font-mono text-sm tabular-nums text-gray-900 dark:text-dark-100">{{ displayedUserId }}</span>
     <Icon :name="copied ? 'check' : 'copy'" size="xs" class="shrink-0" />
   </button>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { computed } from 'vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 
-// UserIdBadge.vue displays the signed-in account identifier with a copy action.
-// Profile summaries and the header account menu share this control so both copy
-// the numeric identifier and use the application's clipboard feedback and browser
-// compatibility handling.
+// UserIdBadge.vue displays the signed-in account ID with a copy action.
+// Profile summaries and the header account menu share the same prefixed value,
+// so clicking either control copies the complete identifier, including its #
+// prefix, through the application's clipboard feedback.
 
-defineProps<{
-  userId: number // displayed account identifier
+const props = defineProps<{
+  userId: number // stored account identifier
 }>()
 
 // Translations label the control, while shared clipboard state supplies copy
 // feedback and the confirmation icon after the browser accepts the identifier.
 const { t } = useI18n()
 const { copied, copyToClipboard } = useClipboard()
+
+// displayedUserId formats the stored user ID with its visible prefix.
+const displayedUserId = computed(() => `#${props.userId}`)
 </script>
