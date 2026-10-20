@@ -1115,12 +1115,6 @@
       @close="closeUseKeyModal"
     />
 
-    <TfCliImportDialog
-      :show="showTfCliImportDialog"
-      :api-key="tfImportKey"
-      @close="closeTfCliImportDialog"
-    />
-
     <KeyActionMenu
       :show="Boolean(actionMenuKey)"
       :api-key="actionMenuKey"
@@ -1128,7 +1122,7 @@
       :allow-import="!publicSettings?.hide_ccs_import_button"
       @close="closeKeyActionMenu"
       @use="openUseKeyModal"
-      @import-tf="openTfCliImportDialog"
+      @import-magpie="importToMagpie"
       @import="importToCcswitch"
       @rotate="confirmRotate"
       @delete="confirmDelete"
@@ -1252,7 +1246,6 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import KeyActionMenu from '@/components/keys/KeyActionMenu.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
 	import ModelRedirectHelp from '@/components/keys/ModelRedirectHelp.vue'
-	import TfCliImportDialog from '@/components/keys/TfCliImportDialog.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -1285,6 +1278,12 @@ import {
   type CcSwitchClientType
 } from '@/utils/ccswitchImport'
 import { availableClients, CLIENT_LABELS, clientProtocol, modelsForProtocol, groupForKeyConfig } from '@/utils/clientConfig'
+import { buildMagpieImportUrl } from '@/utils/magpieImport'
+
+// KeysView.vue manages personal and team API keys, their billing and routing
+// settings, and client configuration exports. The selected scope supplies keys
+// and visible groups, while row actions use the selected key for editing,
+// rotation, and imports into desktop clients.
 
 // Helper to format date for datetime-local input
 const formatDateTimeLocal = (isoDate: string): string => {
@@ -1509,11 +1508,9 @@ const rotatingKey = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
-const showTfCliImportDialog = ref(false)
 const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
-const tfImportKey = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const actionMenuKey = ref<ApiKey | null>(null)
 const actionMenuPosition = ref<{ top: number; left: number } | null>(null)
@@ -2011,16 +2008,6 @@ const openUseKeyModal = (key: ApiKey) => {
 const closeUseKeyModal = () => {
   showUseKeyModal.value = false
   selectedKey.value = null
-}
-
-const openTfCliImportDialog = (key: ApiKey) => {
-  tfImportKey.value = key
-  showTfCliImportDialog.value = true
-}
-
-const closeTfCliImportDialog = () => {
-  showTfCliImportDialog.value = false
-  tfImportKey.value = null
 }
 
 const handlePageChange = (page: number) => {
@@ -2579,6 +2566,28 @@ watch(ccModelOptions, options => { if (!options.some(option => option.value === 
 const importToCcswitch = (row: ApiKey) => {
   pendingCcsRow.value = row
   showCcsClientSelect.value = true
+}
+
+// importToMagpie opens the selected key's provider confirmation in Magpie's web
+// handoff page. Composite keys combine their bound groups' protocols; unavailable
+// destinations show an error before a browser window opens.
+const importToMagpie = (row: ApiKey) => {
+  const keyGroups = row.is_composite
+    ? (row.composite_groups ?? []).map(binding =>
+        groups.value.find(group => group.id === binding.group_id) ?? binding.group
+      )
+    : [groups.value.find(group => group.id === row.group_id) ?? row.group]
+  const url = buildMagpieImportUrl({
+    baseUrl: publicSettings.value?.api_base_url || window.location.origin,
+    providerName: publicSettings.value?.site_name || 'TokenRouter',
+    apiKey: row.key,
+    protocols: keyGroups.flatMap(group => group?.allowed_protocols ?? []),
+  })
+  if (!url) {
+    appStore.showError(t('keys.magpieImportUnavailable'))
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {

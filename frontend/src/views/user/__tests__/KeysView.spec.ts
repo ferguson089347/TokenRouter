@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
@@ -55,7 +55,7 @@ const messages: Record<string, string> = {
   'keys.createKey': 'Create API Key',
   'keys.disable': 'Disable',
   'keys.enable': 'Enable',
-  'keys.importToTf': 'Import to TF CLI',
+  'keys.importToMagpie': 'Import to Magpie',
   'keys.apiKeyLimitReached': 'API key limit reached',
   'keys.created': 'Created',
   'keys.expiresAt': 'Expires',
@@ -315,19 +315,6 @@ const GroupOptionItemStub = {
   template: '<span data-test="group-option-item" :data-has-capacity="capacity ? \'true\' : \'false\'">{{ name }}</span>',
 }
 
-const TfCliImportDialogStub = {
-  name: 'TfCliImportDialog',
-  props: ['show', 'apiKey'],
-  emits: ['close'],
-  template: `
-    <div
-      v-if="show"
-      data-test="tf-cli-dialog-stub"
-      :data-key-name="apiKey?.name"
-    />
-  `,
-}
-
 const mountView = async (settle = true) => {
   const wrapper = mount(KeysView, {
     global: {
@@ -344,7 +331,6 @@ const mountView = async (settle = true) => {
         SearchInput: SearchInputStub,
         Icon: IconStub,
         UseKeyModal: true,
-        TfCliImportDialog: TfCliImportDialogStub,
         EndpointPopover: true,
         GroupBadge: true,
         GroupOptionItem: GroupOptionItemStub,
@@ -374,6 +360,8 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
 }
 
 describe('user KeysView column settings', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   beforeEach(() => {
     localStorage.clear()
 
@@ -492,7 +480,13 @@ describe('user KeysView column settings', () => {
     expect(actionButtons.some((button) => button.text().includes('More'))).toBe(true)
   })
 
-  it('opens tf import from the More menu without a fragment session', async () => {
+  // The More menu imports the selected row using the configured API address.
+  // Credentials stay in Magpie's fragment while the original Keys page remains open.
+  it('opens Magpie import for the selected key and closes the More menu', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    getPublicSettings.mockResolvedValue({ site_name: 'MoonUp', api_base_url: 'https://api.example.test/gateway/v1/' })
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 4 }], total: 1 })
+    getAvailableGroups.mockResolvedValue([{ id: 4, name: 'Responses', allowed_protocols: ['openai_responses'] }])
     const wrapper = await mountView()
 
     const moreButton = getButtonByText(wrapper, 'More')
@@ -501,10 +495,56 @@ describe('user KeysView column settings', () => {
     await nextTick()
     expect(moreButton.attributes('aria-expanded')).toBe('true')
     expect(moreButton.attributes('aria-controls')).toBe('key-action-menu-1')
-    await getButtonByText(wrapper, 'Import to TF CLI').trigger('click')
+    await getButtonByText(wrapper, 'Import to Magpie').trigger('click')
     await nextTick()
 
-    expect(wrapper.get('[data-test="tf-cli-dialog-stub"]').attributes('data-key-name')).toBe('test-key')
+    expect(open).toHaveBeenCalledWith(expect.stringContaining('https://usemagpie.ai/import#'), '_blank', 'noopener,noreferrer')
+    const url = new URL(open.mock.calls[0]![0] as string)
+    const params = new URLSearchParams(url.hash.slice(1))
+    expect(url.search).toBe('')
+    expect(params.get('name')).toBe('MoonUp')
+    expect(params.get('key')).toBe('sk-test-key')
+    expect(params.get('responses')).toBe('https://api.example.test/gateway/v1')
+    expect(params.has('anthropic')).toBe(false)
+    expect(moreButton.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.text()).not.toContain('Import to TF CLI')
+    wrapper.unmount()
+  })
+
+  // Composite keys can route through several bound groups. The Magpie handoff
+  // includes their text endpoints and leaves prefixed model discovery to the gateway.
+  it('imports composite group protocols from visible and embedded groups', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), is_composite: true, composite_groups: [
+      { group_id: 4, prefix: 'GPT', group: { id: 4, allowed_protocols: ['openai_chat_completions'] } },
+      { group_id: 5, prefix: 'Claude', group: { id: 5, allowed_protocols: ['anthropic_messages'] } },
+    ] }], total: 1 })
+    getAvailableGroups.mockResolvedValue([{ id: 4, name: 'Responses', allowed_protocols: ['openai_responses'] }])
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'More').trigger('click')
+    await getButtonByText(wrapper, 'Import to Magpie').trigger('click')
+
+    const params = new URLSearchParams(new URL(open.mock.calls[0]![0] as string).hash.slice(1))
+    expect(params.get('responses')).toBe(`${window.location.origin}/v1`)
+    expect(params.get('anthropic')).toBe(window.location.origin)
+    expect(params.has('chat')).toBe(false)
+    expect(params.has('models')).toBe(false)
+    wrapper.unmount()
+  })
+
+  // A key with media endpoints has no text provider Magpie can import. The page
+  // explains the unavailable import and leaves browser navigation unchanged.
+  it('shows an error for keys without a supported Magpie protocol', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 4 }], total: 1 })
+    getAvailableGroups.mockResolvedValue([{ id: 4, name: 'Images', allowed_protocols: ['image_batches'] }])
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'More').trigger('click')
+    await getButtonByText(wrapper, 'Import to Magpie').trigger('click')
+
+    expect(open).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('keys.magpieImportUnavailable')
+    wrapper.unmount()
   })
 
   it('轮换先确认，取消时不发送请求', async () => {

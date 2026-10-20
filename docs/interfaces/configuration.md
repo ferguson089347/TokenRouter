@@ -185,7 +185,7 @@ usage、audit 和 ops 的静态参数，由 app 整理成各模块的 Options；
 
 公开设置只返回各提供方的启用状态、站点和渲染需要的非敏感参数；管理响应对 secret 只返回"已配置"标记，提交空白值时保留原值，审计只记录字段被写入过，不记录内容。腾讯和阿里云 Web SDK 需要的脚本、连接、iframe、worker 和样式来源，由默认 CSP 和运行时的 CSP 补全逻辑共同维护，覆盖自定义的旧策略时也要补全，其中阿里云的静态资源允许 `https://*.alicdn.com`。
 
-Google GIS 同样由默认策略和对旧自定义策略的增强共同放行：`script-src` 只加入 `https://accounts.google.com/gsi/client`，`frame-src` 和 `connect-src` 加入 `https://accounts.google.com/gsi/`，`style-src` 加入 `https://accounts.google.com/gsi/style`。tf CLI 网页导入在 `connect-src` 里只允许 `http://127.0.0.1:43110` 到 `43119` 这十个精确的 Origin；代码里的默认策略、对旧自定义策略的增强和 `deploy/config.example.yaml` 需要同步修改，范围不能扩大到端口通配符或局域网。完整说明见 [tf CLI 网页导入](tf_cli_web_import.md)。
+Google GIS 同样由默认策略和对旧自定义策略的增强共同放行：`script-src` 只加入 `https://accounts.google.com/gsi/client`，`frame-src` 和 `connect-src` 加入 `https://accounts.google.com/gsi/`，`style-src` 加入 `https://accounts.google.com/gsi/style`。
 
 <a id="notification_delivery"></a>
 ### 通知与 SMTP

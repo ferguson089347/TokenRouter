@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -304,8 +303,8 @@ func TestNonceTemplate(t *testing.T) {
 
 // TestEnhanceCSPPolicy supplements sparse policies and policies already
 // containing selected permissions. The assertions protect nonce syntax,
-// configured integration sources, repeated-value avoidance, and the ten exact
-// loopback-import origins.
+// configured integration sources, repeated-value avoidance, and the default
+// connection permissions used by browser pages.
 func TestEnhanceCSPPolicy(t *testing.T) {
 	t.Run("adds_nonce_placeholder_if_missing", func(t *testing.T) {
 		policy := "default-src 'self'; script-src 'self'"
@@ -363,19 +362,14 @@ func TestEnhanceCSPPolicy(t *testing.T) {
 		assert.Equal(t, 1, countDirectiveValue(enhanced, "worker-src", TencentCaptchaWorkerSource))
 	})
 
-	t.Run("adds_only_the_tf_cli_loopback_ports", func(t *testing.T) {
+	// Browser integrations use their configured HTTPS sources. Default policy and
+	// runtime supplementation keep local HTTP connections outside the granted sources.
+	t.Run("keeps_local_http_sources_out_of_browser_integration_defaults", func(t *testing.T) {
 		policy := "default-src 'self'; connect-src 'self'"
 		enhanced := enhanceCSPPolicy(policy)
 
-		// The loopback importer listens on these ten configured ports. Check each
-		// exact origin so supplementation does not broaden permission to arbitrary
-		// local ports.
-		for port := 43110; port <= 43119; port++ {
-			origin := fmt.Sprintf("http://127.0.0.1:%d", port)
-			assert.Equal(t, 1, countDirectiveValue(enhanced, "connect-src", origin))
-		}
-		assert.NotContains(t, enhanced, "http://127.0.0.1:*")
-		assert.NotContains(t, enhanced, "http://localhost")
+		assert.NotContains(t, enhanced, "http://")
+		assert.NotContains(t, config.DefaultCSPPolicy, "http://")
 	})
 
 	t.Run("default_policy_already_carries_required_domains", func(t *testing.T) {

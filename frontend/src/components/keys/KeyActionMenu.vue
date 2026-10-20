@@ -17,9 +17,9 @@
               <Icon name="terminal" size="sm" class="text-emerald-500" :stroke-width="2" />
               {{ t('keys.useKey') }}
             </button>
-            <button type="button" class="dropdown-item" role="menuitem" @click="emitAction('import-tf')">
+            <button type="button" class="dropdown-item" role="menuitem" @click="emitAction('import-magpie')">
               <Icon name="upload" size="sm" class="text-blue-500" :stroke-width="2" />
-              {{ t('keys.importToTf') }}
+              {{ t('keys.importToMagpie') }}
             </button>
             <button v-if="allowImport" type="button" class="dropdown-item" role="menuitem" @click="emitAction('import')">
               <Icon name="upload" size="sm" class="text-violet-500" :stroke-width="2" />
@@ -47,6 +47,10 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type { ApiKey } from '@/types'
 
+// KeyActionMenu.vue presents actions for one API key in a floating menu outside
+// the table's clipping area. Import and management actions receive the selected
+// key before the menu closes, and Escape dismisses the open menu.
+
 const props = defineProps<{
   show: boolean
   apiKey: ApiKey | null
@@ -57,7 +61,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'close'): void
   (event: 'use', apiKey: ApiKey): void
-  (event: 'import-tf', apiKey: ApiKey): void
+  (event: 'import-magpie', apiKey: ApiKey): void
   (event: 'import', apiKey: ApiKey): void
   (event: 'rotate', apiKey: ApiKey): void
   (event: 'delete', apiKey: ApiKey): void
@@ -65,11 +69,13 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-// 菜单动作先传递当前 Key，再关闭浮层，确保后续弹窗不被透明遮罩拦截。
-const emitAction = (event: 'use' | 'import-tf' | 'import' | 'rotate' | 'delete') => {
+// emitAction passes the selected key to the requested action and closes the menu.
+// A missing selection leaves the menu unchanged; action handlers run before the
+// close event removes the selection and click overlay.
+const emitAction = (event: 'use' | 'import-magpie' | 'import' | 'rotate' | 'delete') => {
   if (!props.apiKey) return
   if (event === 'use') emit('use', props.apiKey)
-  else if (event === 'import-tf') emit('import-tf', props.apiKey)
+  else if (event === 'import-magpie') emit('import-magpie', props.apiKey)
   else if (event === 'import') emit('import', props.apiKey)
   else if (event === 'rotate') emit('rotate', props.apiKey)
   else emit('delete', props.apiKey)

@@ -18,9 +18,8 @@ import (
 // Placeholder-based browser policies use a request nonce in both the CSP header
 // and the HTML rendered by the frontend server. Configured policies are
 // supplemented with the sources the application's CAPTCHA, identity, payment,
-// analytics, and loopback-import integrations are granted. A fixed policy is
-// prepared when middleware is constructed, while optional frame origins are
-// read per request.
+// and analytics integrations are granted. A fixed policy is prepared when
+// middleware is constructed, while optional frame origins are read per request.
 //
 // Baseline response headers apply before the selected gateway-path exclusions,
 // which skip nonce generation and CSP assignment. Other paths receive nonce
@@ -140,17 +139,6 @@ var requiredCSPDirectiveValues = []struct {
 	{"style-src", AirwallexDemoStaticDomain},
 	{"style-src", AirwallexDemoCheckoutDomain},
 	{"frame-src", AirwallexDemoCheckoutDomain},
-	// @project-doc docs/interfaces/tf_cli_web_import.md#browser_security_headers
-	{"connect-src", "http://127.0.0.1:43110"},
-	{"connect-src", "http://127.0.0.1:43111"},
-	{"connect-src", "http://127.0.0.1:43112"},
-	{"connect-src", "http://127.0.0.1:43113"},
-	{"connect-src", "http://127.0.0.1:43114"},
-	{"connect-src", "http://127.0.0.1:43115"},
-	{"connect-src", "http://127.0.0.1:43116"},
-	{"connect-src", "http://127.0.0.1:43117"},
-	{"connect-src", "http://127.0.0.1:43118"},
-	{"connect-src", "http://127.0.0.1:43119"},
 }
 
 // GenerateNonce returns sixteen random bytes encoded as padded standard base64

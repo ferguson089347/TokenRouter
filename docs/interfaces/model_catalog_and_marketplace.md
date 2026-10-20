@@ -42,7 +42,7 @@ Gemini 模型列表和创作台目录在属性配置读取失败时返回不可�
 
 用户可见的分组目录提供 `models: string[]` 和 `model_protocols: Record<string, ProtocolID[]>`，后者列出每个模型当前可以请求的客户端入口。两者只用于控制台的展示和配置生成，请求时仍要做权限和资格校验。Key 列表里内嵌的分组没有带目录时，前端按分组 ID 复用可见分组列表。`/api/v1/groups/available` 的 `include_models` 默认为 `true`；使用记录和仪表盘的分组筛选传 `false`，跳过模型、协议和属性解析。
 
-Claude Code、Codex、Gemini、Grok、OpenCode 和 CC Switch 的配置，按用户选择的客户端协议和实际的模型生成。有 `model_protocols` 时按它过滤；目录为空时不生成虚构的示例。Key 级的映射（精确匹配或最长的末尾通配符）按一跳的目标整理出可用的模型和协议，复合 Key 的示例加回已绑定的前缀；导出不会因为品牌或模型名而加上 `/antigravity` 等强制平台的路径。tf CLI 回环协议保持原格式。
+Claude Code、Codex、Gemini、Grok、OpenCode 和 CC Switch 的配置，按用户选择的客户端协议和实际的模型生成。有 `model_protocols` 时按它过滤；目录为空时不生成虚构的示例。Key 级的映射（精确匹配或最长的末尾通配符）按一跳的目标整理出可用的模型和协议，复合 Key 的示例加回已绑定的前缀；导出不会因为品牌或模型名而加上 `/antigravity` 等强制平台的路径。[Magpie 导入](magpie_import.md)提供分组允许的文本接口地址，由 Magpie 使用导入的密钥读取模型列表。
 
 模型 ID 是客户端的请求键，display name 是展示信息，pricing model 是解析价格用的键，三者可以不同。Key 级重定向和分组映射要让 `/v1/models`、`/models`、实际调度和响应模型恢复保持一致；目标无法请求的别名，不应该只出现在列表里。
 

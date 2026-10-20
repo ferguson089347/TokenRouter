@@ -70,7 +70,9 @@ describe('KeyActionMenu', () => {
     }
   })
 
-  it('将使用、tf/CCS 导入、轮换和删除收纳到更多菜单', async () => {
+  // Each menu action receives the selected key before the menu closes. Magpie
+  // import stays available alongside CCS, rotation, and deletion actions.
+  it('将使用、Magpie/CCS 导入、轮换和删除收纳到更多菜单', async () => {
     const wrapper = mount(KeyActionMenu, {
       props: {
         show: true,
@@ -85,23 +87,23 @@ describe('KeyActionMenu', () => {
     expect(menu?.id).toBe('key-action-menu-7')
     expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(5)
     expect(document.body.textContent).toContain('keys.useKey')
-    expect(document.body.textContent).toContain('keys.importToTf')
+    expect(document.body.textContent).toContain('keys.importToMagpie')
     expect(document.body.textContent).toContain('keys.importToCcSwitch')
     expect(document.body.textContent).toContain('common.delete')
     expect(document.body.textContent).toContain('keys.rotateKey')
 
-    const tfButton = Array.from(document.body.querySelectorAll('button'))
-      .find((button) => button.textContent?.includes('keys.importToTf'))
+    const magpieButton = Array.from(document.body.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('keys.importToMagpie'))
     const ccsButton = Array.from(document.body.querySelectorAll('button'))
       .find((button) => button.textContent?.includes('keys.importToCcSwitch'))
-    expect(tfButton?.querySelector('path')?.getAttribute('d'))
+    expect(magpieButton?.querySelector('path')?.getAttribute('d'))
       .toBe(ccsButton?.querySelector('path')?.getAttribute('d'))
-    expect(tfButton?.querySelector('svg')?.classList.contains('text-blue-500')).toBe(true)
+    expect(magpieButton?.querySelector('svg')?.classList.contains('text-blue-500')).toBe(true)
     expect(ccsButton?.querySelector('svg')?.classList.contains('text-violet-500')).toBe(true)
-    tfButton?.click()
+    magpieButton?.click()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.emitted('import-tf')?.[0]).toEqual([apiKey])
+    expect(wrapper.emitted('import-magpie')?.[0]).toEqual([apiKey])
     expect(wrapper.emitted('close')).toHaveLength(1)
 
     await wrapper.setProps({ show: true })
@@ -122,6 +124,8 @@ describe('KeyActionMenu', () => {
     wrapper.unmount()
   })
 
+  // The site setting controls the CCS integration independently. Hiding CCS
+  // leaves the selected key available for the Magpie import action.
   it('按设置隐藏 CCS 导入入口', () => {
     const wrapper = mount(KeyActionMenu, {
       props: {
@@ -134,7 +138,7 @@ describe('KeyActionMenu', () => {
     })
 
     expect(document.body.textContent).not.toContain('keys.importToCcSwitch')
-    expect(document.body.textContent).toContain('keys.importToTf')
+    expect(document.body.textContent).toContain('keys.importToMagpie')
     wrapper.unmount()
   })
 })

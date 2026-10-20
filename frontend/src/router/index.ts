@@ -7,7 +7,6 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
-import { initializeTfCliImportSession } from '@/utils/tfCliImport'
 
 // index.ts declares application routes and their access requirements for the
 // frontend router. Route metadata supplies page titles, optional descriptions,
@@ -18,11 +17,7 @@ import { initializeTfCliImportSession } from '@/utils/tfCliImport'
 // Initial navigation restores the browser's authentication state before access
 // checks run. Public, user, and administrator destinations apply their respective
 // access rules, while backend mode limits the available public routes. Custom
-// menu configuration contributes document titles, and one-time CLI import
-// secrets are removed before login redirects use the destination URL.
-
-// 登录守卫读取 fullPath 前移除一次性会话 secret，重定向参数使用清理后的路径。
-initializeTfCliImportSession()
+// menu configuration contributes document titles for configured pages.
 
 /**
  * routes defines lazy page components, translated headings, and access requirements for public, user, and administrator destinations.
