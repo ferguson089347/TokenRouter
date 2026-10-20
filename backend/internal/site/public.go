@@ -74,6 +74,7 @@ const (
 	SettingKeyLoginAgreementUpdatedAt             = "login_agreement_updated_at"
 	SettingKeyPasswordResetEnabled                = "password_reset_enabled"
 	SettingKeyPromoCodeEnabled                    = "promo_code_enabled"
+	SettingKeySubscriptionEntryEnabled            = "subscription_entry_enabled"
 	SettingKeyPurchaseSubscriptionEnabled         = "purchase_subscription_enabled"
 	SettingKeyPurchaseSubscriptionURL             = "purchase_subscription_url"
 	SettingKeyRegistrationEmailDomainQuotaEnabled = "registration_email_domain_quota_enabled"
@@ -297,6 +298,7 @@ func (s *PublicService) GetPublicSettings(ctx context.Context) (*PublicSettings,
 		DocURL:                      settings[SettingKeyDocURL],
 		HomeContent:                 settings[SettingKeyHomeContent],
 		HideCcsImportButton:         settings[SettingKeyHideCcsImportButton] == "true",
+		SubscriptionEntryEnabled:    settings[SettingKeySubscriptionEntryEnabled] != "false",
 		PurchaseSubscriptionEnabled: settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:     strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		TableDefaultPageSize:        tableDefaultPageSize,
@@ -616,6 +618,7 @@ func (s *PublicService) GetPublicSettingsForInjection(ctx context.Context) (any,
 		DocURL                              string                       `json:"doc_url,omitempty"`                       // resolved documentation link
 		HomeContent                         string                       `json:"home_content,omitempty"`                  // resolved homepage content
 		HideCcsImportButton                 bool                         `json:"hide_ccs_import_button"`                  // hide import action
+		SubscriptionEntryEnabled            bool                         `json:"subscription_entry_enabled"`              // user subscription entry visibility
 		PurchaseSubscriptionEnabled         bool                         `json:"purchase_subscription_enabled"`           // subscription purchase switch
 		PurchaseSubscriptionURL             string                       `json:"purchase_subscription_url,omitempty"`     // resolved purchase destination
 		TableDefaultPageSize                int                          `json:"table_default_page_size"`                 // default rows per page
@@ -705,6 +708,7 @@ func (s *PublicService) GetPublicSettingsForInjection(ctx context.Context) (any,
 		DocURL:                              settings.DocURL,
 		HomeContent:                         settings.HomeContent,
 		HideCcsImportButton:                 settings.HideCcsImportButton,
+		SubscriptionEntryEnabled:            settings.SubscriptionEntryEnabled,
 		PurchaseSubscriptionEnabled:         settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:             settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                settings.TableDefaultPageSize,
@@ -979,5 +983,5 @@ func ParseTablePreferences(defaultPageSizeRaw, optionsRaw string) (int, []int) {
 // InputSource copies these keys from its larger storage batch before returning
 // Values, retaining public copy while credential settings stay inputs to authentication conversion.
 func PublicValueKeys() []string {
-	return []string{"balance_unit_name_localized", "oidc_connect_provider_name_localized", "balance_low_notify_recharge_url_localized", SettingKeySiteTexts, SettingKeyDefaultLocale, SettingKeyAPIBaseURL, SettingKeyProviderQuotaNotifyEnabled, SettingKeyAffiliateEnabled, SettingKeyAliyunCaptchaEnabled, SettingKeyAliyunCaptchaPrefix, SettingKeyAliyunCaptchaSceneID, SettingKeyAllowUserViewErrorRequests, SettingKeyBackendModeEnabled, SettingKeyBalanceIconSVG, SettingKeyBalanceLowNotifyEnabled, SettingKeyBalanceLowNotifyRechargeURL, SettingKeyBalanceLowNotifyThreshold, SettingKeyBalanceUnitName, SettingKeyBalanceUnitSymbol, SettingKeyContactInfo, SettingKeyTicketEnabled, SettingKeyIntelligenceEnabled, SettingKeyCreativeEnabled, SettingKeyCustomEndpoints, SettingKeyCustomMenuItems, SettingKeyDocURL, SettingKeyEmailVerifyEnabled, SettingKeyFooterLinks, SettingKeyFooterText, SettingKeyForceEmailOnThirdPartySignup, SettingKeyHideCcsImportButton, SettingKeyHomeContent, SettingKeyHomeFeaturedModels, SettingKeyInvitationCodeEnabled, SettingKeyLoginAgreementDocuments, SettingKeyLoginAgreementEnabled, SettingKeyLoginAgreementMode, SettingKeyLoginAgreementUpdatedAt, SettingKeyPasswordResetEnabled, SettingKeyPromoCodeEnabled, SettingKeyPurchaseSubscriptionEnabled, SettingKeyPurchaseSubscriptionURL, SettingKeyRegistrationEmailDomainQuotaEnabled, SettingKeyRegistrationEnabled, SettingKeyRiskControlEnabled, SettingKeySiteLogo, SettingKeySiteName, SettingKeySiteSubtitle, SettingKeyTableDefaultPageSize, SettingKeyTablePageSizeOptions, SettingKeyTencentCaptchaAppID, SettingKeyTencentCaptchaEnabled, SettingKeyTotpEnabled, SettingKeyTurnstileEnabled, SettingKeyTurnstileSiteKey, SettingKeyUserEmailChangeEnabled, SettingPaymentEnabled}
+	return []string{"balance_unit_name_localized", "oidc_connect_provider_name_localized", "balance_low_notify_recharge_url_localized", SettingKeySiteTexts, SettingKeyDefaultLocale, SettingKeyAPIBaseURL, SettingKeyProviderQuotaNotifyEnabled, SettingKeyAffiliateEnabled, SettingKeyAliyunCaptchaEnabled, SettingKeyAliyunCaptchaPrefix, SettingKeyAliyunCaptchaSceneID, SettingKeyAllowUserViewErrorRequests, SettingKeyBackendModeEnabled, SettingKeyBalanceIconSVG, SettingKeyBalanceLowNotifyEnabled, SettingKeyBalanceLowNotifyRechargeURL, SettingKeyBalanceLowNotifyThreshold, SettingKeyBalanceUnitName, SettingKeyBalanceUnitSymbol, SettingKeyContactInfo, SettingKeyTicketEnabled, SettingKeyIntelligenceEnabled, SettingKeyCreativeEnabled, SettingKeyCustomEndpoints, SettingKeyCustomMenuItems, SettingKeyDocURL, SettingKeyEmailVerifyEnabled, SettingKeyFooterLinks, SettingKeyFooterText, SettingKeyForceEmailOnThirdPartySignup, SettingKeyHideCcsImportButton, SettingKeyHomeContent, SettingKeyHomeFeaturedModels, SettingKeyInvitationCodeEnabled, SettingKeyLoginAgreementDocuments, SettingKeyLoginAgreementEnabled, SettingKeyLoginAgreementMode, SettingKeyLoginAgreementUpdatedAt, SettingKeyPasswordResetEnabled, SettingKeyPromoCodeEnabled, SettingKeySubscriptionEntryEnabled, SettingKeyPurchaseSubscriptionEnabled, SettingKeyPurchaseSubscriptionURL, SettingKeyRegistrationEmailDomainQuotaEnabled, SettingKeyRegistrationEnabled, SettingKeyRiskControlEnabled, SettingKeySiteLogo, SettingKeySiteName, SettingKeySiteSubtitle, SettingKeyTableDefaultPageSize, SettingKeyTablePageSizeOptions, SettingKeyTencentCaptchaAppID, SettingKeyTencentCaptchaEnabled, SettingKeyTotpEnabled, SettingKeyTurnstileEnabled, SettingKeyTurnstileSiteKey, SettingKeyUserEmailChangeEnabled, SettingPaymentEnabled}
 }

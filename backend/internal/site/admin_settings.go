@@ -43,6 +43,7 @@ type AdminSettings struct {
 	// LoginAgreementUpdatedAt labels the agreement revision; preparation trims
 	// it and substitutes the built-in date when the submitted string is blank.
 	LoginAgreementUpdatedAt     string `json:"login_agreement_updated_at"`    // agreement revision label
+	SubscriptionEntryEnabled    bool   `json:"subscription_entry_enabled"`    // user subscription entry visibility
 	PurchaseSubscriptionEnabled bool   `json:"purchase_subscription_enabled"` // subscription purchase switch
 	PurchaseSubscriptionURL     string `json:"purchase_subscription_url"`     // subscription purchase destination
 	SiteLogo                    string `json:"site_logo"`                     // branding image location
@@ -100,6 +101,7 @@ func PrepareAdminSettings(settings *AdminSettings) (map[string]string, error) {
 	updates[SettingKeyDocURL] = settings.DocURL
 	updates[SettingKeyHomeContent] = settings.HomeContent
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
+	updates[SettingKeySubscriptionEntryEnabled] = strconv.FormatBool(settings.SubscriptionEntryEnabled)
 	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)
 	tableDefaultPageSize, tablePageSizeOptions := NormalizeTablePreferences(

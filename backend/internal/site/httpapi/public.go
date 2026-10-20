@@ -95,6 +95,7 @@ func (h *PublicHandler) GetPublicSettings(c *gin.Context) {
 		DocURL:                              settings.DocURL,
 		HomeContent:                         settings.HomeContent,
 		HideCcsImportButton:                 settings.HideCcsImportButton,
+		SubscriptionEntryEnabled:            settings.SubscriptionEntryEnabled,
 		PurchaseSubscriptionEnabled:         settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:             settings.PurchaseSubscriptionURL,
 		TableDefaultPageSize:                settings.TableDefaultPageSize,

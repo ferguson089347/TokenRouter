@@ -18,7 +18,7 @@ import (
 // calendarPublicSource supplies empty settings so the test exercises the injected calendar.
 type calendarPublicSource struct{}
 
-// ticketPublicSource supplies ticket availability for API and HTML comparison.
+// ticketPublicSource supplies configured public settings for API and HTML comparisons.
 type ticketPublicSource map[string]string
 
 // TestPublicCalendarMatchesAPIAndInjection supplies calendars with distinct zone names and display labels.
@@ -104,6 +104,39 @@ func TestTicketAvailabilityMatchesAPIAndInjection(t *testing.T) {
 		for _, public := range []map[string]any{envelope.Data, fields} {
 			require.Equal(t, value != "false", public["ticket_enabled"])
 			require.NotContains(t, public, "tickets")
+		}
+	}
+}
+
+// TestSubscriptionEntryVisibilityMatchesAPIAndInjection checks the default and
+// configured subscription visibility. Anonymous API responses and injected page
+// settings must agree while payment availability keeps its independent value.
+func TestSubscriptionEntryVisibilityMatchesAPIAndInjection(t *testing.T) {
+	for _, value := range []string{"", "true", "false"} {
+		service := site.NewPublicService(
+			ticketPublicSource{"subscription_entry_enabled": value, "payment_enabled": "true"},
+			timezone.NewCalendar(time.UTC),
+			"UTC",
+		)
+		handler := NewPublicHandler(service, "entry-test")
+		response := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(response)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/settings/public", nil)
+		handler.GetPublicSettings(ctx)
+		require.Equal(t, 200, response.Code)
+		var envelope struct {
+			Data map[string]any `json:"data"` // public response fields
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &envelope))
+		injected, err := service.GetPublicSettingsForInjection(context.Background())
+		require.NoError(t, err)
+		encoded, err := json.Marshal(injected)
+		require.NoError(t, err)
+		var fields map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &fields))
+		for _, public := range []map[string]any{envelope.Data, fields} {
+			require.Equal(t, value != "false", public["subscription_entry_enabled"])
+			require.Equal(t, true, public["payment_enabled"])
 		}
 	}
 }

@@ -35,7 +35,10 @@ type AdminReadSettings struct {
 	LoginAgreementMode string // consent presentation mode
 	// LoginAgreementUpdatedAt is the trimmed stored revision label; a blank
 	// value selects the built-in date used by administrator and public readers.
-	LoginAgreementUpdatedAt     string         // agreement revision label
+	LoginAgreementUpdatedAt string // agreement revision label
+	// SubscriptionEntryEnabled controls user navigation; the reader treats a missing
+	// storage value as visible so existing sites keep their subscription entry points.
+	SubscriptionEntryEnabled    bool           // user subscription entry visibility
 	PurchaseSubscriptionEnabled bool           // subscription purchase switch
 	PurchaseSubscriptionURL     string         // subscription purchase destination
 	SiteLogo                    string         // branding image location
@@ -85,6 +88,7 @@ func ReadAdminSettings(settings map[string]string) *AdminReadSettings {
 	result.DocURL = settings[SettingKeyDocURL]
 	result.HomeContent = settings[SettingKeyHomeContent]
 	result.HideCcsImportButton = settings[SettingKeyHideCcsImportButton] == "true"
+	result.SubscriptionEntryEnabled = settings[SettingKeySubscriptionEntryEnabled] != "false"
 	result.PurchaseSubscriptionEnabled = settings[SettingKeyPurchaseSubscriptionEnabled] == "true"
 	result.PurchaseSubscriptionURL = strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL])
 	result.CustomMenuItems = settings[SettingKeyCustomMenuItems]

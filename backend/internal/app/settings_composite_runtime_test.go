@@ -440,7 +440,7 @@ func newCompositeSettingsHTTPFixture(repo settingscore.Repository, cfg *config.C
 }
 
 // TestSettingsFieldOwnership enumerates static participants and the flattened
-// update request type. It checks unique ownership, all 284 request fields are
+// update request type. It checks unique ownership, all flattened request fields are
 // represented, and no participant declares an extra field outside that request.
 func TestSettingsFieldOwnership(t *testing.T) {
 	defaults := scheduler.DefaultAdminSettingsDefaults()
@@ -473,7 +473,7 @@ func TestSettingsFieldOwnership(t *testing.T) {
 		delete(owners, name)
 		count++
 	}
-	require.Equal(t, 284, count, "HTTP 字段变化需要同步字段登记")
+	require.Equal(t, 285, count, "HTTP 字段变化需要同步字段登记")
 	require.Empty(t, owners, "参与者不应声明不存在的输入字段")
 }
 
@@ -2228,5 +2228,32 @@ func TestUpdateSettingsIntelligencePresence(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &envelope))
 		require.Equal(t, tc.enabled, envelope.Data.IntelligenceEnabled)
+	}
+}
+
+// TestUpdateSettingsSubscriptionEntryPresence toggles subscription navigation
+// through the administrator settings handler. An omitted field keeps the stored
+// choice, and each supplied value appears in persistence and the response.
+func TestUpdateSettingsSubscriptionEntryPresence(t *testing.T) {
+	h, repo := newStepUpSwitchTestHandler(t, map[string]string{"subscription_entry_enabled": "false"})
+	for _, tc := range []struct {
+		body    map[string]any // submitted administrator fields
+		enabled bool           // expected persisted availability
+	}{
+		{map[string]any{"subscription_entry_enabled": true}, true},
+		{map[string]any{"registration_enabled": true}, true},
+		{map[string]any{"subscription_entry_enabled": false}, false},
+		{map[string]any{"registration_enabled": true}, false},
+	} {
+		rec := doUpdateSettings(t, h, tc.body, nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Equal(t, fmt.Sprint(tc.enabled), repo.values["subscription_entry_enabled"])
+		var envelope struct {
+			Data struct {
+				SubscriptionEntryEnabled bool `json:"subscription_entry_enabled"` // saved navigation visibility
+			} `json:"data"` // administrator response settings
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &envelope))
+		require.Equal(t, tc.enabled, envelope.Data.SubscriptionEntryEnabled)
 	}
 }

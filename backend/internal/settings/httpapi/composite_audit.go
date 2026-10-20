@@ -534,6 +534,9 @@ func DiffSettings(before *composite.Snapshot, after *composite.Snapshot, beforeA
 	if before.BackendModeEnabled != after.BackendModeEnabled {
 		changed = append(changed, "backend_mode_enabled")
 	}
+	if before.SubscriptionEntryEnabled != after.SubscriptionEntryEnabled {
+		changed = append(changed, "subscription_entry_enabled")
+	}
 	if before.PurchaseSubscriptionEnabled != after.PurchaseSubscriptionEnabled {
 		changed = append(changed, "purchase_subscription_enabled")
 	}

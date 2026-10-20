@@ -175,6 +175,11 @@ export default {
           'If the window and bucket size would produce more than 720 bars, the backend widens the bucket size automatically.'
       },
       features: {
+        subscriptionEntry: {
+          title: 'Subscription Entries',
+          enabled: 'Show subscription entries',
+          hint: 'When off, hide subscription menus, the purchase tab, and renewal buttons. Balance top-ups and existing subscriptions remain available.'
+        },
         team: {
           title: 'Team Features',
           description: 'Control whether team pages are available to users and administrators.',

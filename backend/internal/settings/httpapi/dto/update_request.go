@@ -190,6 +190,9 @@ type UpdateSettingsRequest struct {
 	DocURL              string                 `json:"doc_url"`                // source documentation destination text
 	HomeContent         string                 `json:"home_content"`           // source custom homepage content
 	HideCcsImportButton bool                   `json:"hide_ccs_import_button"` // CCS import control visibility switch
+	// SubscriptionEntryEnabled retains the stored visibility when omitted; browser
+	// consumers use it to hide subscription navigation and purchase controls.
+	SubscriptionEntryEnabled *bool `json:"subscription_entry_enabled"` // user subscription entry visibility
 	// PurchaseSubscriptionEnabled and PurchaseSubscriptionURL use the prior
 	// Snapshot when nil. Enabled purchase requires a nonempty absolute HTTP(S) URL,
 	// while supplied URLs are validated even when the entry is disabled.

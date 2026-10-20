@@ -203,6 +203,8 @@ const flagBatchImageAccess = () => canUseBatchImage.value
 const flagIntelligenceAccess = () => appStore.cachedPublicSettings?.intelligence_enabled === true
 // flagTicketAccess checks the confirmed public switch before showing support navigation.
 const flagTicketAccess = () => appStore.cachedPublicSettings?.ticket_enabled !== false
+// flagSubscriptionEntryAccess reports whether user subscription navigation is visible.
+const flagSubscriptionEntryAccess = () => appStore.cachedPublicSettings?.subscription_entry_enabled !== false
 // 创作台入口由功能开关控制（默认开），可用模型以页面内目录为准。
 const flagCreativeStudioAccess = () => appStore.cachedPublicSettings?.creative_enabled !== false
 const flagTeamAccess = () => appStore.cachedPublicSettings?.team_enabled !== false
@@ -222,12 +224,12 @@ const userNavItems = computed((): NavItem[] => {
     { path: '/batch-image', label: t('nav.batchImage'), icon: 'batchImage' as const, featureFlag: flagBatchImageAccess },
     { path: '/creative', label: t('nav.creative'), icon: 'creative' as const, featureFlag: flagCreativeStudioAccess },
     { path: '/usage', label: t('nav.usage'), icon: 'chart' as const },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: 'creditCard' as const },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: 'creditCard' as const, featureFlag: flagSubscriptionEntryAccess },
     ...(appStore.cachedPublicSettings?.payment_enabled
       ? [
           {
             path: '/purchase',
-            label: t('nav.buySubscription'),
+            label: t(appStore.cachedPublicSettings?.subscription_entry_enabled === false ? 'payment.rechargeAccount' : 'nav.buySubscription'),
             icon: 'recharge' as const,
           },
         ]
@@ -279,12 +281,12 @@ const personalNavItems = computed((): NavItem[] => {
     { path: '/batch-image', label: t('nav.batchImage'), icon: 'batchImage' as const, featureFlag: flagBatchImageAccess },
     { path: '/creative', label: t('nav.creative'), icon: 'creative' as const, featureFlag: flagCreativeStudioAccess },
     { path: '/usage', label: t('nav.usage'), icon: 'chart' as const },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: 'creditCard' as const },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: 'creditCard' as const, featureFlag: flagSubscriptionEntryAccess },
     ...(appStore.cachedPublicSettings?.payment_enabled
       ? [
           {
             path: '/purchase',
-            label: t('nav.buySubscription'),
+            label: t(appStore.cachedPublicSettings?.subscription_entry_enabled === false ? 'payment.rechargeAccount' : 'nav.buySubscription'),
             icon: 'recharge' as const,
           },
         ]

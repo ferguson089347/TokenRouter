@@ -1126,6 +1126,11 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		}
 	}
 
+	subscriptionEntryEnabled := previousSettings.SubscriptionEntryEnabled
+	if req.SubscriptionEntryEnabled != nil {
+		subscriptionEntryEnabled = *req.SubscriptionEntryEnabled
+	}
+
 	// Merge purchase entry and destination before validating them together so
 	// disabling the entry can coexist with an empty URL while supplied destinations remain checked.
 	purchaseEnabled := previousSettings.PurchaseSubscriptionEnabled
@@ -1635,6 +1640,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		DocURL:                                 req.DocURL,
 		HomeContent:                            req.HomeContent,
 		HideCcsImportButton:                    req.HideCcsImportButton,
+		SubscriptionEntryEnabled:               subscriptionEntryEnabled,
 		PurchaseSubscriptionEnabled:            purchaseEnabled,
 		PurchaseSubscriptionURL:                purchaseURL,
 		TableDefaultPageSize:                   req.TableDefaultPageSize,

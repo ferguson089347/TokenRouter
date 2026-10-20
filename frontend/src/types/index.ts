@@ -275,6 +275,9 @@ export interface PublicSettings {
   // intelligence_enabled requires confirmed true before quality-check navigation
   // opens. Missing values keep the optional result feature disabled.
   intelligence_enabled?: boolean // model quality availability
+  // subscription_entry_enabled defaults to visible when omitted from public
+  // settings. Browser consumers use it for subscription navigation and purchase controls.
+  subscription_entry_enabled?: boolean // user subscription entry visibility
   ticket_enabled?: boolean
   // Older public settings can omit creative_enabled; callers disable the studio
   // entry only when the returned value is explicitly false.

@@ -53,7 +53,7 @@
           item-class="border-b border-gray-50 p-3 last:border-b-0 dark:border-dark-700/50"
         />
 
-        <div class="border-t border-gray-100 p-2 dark:border-dark-700">
+        <div v-if="appStore.cachedPublicSettings?.subscription_entry_enabled !== false" class="border-t border-gray-100 p-2 dark:border-dark-700">
           <router-link
             to="/subscriptions"
             class="block w-full py-1 text-center text-xs text-primary-600 hover:underline dark:text-primary-400"
@@ -74,7 +74,18 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import SubscriptionUsageList from '@/components/common/SubscriptionUsageList.vue'
 import { useSubscriptionUsage } from '@/composables/useSubscriptionUsage'
-import { useSubscriptionStore } from '@/stores'
+import { useAppStore, useSubscriptionStore } from '@/stores'
+
+// SubscriptionProgressMini.vue displays active subscription usage in a compact
+// trigger and expandable summary. The status variant keeps its balance slot
+// visible for accounts with no active subscriptions, while usage dots summarize
+// the subscriptions supplied by the shared subscription store.
+//
+// Subscription navigation visibility controls the detail link below the usage
+// summary. The usage figures and status indicators remain available when that
+// link is hidden, allowing existing subscribers to monitor their allowances.
+// Outside clicks and component teardown close the popover through its local
+// interaction handlers and document listener lifecycle.
 
 const props = withDefaults(defineProps<{
   variant?: 'default' | 'status'
@@ -84,6 +95,7 @@ const props = withDefaults(defineProps<{
 
 const { t } = useI18n()
 const subscriptionStore = useSubscriptionStore()
+const appStore = useAppStore()
 const { sortByUsage, getProgressDotClass } = useSubscriptionUsage()
 
 const containerRef = ref<HTMLElement | null>(null)

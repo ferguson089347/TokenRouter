@@ -31,6 +31,7 @@ func (s *Snapshot) SiteAdminSettings() site.AdminSettings {
 		LoginAgreementEnabled:       s.LoginAgreementEnabled,
 		LoginAgreementMode:          s.LoginAgreementMode,
 		LoginAgreementUpdatedAt:     s.LoginAgreementUpdatedAt,
+		SubscriptionEntryEnabled:    s.SubscriptionEntryEnabled,
 		PurchaseSubscriptionEnabled: s.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:     s.PurchaseSubscriptionURL,
 		SiteLogo:                    s.SiteLogo,
@@ -63,6 +64,7 @@ func (s *Snapshot) ApplySiteAdminSettings(value site.AdminSettings) {
 	s.LoginAgreementEnabled = value.LoginAgreementEnabled
 	s.LoginAgreementMode = value.LoginAgreementMode
 	s.LoginAgreementUpdatedAt = value.LoginAgreementUpdatedAt
+	s.SubscriptionEntryEnabled = value.SubscriptionEntryEnabled
 	s.PurchaseSubscriptionEnabled = value.PurchaseSubscriptionEnabled
 	s.PurchaseSubscriptionURL = value.PurchaseSubscriptionURL
 	s.SiteLogo = value.SiteLogo
@@ -94,6 +96,7 @@ func (s *Snapshot) ApplySiteAdminReadSettings(value *site.AdminReadSettings) {
 	s.LoginAgreementEnabled = value.LoginAgreementEnabled
 	s.LoginAgreementMode = value.LoginAgreementMode
 	s.LoginAgreementUpdatedAt = value.LoginAgreementUpdatedAt
+	s.SubscriptionEntryEnabled = value.SubscriptionEntryEnabled
 	s.PurchaseSubscriptionEnabled = value.PurchaseSubscriptionEnabled
 	s.PurchaseSubscriptionURL = value.PurchaseSubscriptionURL
 	s.SiteLogo = value.SiteLogo

@@ -318,8 +318,8 @@ const menuNavGroups = computed(() => {
     {
       key: 'billing',
       items: [
-        paymentEnabled && { path: '/purchase', label: t('nav.buySubscription'), icon: 'recharge' },
-        { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: 'creditCard' },
+        paymentEnabled && { path: '/purchase', label: t(settings?.subscription_entry_enabled === false ? 'payment.rechargeAccount' : 'nav.buySubscription'), icon: 'recharge' },
+        settings?.subscription_entry_enabled !== false && { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: 'creditCard' },
         paymentEnabled && { path: '/orders', label: t('nav.myOrders'), icon: 'orderList' },
         { path: '/redeem', label: t('nav.redeem'), icon: 'gift' },
         settings?.affiliate_enabled === true && { path: '/affiliate', label: t('nav.affiliate'), icon: 'affiliate' }

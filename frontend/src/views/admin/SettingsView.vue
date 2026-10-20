@@ -4299,6 +4299,17 @@
             </SettingsSection>
           </SettingsCard>
 
+          <SettingsCard :title="t('admin.settings.features.subscriptionEntry.title')">
+            <SettingsSection>
+              <SettingToggleRow
+                id="subscription-entry-enabled"
+                v-model="form.subscription_entry_enabled"
+                :label="t('admin.settings.features.subscriptionEntry.enabled')"
+                :hint="t('admin.settings.features.subscriptionEntry.hint')"
+              />
+            </SettingsSection>
+          </SettingsCard>
+
           <SettingsCard :title="t('intelligence.title')">
             <SettingsSection>
               <SettingToggleRow
@@ -6296,6 +6307,7 @@ const form = reactive<SettingsForm>({
   enable_client_dateline_normalization: true,
   // 页面功能开关默认开启，兼容升级前行为。
   team_enabled: true,
+  subscription_entry_enabled: true,
   creative_enabled: true,
   intelligence_enabled: false,
   creative_model_settings: [] as CreativeModelSetting[],
@@ -8505,6 +8517,7 @@ async function saveSettings(): Promise<boolean> {
       payment_enabled: form.payment_enabled,
       // 页面功能开关
       team_enabled: form.team_enabled,
+      subscription_entry_enabled: form.subscription_entry_enabled,
       creative_enabled: form.creative_enabled,
       intelligence_enabled: form.intelligence_enabled,
       creative_model_settings: normalizedCreativeModelSettings,

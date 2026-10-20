@@ -71,6 +71,9 @@ type (
 		HomeContent             string                   // resolved homepage content
 		HideCcsImportButton     bool                     // hide import action
 
+		// SubscriptionEntryEnabled controls user navigation; the reader treats a missing
+		// storage value as visible so existing sites keep their subscription entry points.
+		SubscriptionEntryEnabled    bool   // user subscription entry visibility
 		PurchaseSubscriptionEnabled bool   // subscription purchase switch
 		PurchaseSubscriptionURL     string // resolved purchase destination
 		// TableDefaultPageSize and TablePageSizeOptions are normalized for browser

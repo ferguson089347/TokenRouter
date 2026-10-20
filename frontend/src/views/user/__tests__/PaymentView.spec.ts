@@ -64,6 +64,7 @@ const authUserState = vi.hoisted(() => ({
 }))
 const fetchActiveSubscriptions = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const activeSubscriptionsState = vi.hoisted(() => ({ value: [] as Array<Record<string, unknown>> }))
+const publicSettingsState = vi.hoisted(() => ({ subscription_entry_enabled: true }))
 const showError = vi.hoisted(() => vi.fn())
 const showInfo = vi.hoisted(() => vi.fn())
 const showWarning = vi.hoisted(() => vi.fn())
@@ -116,6 +117,7 @@ vi.mock('@/stores/subscriptions', () => ({
 
 vi.mock('@/stores', () => ({
   useAppStore: () => ({
+    cachedPublicSettings: publicSettingsState,
     showError,
     showInfo,
     showWarning,
@@ -391,6 +393,24 @@ async function mountSubscriptionPlanList(planCount: number) {
   await flushPromises()
   return wrapper
 }
+
+beforeEach(() => {
+  publicSettingsState.subscription_entry_enabled = true
+})
+
+describe('PaymentView subscription entry visibility', () => {
+  // Reopen a bookmarked subscription purchase while navigation is hidden.
+  // Plan selection must stay hidden and the balance top-up controls remain usable.
+  it('keeps recharge available when a subscription bookmark is opened with entries hidden', async () => {
+    publicSettingsState.subscription_entry_enabled = false
+    const wrapper = await mountSubscriptionPlanList(3)
+    expect(wrapper.findComponent(SubscriptionPlanCard).exists()).toBe(false)
+    expect(wrapper.findComponent(AmountInput).exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('payment.activeSubscription')
+    expect(createOrder).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+})
 
 describe('PaymentView 横向切换', () => {
   it('同一页签输入不重建面板，往返切换保留已填金额和账单信息', async () => {

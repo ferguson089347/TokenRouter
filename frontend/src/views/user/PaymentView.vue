@@ -129,7 +129,7 @@
             </template>
 
             <!-- 充值未开放 -->
-            <div v-else-if="activeTab === 'recharge' && enabledMethods.length === 0" class="card empty-state">
+            <div v-else-if="activeTab === 'recharge' && (checkout.balance_disabled || enabledMethods.length === 0)" class="card empty-state">
               <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-surface bg-gray-100 dark:bg-dark-800">
                 <Icon name="creditCard" size="lg" class="text-gray-400 dark:text-dark-500" />
               </div>
@@ -394,6 +394,17 @@ import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSele
 import { buildPaymentErrorToastMessage, describePaymentScenarioError } from './paymentUx'
 import { hasWechatResumeQuery, parseWechatResumeRoute, stripWechatResumeQuery } from './paymentWechatResume'
 
+// PaymentView.vue presents balance top-ups, subscription plans, and payment status
+// in one checkout workspace. Public settings control which purchase tabs appear,
+// while payment configuration supplies methods, prices, and balance availability.
+// Subscription navigation can be hidden while existing subscriptions continue to
+// supply usage information elsewhere in the account.
+//
+// A selected plan shares checkout controls with balance purchases. Payment state
+// also survives redirects through recovery snapshots and WeChat resume parameters.
+// Hiding subscription entries affects selection controls; a payment already in
+// progress keeps its status panel so its buyer can observe completion and recovery.
+
 const i18n = useI18n()
 const { t } = i18n
 const route = useRoute()
@@ -612,10 +623,14 @@ const checkout = ref<CheckoutInfoResponse>({
   plans: [], balance_disabled: false, balance_recharge_multiplier: 1, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, method_fees: {}, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
 
+// subscriptionEntryEnabled reads navigation visibility, defaulting to visible for older public settings.
+const subscriptionEntryEnabled = computed(() => appStore.cachedPublicSettings?.subscription_entry_enabled !== false)
+
+// tabs lists purchase destinations permitted by visibility and balance settings.
 const tabs = computed(() => {
   const result: { key: 'recharge' | 'subscription'; label: string }[] = []
   if (!checkout.value.balance_disabled) result.push({ key: 'recharge', label: t('payment.tabTopUp') })
-  result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
+  if (subscriptionEntryEnabled.value) result.push({ key: 'subscription', label: t('payment.tabSubscribe') })
   return result
 })
 
@@ -905,6 +920,17 @@ const paymentButtonClass = computed(() => {
   if (m === 'stripe') return 'btn-stripe'
   if (m === 'airwallex') return 'btn-airwallex'
   return 'btn-primary'
+})
+
+// Return selection controls to recharge when a refreshed setting hides subscription
+// purchases. An existing payment keeps its status panel so the buyer can finish it.
+watch([subscriptionEntryEnabled, paymentPhase], ([enabled, phase]) => {
+  if (enabled || phase === 'paying') return
+  activeTab.value = 'recharge'
+  selectedPlan.value = null
+  showRenewalModal.value = false
+  duplicatePlanDialogPlan.value = null
+  duplicatePlanDialogConfirm.value = null
 })
 
 // Renewal modal state
@@ -1400,10 +1426,10 @@ onMounted(async () => {
       }
     }
     await resumeWechatPaymentFromQuery()
-    if (checkout.value.balance_disabled) {
+    if (checkout.value.balance_disabled && subscriptionEntryEnabled.value) {
       activeTab.value = 'subscription'
     }
-    if (route.query.tab === 'subscription') {
+    if (route.query.tab === 'subscription' && subscriptionEntryEnabled.value) {
       activeTab.value = 'subscription'
       const planId = Number(route.query.plan)
       if (planId > 0) {

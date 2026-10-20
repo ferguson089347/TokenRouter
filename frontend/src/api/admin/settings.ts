@@ -14,6 +14,11 @@ import type {
   NotifyEmailEntry,
 } from "@/types";
 
+// settings.ts defines administrator configuration records and their HTTP calls.
+// Read responses supply the settings editor with resolved values, while optional
+// update fields let callers submit selected changes and retain stored values for
+// fields they omit from a request.
+
 export interface PaymentMethodFeeConfig {
   enabled: boolean;
   fixed_fee: number;
@@ -670,6 +675,7 @@ export interface SystemSettings {
   // 页面功能开关
   team_enabled: boolean;
   intelligence_enabled: boolean; // model quality availability
+  subscription_entry_enabled: boolean; // user subscription entry visibility
   creative_enabled: boolean;
   creative_model_settings: CreativeModelSetting[];
   creative_worker_count: number;
@@ -979,6 +985,7 @@ export interface UpdateSettingsRequest {
   // 页面功能开关
   team_enabled?: boolean;
   intelligence_enabled?: boolean; // requested quality availability
+  subscription_entry_enabled?: boolean; // optional subscription entry visibility
   creative_enabled?: boolean;
   creative_worker_count?: number;
   risk_control_enabled?: boolean;

@@ -107,6 +107,7 @@ func PublicInputKeys() []string {
 		"doc_url",
 		"home_content",
 		"hide_ccs_import_button",
+		"subscription_entry_enabled",
 		"purchase_subscription_enabled",
 		"purchase_subscription_url",
 		"table_default_page_size",

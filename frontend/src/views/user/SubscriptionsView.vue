@@ -66,6 +66,7 @@
                 {{ t('userSubscriptions.revoke') }}
               </button>
               <button
+                v-if="appStore.cachedPublicSettings?.subscription_entry_enabled !== false"
                 type="button"
                 class="btn btn-primary btn-sm flex-1 sm:flex-none"
                 @click="router.push({ path: '/purchase', query: { tab: 'subscription', plan: String(chain.plan_id) } })"
@@ -237,6 +238,17 @@ import {
   highestQuotaExhausted,
   type RemainingDurationParts
 } from '@/utils/subscriptionQuota'
+
+// SubscriptionsView.vue presents the user's subscription time chains and current
+// quota usage. Active and pending records belonging to a plan are grouped for
+// display so the user can see the chain's effective dates and remaining duration.
+// The page exposes renewal and eligible self-revocation controls beside each chain.
+//
+// Renewal visibility follows the public subscription entry setting. Direct visits
+// continue to show existing entitlements, and quota eligibility determines whether
+// a self-revocation action is offered. After revocation, refreshed subscription
+// records determine the displayed chain and current usage, including a pending
+// record that becomes active through the server's chain adjustment.
 
 type PlanChain = {
   plan_id: number

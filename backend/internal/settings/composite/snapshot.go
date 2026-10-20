@@ -196,6 +196,7 @@ type Snapshot struct {
 	DocURL                      string                          // source documentation destination text
 	HomeContent                 string                          // source custom homepage content
 	HideCcsImportButton         bool                            // CCS import control visibility switch
+	SubscriptionEntryEnabled    bool                            // user subscription entry visibility
 	PurchaseSubscriptionEnabled bool                            // subscription purchase entry switch
 	PurchaseSubscriptionURL     string                          // subscription purchase destination address
 	TableDefaultPageSize        int                             // default table row count

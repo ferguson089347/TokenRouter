@@ -173,6 +173,11 @@ export default {
         bucketLimitHint: '如果窗口和粒度会产生超过 720 根柱子，后端会自动放大单柱时间窗口。'
       },
       features: {
+        subscriptionEntry: {
+          title: '订阅入口',
+          enabled: '显示订阅入口',
+          hint: '关闭后隐藏用户端的订阅菜单、购买标签和续费按钮，余额充值与已有订阅照常使用。'
+        },
         team: {
           title: '团队功能',
           description: '控制用户团队页和管理员团队管理页是否开放。',

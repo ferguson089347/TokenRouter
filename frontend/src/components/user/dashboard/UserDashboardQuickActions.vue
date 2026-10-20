@@ -64,8 +64,8 @@
           <Icon name="creditCard" size="md" class="text-rose-600 dark:text-rose-400" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-gray-900 dark:text-dark-50">{{ t('nav.buySubscription') }}</p>
-          <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('dashboard.purchasePlanOrRecharge') }}</p>
+          <p class="text-sm font-medium text-gray-900 dark:text-dark-50">{{ t(appStore.cachedPublicSettings?.subscription_entry_enabled === false ? 'payment.rechargeAccount' : 'nav.buySubscription') }}</p>
+          <p class="text-xs text-gray-500 dark:text-dark-400">{{ t(appStore.cachedPublicSettings?.subscription_entry_enabled === false ? 'payment.tabTopUp' : 'dashboard.purchasePlanOrRecharge') }}</p>
         </div>
         <Icon
           name="chevronRight"

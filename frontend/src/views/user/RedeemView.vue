@@ -186,6 +186,7 @@
             {{ t('subscriptionProgress.title') }}
           </h2>
           <router-link
+            v-if="appStore.cachedPublicSettings?.subscription_entry_enabled !== false"
             to="/subscriptions"
             class="shrink-0 text-sm text-primary-600 hover:underline dark:text-primary-400"
           >
@@ -227,6 +228,11 @@ import Icon from '@/components/icons/Icon.vue'
 import RedeemCelebration from '@/components/user/RedeemCelebration.vue'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 import { formatDateTime } from '@/utils/format'
+
+// RedeemView.vue accepts redemption codes and displays their history alongside
+// active subscription allowances. Successful redemption refreshes the account and
+// entitlement information, while public subscription visibility controls the link
+// from the allowance summary to the subscription details page.
 
 const { t } = useI18n()
 const authStore = useAuthStore()
