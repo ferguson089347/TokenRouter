@@ -54,10 +54,10 @@ export interface RemotePoolOptions extends RemotePoolSnapshotStatus {
   plan_types: Array<{ value: string; label: string }> // visible subscription tier choices
 }
 
-/** RemotePoolAccount contains the allowed source account fields and local memberships. */
+/** RemotePoolAccount exposes a site-local reference, tier and authorized local memberships. */
 export interface RemotePoolAccount {
-  id: number // source account identifier
-  display_name: string // source account display name
+  id: string // site-local account reference
+  display_name: string // account tier or platform
   platform: string // source upstream platform name
   auth_type: string // source authentication type label
   plan_type: string // source subscription tier identifier
@@ -85,7 +85,7 @@ export interface RemotePoolPage extends RemotePoolSnapshotStatus {
 export interface RemotePoolFilters {
   page: number // one based page number
   page_size: number // maximum accounts per page
-  search?: string // account name or identifier
+  search?: string // account tier or local reference
   plan_type?: string // source subscription tier filter
   status?: string // source account availability filter
   group_id?: number // local group identifier filter

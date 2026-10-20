@@ -2,6 +2,9 @@ package remotepool
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base32"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -26,7 +29,9 @@ import (
 //
 // Source group identities remain in stored snapshots so every response can resolve
 // current local names, multipliers, enabled state, and caller access. Account IDs
-// shared by multiple source groups are merged before publication. Browser
+// shared by multiple source groups are merged before publication. Public identities
+// use a site-keyed digest of source origin and account ID, while source names
+// remain inside the saved snapshot. Browser
 // cancellation cannot interrupt the bounded persistence of a consumed refresh token.
 
 // remotePoolSettingKey identifies the settings record shared by remote
@@ -166,10 +171,14 @@ type RemotePoolUsageWindow struct {
 	Utilization *float64 `json:"utilization"` // percent; null means unavailable
 }
 
-// RemotePoolAccount lists the allowed remote account fields presented through
-// local group bindings.
+// RemotePoolAccount stores allowlisted source summary fields in private snapshots.
+// Public rows replace source identity and names before applying local memberships.
 type RemotePoolAccount struct {
-	ID                 int64  `json:"id"`                  // stable source account identifier
+	// ID retains the numeric source identity in snapshots. Public rows clear
+	// this field and encode the outer RemotePoolDisplayAccount.ID instead.
+	ID int64 `json:"id"` // stable source account identifier
+	// DisplayName keeps the source name in snapshots. Public rows replace it
+	// with a tier or platform label before returning account summaries.
 	DisplayName        string `json:"display_name"`        // source account display name
 	Platform           string `json:"platform"`            // source upstream platform identifier
 	AuthType           string `json:"auth_type"`           // source authentication type label
@@ -191,17 +200,37 @@ type RemotePoolAccount struct {
 	LastUsedAt         *time.Time `json:"last_used_at"`         // source most recent use
 }
 
-// RemotePoolPage contains a filtered snapshot page and its synchronization status.
+// RemotePoolDisplayAccount exposes a site-local identity and authorized account summary.
+// The embedded source ID is cleared before publication; the outer string ID is
+// the sole account identifier encoded in the panel response.
+type RemotePoolDisplayAccount struct {
+	RemotePoolAccount // sanitized account summary
+	// ID derives from the stable site key, source origin and source account ID.
+	// Identical snapshots retain their display identity across pages and process restarts.
+	ID string `json:"id"` // site-local account reference
+}
+
+// remotePoolSourcePage decodes source pagination while retaining numeric identities
+// needed for deduplicating snapshots across the configured source group bindings.
+type remotePoolSourcePage struct {
+	Items    []RemotePoolAccount `json:"items"`     // source account summaries
+	Total    int64               `json:"total"`     // matching source count
+	Page     int                 `json:"page"`      // source page number
+	PageSize int                 `json:"page_size"` // source page size
+	Pages    int                 `json:"pages"`     // source page count
+}
+
+// RemotePoolPage contains a filtered public page with site-local account identities.
 type RemotePoolPage struct {
-	Stale       bool                `json:"stale"`                 // previous snapshot being served
-	AuthInvalid bool                `json:"auth_invalid"`          // refresh credentials rejected remotely
-	SnapshotAt  *time.Time          `json:"snapshot_at,omitempty"` // last complete collection time
-	Warning     string              `json:"warning,omitempty"`     // sanitized synchronization warning message
-	Items       []RemotePoolAccount `json:"items"`                 // visible filtered account summaries
-	Total       int64               `json:"total"`                 // visible matching account count
-	Page        int                 `json:"page"`                  // one based page number
-	PageSize    int                 `json:"page_size"`             // maximum accounts per page
-	Pages       int                 `json:"pages"`                 // total matching page count
+	Stale       bool                       `json:"stale"`                 // previous snapshot being served
+	AuthInvalid bool                       `json:"auth_invalid"`          // refresh credentials rejected remotely
+	SnapshotAt  *time.Time                 `json:"snapshot_at,omitempty"` // last complete collection time
+	Warning     string                     `json:"warning,omitempty"`     // sanitized synchronization warning message
+	Items       []RemotePoolDisplayAccount `json:"items"`                 // visible filtered account summaries
+	Total       int64                      `json:"total"`                 // visible matching account count
+	Page        int                        `json:"page"`                  // one based page number
+	PageSize    int                        `json:"page_size"`             // maximum accounts per page
+	Pages       int                        `json:"pages"`                 // total matching page count
 }
 
 // remotePoolTokens decodes session credentials returned by the remote refresh
@@ -221,6 +250,9 @@ type RemoteAccountPoolService struct {
 	encryptor     SecretEncryptor // session secret encryption provider
 	keyConfigured bool            // fixed encryption key configured
 	client        Client          // remote JSON exchange provider
+	// identityKey is the stable application signing secret used for public account
+	// references. Each process serving this site supplies the same configured value.
+	identityKey []byte
 	// mu serializes callbacks within this instance while Repository.UpdateMultiple holds
 	// the database row lock across instances and persists any rotated refresh
 	// credentials.
@@ -238,8 +270,10 @@ type HTTPError struct {
 // persistence and transport.
 // keyConfigured must describe a fixed encryption key before any configuration or
 // session update can be saved; groups supplies current local display permissions.
-func NewRemoteAccountPoolService(repo Repository, encryptor SecretEncryptor, keyConfigured bool, groups GroupSource, client Client) *RemoteAccountPoolService {
-	return &RemoteAccountPoolService{repo: repo, encryptor: encryptor, keyConfigured: keyConfigured, groups: groups, client: client}
+// identityKey must be the stable site signing secret so display references remain
+// consistent across instances and differ between separately configured sites.
+func NewRemoteAccountPoolService(repo Repository, encryptor SecretEncryptor, keyConfigured bool, groups GroupSource, client Client, identityKey string) *RemoteAccountPoolService {
+	return &RemoteAccountPoolService{repo: repo, encryptor: encryptor, keyConfigured: keyConfigured, groups: groups, client: client, identityKey: []byte(identityKey)}
 }
 
 // decode decodes one saved record and decrypts its session credentials.
@@ -568,7 +602,7 @@ func (s *RemoteAccountPoolService) snapshot(ctx context.Context) (*remotePoolRec
 		for _, binding := range r.Bindings {
 			var collected int64
 			for page := 1; page <= 100; page++ {
-				var result RemotePoolPage
+				var result remotePoolSourcePage
 				query := url.Values{"page": {strconv.Itoa(page)}, "page_size": {"500"}, "group_id": {strconv.FormatInt(binding.RemoteGroupID, 10)}}
 				// A later page may fail after session refresh. Save that credential
 				// change and leave the previously published account collection intact.
@@ -694,13 +728,15 @@ func (s *RemoteAccountPoolService) visibleGroups(ctx context.Context, r *remoteP
 // The saved snapshot keeps source IDs so deletion, disablement, permission removal,
 // and rebinding affect the next response. Each returned account receives a fresh
 // group slice, local names, and local multipliers. Source account multipliers are
-// replaced, including when an older snapshot is being served.
-func (s *RemoteAccountPoolService) project(ctx context.Context, r *remotePoolRecord, allowed []routing.Group) ([]RemotePoolAccount, error) {
+// replaced, including when an older snapshot is being served. Public rows receive
+// a stable opaque account reference and a tier or platform label; saved numeric
+// source IDs and source account names remain available for synchronization only.
+func (s *RemoteAccountPoolService) project(ctx context.Context, r *remotePoolRecord, allowed []routing.Group) ([]RemotePoolDisplayAccount, error) {
 	groups, err := s.visibleGroups(ctx, r, allowed)
 	if err != nil {
 		return nil, err
 	}
-	items := []RemotePoolAccount{}
+	items := []RemotePoolDisplayAccount{}
 	for _, source := range r.Snapshot {
 		account := source
 		account.Groups = []RemotePoolGroup{}
@@ -716,7 +752,18 @@ func (s *RemoteAccountPoolService) project(ctx context.Context, r *remotePoolRec
 		}
 		account.RateMultiplier = account.Groups[0].RateMultiplier
 		account.AccountRateEnabled = false
-		items = append(items, account)
+		// Derive identity before clearing source fields so repeated snapshots and
+		// group mappings keep the same public account reference without publishing source labels.
+		id := s.accountReference(r.BaseURL, source.ID)
+		account.ID = 0
+		account.DisplayName = strings.TrimSpace(source.PlanLabel)
+		if account.DisplayName == "" {
+			account.DisplayName = strings.TrimSpace(source.PlanType)
+		}
+		if account.DisplayName == "" {
+			account.DisplayName = strings.TrimSpace(source.Platform)
+		}
+		items = append(items, RemotePoolDisplayAccount{RemotePoolAccount: account, ID: id})
 	}
 	return items, nil
 }
@@ -734,11 +781,11 @@ func (s *RemoteAccountPoolService) List(ctx context.Context, query url.Values, a
 	if err != nil {
 		return nil, err
 	}
-	filtered := []RemotePoolAccount{}
+	filtered := []RemotePoolDisplayAccount{}
 	groupID, _ := strconv.ParseInt(query.Get("group_id"), 10, 64)
 	search := strings.ToLower(query.Get("search"))
 	for _, item := range items {
-		if search != "" && !strings.Contains(strings.ToLower(item.DisplayName), search) && !strings.Contains(strconv.FormatInt(item.ID, 10), search) {
+		if search != "" && !strings.Contains(strings.ToLower(item.DisplayName), search) && !strings.Contains(strings.ToLower(item.ID), search) {
 			continue
 		}
 		if plan := query.Get("plan_type"); plan != "" && item.PlanType != plan {
@@ -823,4 +870,18 @@ func (s *RemoteAccountPoolService) SourceGroups(ctx context.Context) ([]RemotePo
 		return []RemotePoolSourceGroup{}, nil
 	}
 	return r.SourceGroups, nil
+}
+
+// accountReference derives a stable site-local account reference for one source identity.
+// The source origin separates equal IDs from different sites, and a dedicated HMAC
+// domain separates these display references from uses of the application signing key.
+// Callers pass the normalized configured source origin. Eight digest bytes
+// encode thirteen Base32 characters so references remain compact
+// while retaining sixty-four bits of identity for the directory's account rows.
+func (s *RemoteAccountPoolService) accountReference(origin string, id int64) string {
+	mac := hmac.New(sha256.New, s.identityKey)
+	_, _ = mac.Write([]byte("remote-pool/account/v1\x00" + origin + "\x00" + strconv.FormatInt(id, 10)))
+	sum := mac.Sum(nil)
+	// Keep sixty-four digest bits for a compact account display reference.
+	return "AC-" + base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(sum[:8])
 }

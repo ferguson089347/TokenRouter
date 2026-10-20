@@ -125,7 +125,7 @@ func poolFixture(t *testing.T, call func(context.Context, string, string, any, s
 	t.Helper()
 	repo := &memoryRepository{}
 	groups := &groupSource{groups: []routing.Group{{ID: 100, Name: "Local group", RateMultiplier: 2.5, Status: routing.StatusActive}}}
-	service := NewRemoteAccountPoolService(repo, cipher{}, true, groups, sourceClient{call: call})
+	service := NewRemoteAccountPoolService(repo, cipher{}, true, groups, sourceClient{call: call}, "test-site-identity")
 	_, err := service.UpdateSettings(context.Background(), RemotePoolSettingsInput{Enabled: true, BaseURL: "https://pool.example", RefreshToken: "rt-first", Bindings: []RemotePoolBinding{{RemoteGroupID: 25, LocalGroupID: 100}}})
 	require.NoError(t, err)
 	return service, repo, groups
@@ -197,7 +197,7 @@ func TestRemotePoolSessionAndVisibility(t *testing.T) {
 	require.True(t, page.AuthInvalid)
 	require.True(t, page.Stale)
 	require.Len(t, page.Items, 1)
-	other := NewRemoteAccountPoolService(repo, cipher{}, true, groups, s.client)
+	other := NewRemoteAccountPoolService(repo, cipher{}, true, groups, s.client, "test-site-identity")
 	page, err = other.List(ctx, url.Values{}, nil)
 	require.NoError(t, err)
 	require.True(t, page.AuthInvalid)
@@ -234,10 +234,10 @@ func TestRemotePoolConcurrentInstances(t *testing.T) {
 		case "/account-pool/options":
 			return RemotePoolOptions{Groups: []RemotePoolGroup{}}, nil
 		default:
-			return RemotePoolPage{Items: []RemotePoolAccount{{ID: 1, Groups: []RemotePoolGroup{{ID: 25}}}}, Total: 1}, nil
+			return remotePoolSourcePage{Items: []RemotePoolAccount{{ID: 1, Groups: []RemotePoolGroup{{ID: 25}}}}, Total: 1}, nil
 		}
 	})
-	other := NewRemoteAccountPoolService(repo, cipher{}, true, groups, s.client)
+	other := NewRemoteAccountPoolService(repo, cipher{}, true, groups, s.client, "test-site-identity")
 	var wg sync.WaitGroup
 	for _, instance := range []*RemoteAccountPoolService{s, other, s, other} {
 		wg.Go(func() {
@@ -273,7 +273,7 @@ func TestRemotePoolPartialCollectionRetainsRotatedToken(t *testing.T) {
 			if fail.Load() {
 				id, total = 2, 501
 			}
-			return RemotePoolPage{Items: []RemotePoolAccount{{ID: id, Groups: []RemotePoolGroup{{ID: 25}}}}, Total: total}, nil
+			return remotePoolSourcePage{Items: []RemotePoolAccount{{ID: id, Groups: []RemotePoolGroup{{ID: 25}}}}, Total: total}, nil
 		}
 	})
 	first, err := s.List(context.Background(), url.Values{}, nil)
@@ -346,7 +346,7 @@ func TestRemotePoolBrowserCancellation(t *testing.T) {
 			require.NoError(t, syncCtx.Err())
 			return RemotePoolOptions{Groups: []RemotePoolGroup{}}, nil
 		default:
-			return RemotePoolPage{Items: []RemotePoolAccount{{ID: 1, Groups: []RemotePoolGroup{{ID: 25}}}}, Total: 1}, nil
+			return remotePoolSourcePage{Items: []RemotePoolAccount{{ID: 1, Groups: []RemotePoolGroup{{ID: 25}}}}, Total: 1}, nil
 		}
 	})
 	page, err := s.List(ctx, url.Values{}, nil)
@@ -375,9 +375,9 @@ func TestRemotePoolMergesMembershipsBeforeFiltering(t *testing.T) {
 				id = 26
 			}
 			if u.Query().Get("group_id") == "27" {
-				return RemotePoolPage{Items: []RemotePoolAccount{{ID: 2, DisplayName: "Basic two", PlanType: "basic", PlanLabel: "Basic", Status: "paused", Groups: []RemotePoolGroup{{ID: 27}}}}, Total: 1}, nil
+				return remotePoolSourcePage{Items: []RemotePoolAccount{{ID: 2, DisplayName: "Basic two", PlanType: "basic", PlanLabel: "Basic", Status: "paused", Groups: []RemotePoolGroup{{ID: 27}}}}, Total: 1}, nil
 			}
-			return RemotePoolPage{Items: []RemotePoolAccount{{ID: 1, DisplayName: "Pro one", PlanType: "pro", PlanLabel: "Pro", Status: "active", Groups: []RemotePoolGroup{{ID: id}}}}, Total: 1}, nil
+			return remotePoolSourcePage{Items: []RemotePoolAccount{{ID: 1, DisplayName: "Pro one", PlanType: "pro", PlanLabel: "Pro", Status: "active", Groups: []RemotePoolGroup{{ID: id}}}}, Total: 1}, nil
 		}
 	})
 	groups.groups = append(groups.groups, routing.Group{ID: 200, Name: "Exclusive local", Status: routing.StatusActive, RateMultiplier: 3})
@@ -390,7 +390,7 @@ func TestRemotePoolMergesMembershipsBeforeFiltering(t *testing.T) {
 	require.Len(t, page.Items[0].Groups, 2)
 	page, err = s.List(context.Background(), url.Values{"page_size": {"1"}, "page": {"2"}}, nil)
 	require.NoError(t, err)
-	require.EqualValues(t, 2, page.Items[0].ID)
+	require.Equal(t, s.accountReference("https://pool.example", 2), page.Items[0].ID)
 	page, err = s.List(context.Background(), url.Values{"search": {"pro"}, "status": {"active"}, "plan_type": {"pro"}, "group_id": {"100"}}, nil)
 	require.NoError(t, err)
 	require.EqualValues(t, 1, page.Total)
@@ -423,7 +423,7 @@ func TestRemotePoolCollectsSourceClampedPages(t *testing.T) {
 			for id := (page-1)*100 + 1; id <= min(page*100, 501); id++ {
 				items = append(items, RemotePoolAccount{ID: int64(id), DisplayName: strconv.Itoa(id), Groups: []RemotePoolGroup{{ID: 25}}})
 			}
-			return RemotePoolPage{Page: page, PageSize: 100, Pages: 6, Total: 501, Items: items}, nil
+			return remotePoolSourcePage{Page: page, PageSize: 100, Pages: 6, Total: 501, Items: items}, nil
 		}
 	})
 	page, err := s.List(context.Background(), url.Values{}, nil)
@@ -435,7 +435,62 @@ func TestRemotePoolCollectsSourceClampedPages(t *testing.T) {
 	last, err := s.List(context.Background(), url.Values{"page": {"26"}}, nil)
 	require.NoError(t, err)
 	require.Len(t, last.Items, 1)
-	require.EqualValues(t, 501, last.Items[0].ID)
+	require.Equal(t, s.accountReference("https://pool.example", 501), last.Items[0].ID)
 	require.Equal(t, 26, last.Pages)
 	require.EqualValues(t, 6, reads.Load())
+}
+
+// TestRemotePoolPublicAccountReferences serves a cached source identity containing
+// its original numeric ID and generated name. Public rows, search, and restarts
+// retain site-local references while the persisted synchronization snapshot keeps
+// the source identity needed for future collection and group deduplication.
+func TestRemotePoolPublicAccountReferences(t *testing.T) {
+	s, repo, groups := poolFixture(t, func(context.Context, string, string, any, string) (any, error) {
+		t.Fatal("cached snapshots must not contact the source")
+		return nil, nil
+	})
+	_, err := s.mutate(context.Background(), func(record *remotePoolRecord) (bool, error) {
+		record.LastAttempt = time.Now()
+		record.Snapshot = []RemotePoolAccount{{ID: 58248, DisplayName: "promax Account #58248", Platform: "openai", PlanType: "promax", PlanLabel: "ProMax", Groups: []RemotePoolGroup{{ID: 25}}}}
+		return true, nil
+	})
+	require.NoError(t, err)
+	page, err := s.List(context.Background(), url.Values{}, nil)
+	require.NoError(t, err)
+	require.Len(t, page.Items, 1)
+	reference := page.Items[0].ID
+	require.Regexp(t, `^AC-[A-Z2-7]{13}$`, reference)
+	require.Equal(t, "ProMax", page.Items[0].DisplayName)
+	encoded, err := json.Marshal(page)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "58248")
+	require.NotContains(t, string(encoded), "promax Account #")
+	var public struct {
+		Items []struct {
+			ID string `json:"id"` // public account reference
+		} `json:"items"` // visible account summaries
+	}
+	require.NoError(t, json.Unmarshal(encoded, &public))
+	require.Equal(t, reference, public.Items[0].ID)
+	for _, query := range []string{reference, strings.ToLower(reference), "promax"} {
+		result, err := s.List(context.Background(), url.Values{"search": {query}}, nil)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, result.Total)
+	}
+	result, err := s.List(context.Background(), url.Values{"search": {"58248"}}, nil)
+	require.NoError(t, err)
+	require.Zero(t, result.Total)
+	restarted := NewRemoteAccountPoolService(repo, cipher{}, true, groups, s.client, "test-site-identity")
+	result, err = restarted.List(context.Background(), url.Values{}, nil)
+	require.NoError(t, err)
+	require.Equal(t, reference, result.Items[0].ID)
+	another := NewRemoteAccountPoolService(repo, cipher{}, true, groups, s.client, "another-site-identity")
+	result, err = another.List(context.Background(), url.Values{}, nil)
+	require.NoError(t, err)
+	require.NotEqual(t, reference, result.Items[0].ID)
+	require.NotEqual(t, reference, s.accountReference("https://another.example", 58248))
+	record, err := s.load(context.Background())
+	require.NoError(t, err)
+	require.EqualValues(t, 58248, record.Snapshot[0].ID)
+	require.Equal(t, "promax Account #58248", record.Snapshot[0].DisplayName)
 }

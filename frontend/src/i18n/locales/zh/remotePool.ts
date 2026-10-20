@@ -4,6 +4,9 @@
 // remote pool interface.
 export default {
   remotePool: {
+    accountNode: '号池节点',
+    groupRate: '{group} 分组倍率',
+    usageUnknown: '暂无数据',
     settingsTitle: '号池配置',
     settingsDescription: '设置远端站点、刷新令牌和本地分组映射。',
     connection: '远端连接',
@@ -20,7 +23,7 @@ export default {
       '填写远端 RT 后自动刷新访问令牌。RT 失效时提醒管理员并展示最近快照，令牌由后端加密保存。',
     saved: '配置已保存',
     disabledHint: '请在配置中填写远端 RT 并启用号池。',
-    search: '搜索账号名称或 ID',
+    search: '搜索账号类型或本站编号',
     allGroups: '全部分组',
     accountType: '账号类型',
     allTypes: '全部账号类型',

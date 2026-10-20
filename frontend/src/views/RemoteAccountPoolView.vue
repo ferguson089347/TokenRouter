@@ -2,9 +2,18 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <form class="flex flex-wrap items-center gap-2" @submit.prevent="applyFilters">
-          <div class="input-icon-wrap min-w-0 grow basis-full sm:basis-48 sm:max-w-64">
-            <Icon name="search" size="md" class="input-icon text-gray-400 dark:text-dark-400" />
+        <form
+          class="flex flex-wrap items-center gap-2"
+          @submit.prevent="applyFilters"
+        >
+          <div
+            class="input-icon-wrap min-w-0 grow basis-full sm:basis-48 sm:max-w-64"
+          >
+            <Icon
+              name="search"
+              size="md"
+              class="input-icon text-gray-400 dark:text-dark-400"
+            />
             <input
               v-model="search"
               type="search"
@@ -26,10 +35,14 @@
               <span
                 v-if="option?.value"
                 class="badge gap-1"
-                :class="planBadge(String(option.value), String(option.label)).classes"
+                :class="
+                  planBadge(String(option.value), String(option.label)).classes
+                "
               >
                 <Icon
-                  :name="planBadge(String(option.value), String(option.label)).icon"
+                  :name="
+                    planBadge(String(option.value), String(option.label)).icon
+                  "
                   size="xs"
                   :animate-on-hover="false"
                 />{{ option.label }}
@@ -40,10 +53,14 @@
               <span
                 v-if="option.value"
                 class="badge gap-1"
-                :class="planBadge(String(option.value), String(option.label)).classes"
+                :class="
+                  planBadge(String(option.value), String(option.label)).classes
+                "
               >
                 <Icon
-                  :name="planBadge(String(option.value), String(option.label)).icon"
+                  :name="
+                    planBadge(String(option.value), String(option.label)).icon
+                  "
                   size="xs"
                   :animate-on-hover="false"
                 />{{ option.label }}
@@ -89,11 +106,19 @@
             :disabled="loading"
             @click="refresh"
           >
-            <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" />
+            <Icon
+              name="refresh"
+              size="sm"
+              :class="{ 'animate-spin': loading }"
+            />
           </button>
         </form>
-        <p v-if="snapshotStatus.snapshot_at" class="mt-2 text-xs text-gray-500 dark:text-dark-400">
-          {{ t('remotePool.snapshotAt') }}: {{ formatTime(snapshotStatus.snapshot_at) }}
+        <p
+          v-if="snapshotStatus.snapshot_at"
+          class="mt-2 text-xs text-gray-500 dark:text-dark-400"
+        >
+          {{ t('remotePool.snapshotAt') }}:
+          {{ formatTime(snapshotStatus.snapshot_at) }}
         </p>
         <p
           v-if="error"
@@ -119,8 +144,25 @@
           row-key="id"
         >
           <template #cell-display_name="{ row }">
-            <div class="font-medium text-gray-900 dark:text-dark-50">{{ row.display_name }}</div>
-            <div class="text-xs text-gray-500 dark:text-dark-400">#{{ row.id }}</div>
+            <div class="flex items-center gap-3">
+              <span
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-300"
+              >
+                <Icon name="server" size="md" :animate-on-hover="false" />
+              </span>
+              <div class="min-w-0 self-baseline">
+                <div
+                  class="whitespace-nowrap font-mono text-xs font-semibold tracking-wide text-gray-900 dark:text-dark-50"
+                >
+                  {{ row.id }}
+                </div>
+                <div
+                  class="mt-1 truncate text-xs text-gray-500 dark:text-dark-400"
+                >
+                  {{ row.display_name || t('remotePool.accountNode') }}
+                </div>
+              </div>
+            </div>
           </template>
           <template #cell-platform="{ row }">
             <div>{{ row.platform }} · {{ row.auth_type }}</div>
@@ -137,7 +179,8 @@
           </template>
           <template #cell-capacity="{ row }">
             <div class="tabular-nums">
-              {{ row.current_concurrency }} / {{ row.concurrency > 0 ? row.concurrency : '∞' }}
+              {{ row.current_concurrency }} /
+              {{ row.concurrency > 0 ? row.concurrency : '∞' }}
             </div>
             <div
               v-if="row.concurrency > 0"
@@ -146,10 +189,12 @@
               <div
                 class="h-full rounded-full"
                 :class="
-                  row.current_concurrency >= row.concurrency ? 'bg-red-500' : 'bg-primary-500'
+                  row.current_concurrency >= row.concurrency
+                    ? 'bg-red-500'
+                    : 'bg-primary-500'
                 "
                 :style="{
-                  width: `${Math.max(0, Math.min(100, (row.current_concurrency / row.concurrency) * 100))}%`
+                  width: `${Math.max(0, Math.min(100, (row.current_concurrency / row.concurrency) * 100))}%`,
                 }"
               />
             </div>
@@ -163,28 +208,95 @@
           >
           <template #cell-groups="{ row }">
             <div class="flex max-w-xs flex-wrap gap-1">
-              <span v-for="group in row.groups" :key="group.id" class="badge badge-gray">{{
-                group.name
-              }}</span>
+              <span
+                v-for="group in row.groups"
+                :key="group.id"
+                class="badge badge-gray"
+                >{{ group.name }}</span
+              >
             </div>
           </template>
           <template #cell-rate_multiplier="{ row }">
-            <div class="space-y-1 tabular-nums">
-              <div v-for="group in row.groups" :key="group.id" :title="group.name">
-                {{ group.rate_multiplier }}x
+            <div class="flex flex-wrap gap-2">
+              <div
+                v-for="group in row.groups"
+                :key="group.id"
+                class="inline-flex items-center gap-2 rounded-control border border-primary-100 bg-primary-50/70 px-3 py-2 dark:border-primary-500/20 dark:bg-primary-500/10"
+                :title="t('remotePool.groupRate', { group: group.name })"
+              >
+                <Icon
+                  name="bolt"
+                  size="sm"
+                  class="shrink-0 text-primary-500 dark:text-primary-400"
+                  :animate-on-hover="false"
+                />
+                <div class="min-w-0">
+                  <div
+                    class="whitespace-nowrap tabular-nums text-primary-700 dark:text-primary-300"
+                  >
+                    <span class="text-base font-semibold">{{
+                      formatMultiplier(group.rate_multiplier)
+                    }}</span
+                    ><span class="ml-1 text-xs">×</span>
+                  </div>
+                  <div
+                    class="max-w-32 truncate text-xs text-primary-700/70 dark:text-primary-300/70"
+                  >
+                    {{ group.name }}
+                  </div>
+                </div>
               </div>
             </div>
           </template>
           <template #cell-usage_windows="{ row }">
-            <div class="space-y-1 text-xs">
-              <div v-for="window in row.usage_windows" :key="window.key">
-                {{ window.label || window.key }}:
-                {{ window.utilization == null ? '—' : `${window.utilization}%` }}
+            <div
+              v-if="row.usage_windows?.length"
+              class="inline-flex flex-col gap-2 rounded-control border border-gray-100 bg-gray-50/70 px-3 py-2 dark:border-dark-600 dark:bg-dark-800/60"
+            >
+              <div
+                v-for="(window, index) in row.usage_windows"
+                :key="window.key"
+              >
+                <div
+                  v-if="
+                    typeof window.utilization === 'number' &&
+                    Number.isFinite(window.utilization)
+                  "
+                  role="progressbar"
+                  :aria-label="window.label || window.key"
+                  :aria-valuenow="
+                    Math.max(0, Math.min(100, window.utilization))
+                  "
+                  :aria-valuetext="`${window.utilization}%`"
+                  :aria-valuemin="0"
+                  :aria-valuemax="100"
+                >
+                  <UsageProgressBar
+                    :label="window.label || window.key"
+                    :utilization="window.utilization"
+                    :color="Number(index) % 2 === 0 ? 'indigo' : 'emerald'"
+                    label-width="auto"
+                  />
+                </div>
+                <div
+                  v-else
+                  class="flex items-center gap-2 text-xs text-gray-400 dark:text-dark-400"
+                >
+                  <span
+                    class="rounded-compact bg-gray-100 px-1 font-medium dark:bg-dark-700"
+                    >{{ window.label || window.key }}</span
+                  >
+                  <span>{{ t('remotePool.usageUnknown') }}</span>
+                </div>
               </div>
-              <span v-if="!row.usage_windows?.length">—</span>
             </div>
+            <span v-else class="text-xs text-gray-400 dark:text-dark-400">{{
+              t('remotePool.usageUnknown')
+            }}</span>
           </template>
-          <template #cell-last_used_at="{ row }">{{ formatTime(row.last_used_at) }}</template>
+          <template #cell-last_used_at="{ row }">{{
+            formatTime(row.last_used_at)
+          }}</template>
         </DataTable>
       </template>
       <template #pagination>
@@ -211,17 +323,19 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
+import UsageProgressBar from '@/components/provider/UsageProgressBar.vue'
 import type { IconName } from '@/components/icons/registry'
 import { SEARCH_DEBOUNCE_MS } from '@/constants/ui'
 import {
   remoteAccountPoolAPI,
   type RemotePoolAccount,
   type RemotePoolOptions,
-  type RemotePoolSnapshotStatus
+  type RemotePoolSnapshotStatus,
 } from '@/api/admin/remoteAccountPool'
 
 // RemoteAccountPoolView.vue presents the user's remote account directory using
-// current local group names and multipliers. The page reads user endpoints for
+// current local group names and multipliers. Account rows use site-local references
+// and tier labels; utilization bars share the provider page's warning thresholds. The page reads user endpoints for
 // account rows and filter choices, and freshness notices explain when the server
 // retains a complete snapshot after remote synchronization fails.
 //
@@ -240,39 +354,50 @@ interface PlanBadge {
 // planBadges assigns distinct colors and symbols to source tiers while retaining the source's displayed labels and filter values.
 const planBadges: Record<string, PlanBadge> = {
   promax: {
-    classes: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
-    icon: 'sparkles'
+    classes:
+      'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+    icon: 'sparkles',
   },
   pro: {
-    classes: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
-    icon: 'sparkles'
+    classes:
+      'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+    icon: 'sparkles',
   },
-  plus: { classes: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300', icon: 'plus' },
+  plus: {
+    classes: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+    icon: 'plus',
+  },
   team: {
-    classes: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
-    icon: 'users'
+    classes:
+      'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+    icon: 'users',
   },
-  free: { classes: 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-dark-300', icon: 'user' },
+  free: {
+    classes: 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-dark-300',
+    icon: 'user',
+  },
   go: {
-    classes: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-    icon: 'bolt'
+    classes:
+      'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    icon: 'bolt',
   },
   supergrok: {
     classes: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
-    icon: 'bolt'
+    icon: 'bolt',
   },
   max: {
-    classes: 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
-    icon: 'sparkles'
+    classes:
+      'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
+    icon: 'sparkles',
   },
   enterprise: {
     classes: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-500/15 dark:text-cyan-300',
-    icon: 'shield'
-  }
+    icon: 'shield',
+  },
 }
 
 // Directory state tracks visible rows, snapshot freshness, local filters, and request ownership for the authenticated user's pool page.
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const loading = ref(true)
 const error = ref('')
 const items = ref<RemotePoolAccount[]>([])
@@ -280,9 +405,12 @@ const options = ref<RemotePoolOptions>({
   groups: [],
   plan_types: [],
   stale: false,
-  auth_invalid: false
+  auth_invalid: false,
 })
-const snapshotStatus = ref<RemotePoolSnapshotStatus>({ stale: false, auth_invalid: false })
+const snapshotStatus = ref<RemotePoolSnapshotStatus>({
+  stale: false,
+  auth_invalid: false,
+})
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
@@ -290,7 +418,13 @@ const search = ref('')
 const groupID = ref('')
 const planType = ref('')
 const status = ref('')
-const statuses = ['active', 'rate_limited', 'temporarily_unavailable', 'paused', 'error']
+const statuses = [
+  'active',
+  'rate_limited',
+  'temporarily_unavailable',
+  'paused',
+  'error',
+]
 let controller: AbortController | undefined
 let disposed = false
 let refreshTimer: ReturnType<typeof setInterval> | undefined
@@ -303,26 +437,30 @@ const columns = computed(() =>
     'groups',
     'rate_multiplier',
     'usage_windows',
-    'last_used_at'
-  ].map((key) => ({ key, label: t(`remotePool.columns.${key}`), sortable: false }))
+    'last_used_at',
+  ].map((key) => ({
+    key,
+    label: t(`remotePool.columns.${key}`),
+    sortable: false,
+  })),
 )
 const groupOptions = computed(() => [
   { value: '', label: t('remotePool.allGroups') },
   ...options.value.groups.map((group) => ({
     value: String(group.id),
-    label: `${group.name} · ${group.rate_multiplier}x`
-  }))
+    label: `${group.name} · ${group.rate_multiplier}x`,
+  })),
 ])
 const planOptions = computed(() => [
   { value: '', label: t('remotePool.allTypes') },
-  ...options.value.plan_types
+  ...options.value.plan_types,
 ])
 const statusOptions = computed(() => [
   { value: '', label: t('remotePool.allStatuses') },
-  ...statuses.map((value) => ({ value, label: statusLabel(value) }))
+  ...statuses.map((value) => ({ value, label: statusLabel(value) })),
 ])
 const activeFilterCount = computed(
-  () => [groupID.value, planType.value, status.value].filter(Boolean).length
+  () => [groupID.value, planType.value, status.value].filter(Boolean).length,
 )
 const debouncedSearch = useDebounceFn(applyFilters, SEARCH_DEBOUNCE_MS)
 
@@ -334,12 +472,28 @@ function planBadge(value: string, label = ''): PlanBadge {
   const key = (value || '').toLowerCase().replace(/[\s_-]/g, '')
   const labelKey = label.toLowerCase().replace(/[\s_-]/g, '')
   // Source-specific identifiers can accompany a recognized display label. Use that label's visual treatment before assigning the neutral unknown-tier style.
-  return planBadges[key] || planBadges[labelKey] || { classes: 'badge-gray', icon: 'userCircle' }
+  return (
+    planBadges[key] ||
+    planBadges[labelKey] || { classes: 'badge-gray', icon: 'userCircle' }
+  )
 }
 
 /** statusLabel translates known states and displays unknown source states verbatim. */
 function statusLabel(value: string) {
   return statuses.includes(value) ? t(`remotePool.status.${value}`) : value
+}
+
+/** formatMultiplier formats the local group's saved rate for the active locale.
+ * Rates retain up to four fractional digits, matching group pricing precision.
+ * Missing or invalid measurements use the empty marker rather than a fabricated price.
+ */
+function formatMultiplier(value: number): string {
+  // Group rates use four decimal places in persisted pricing configuration.
+  return Number.isFinite(value)
+    ? new Intl.NumberFormat(locale.value, { maximumFractionDigits: 4 }).format(
+        value,
+      )
+    : '—'
 }
 
 /** formatTime displays a source timestamp using the browser's local date conventions.
@@ -389,9 +543,9 @@ async function loadData(includeOptions = false) {
         search: search.value.trim() || undefined,
         group_id: groupID.value ? Number(groupID.value) : undefined,
         plan_type: planType.value || undefined,
-        status: status.value || undefined
+        status: status.value || undefined,
       },
-      request.signal
+      request.signal,
     )
     if (request.signal.aborted) return
     items.value = result.items

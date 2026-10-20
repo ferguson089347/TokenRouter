@@ -4,6 +4,9 @@
 // remote pool interface.
 export default {
   remotePool: {
+    accountNode: 'Account node',
+    groupRate: '{group} group multiplier',
+    usageUnknown: 'Not reported',
     settingsTitle: 'Pool settings',
     settingsDescription: 'Configure the remote site, refresh token, and local group bindings.',
     connection: 'Remote connection',
@@ -20,7 +23,7 @@ export default {
       'Enter a remote RT to refresh access automatically. An expired RT prompts administrators to update it while the latest snapshot stays available. The server encrypts stored tokens.',
     saved: 'Settings saved',
     disabledHint: 'Enter a remote RT in settings and enable the pool.',
-    search: 'Search account name or ID',
+    search: 'Search account tier or reference',
     allGroups: 'All groups',
     accountType: 'Account type',
     allTypes: 'All account types',
