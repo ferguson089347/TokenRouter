@@ -84,7 +84,7 @@ export default {
       valuePlaceholder: '例如：123456789 或 https://t.me/example',
       image: '二维码或图片（可选）',
       upload: '上传二维码 / 图片',
-      imageHint: '支持图片文件，每张不超过 300 KB。',
+      imageHint: '支持图片文件，每张不超过 500 KB。',
       imageUrl: '或填写图片的 HTTP(S) 地址',
       preview: '点击查看大图',
       previewLabel: '查看 {label} 的图片',

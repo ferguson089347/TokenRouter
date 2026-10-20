@@ -84,7 +84,7 @@ export default {
       valuePlaceholder: 'For example: 123456789 or https://t.me/example',
       image: 'QR code or image (optional)',
       upload: 'Upload QR code / image',
-      imageHint: 'Image files up to 300 KB each.',
+      imageHint: 'Image files up to 500 KB each.',
       imageUrl: 'Or enter an HTTP(S) image URL',
       preview: 'View full image',
       previewLabel: 'View image for {label}',

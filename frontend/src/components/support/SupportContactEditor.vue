@@ -31,11 +31,11 @@
         /></label>
         <div>
           <p class="input-label">{{ t('common.supportContacts.image') }}</p>
-          <!-- Bound each embedded upload to three hundred kibibytes so localized settings retain compact QR images alongside contact text. -->
+          <!-- Bound each embedded upload to five hundred kibibytes so localized settings retain compact QR images alongside contact text. -->
           <ImageUpload
             :model-value="item.image"
             mode="image"
-            :max-size="300 * 1024"
+            :max-size="500 * 1024"
             :upload-label="t('common.supportContacts.upload')"
             :hint="t('common.supportContacts.imageHint')"
             @update:model-value="setImage(item, $event)"
