@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# apple-container-test.sh runs deployment lifecycle commands against an isolated
+# container CLI fixture. The checks cover generated credentials, the repository's
+# default image, persistent storage, and resource ownership while leaving host
+# containers and deployment files outside the fixture untouched.
+
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,7 +53,7 @@ assert_exists "${STATE_DIR}/containers/tokenrouter-apple"
 assert_exists "${STATE_DIR}/containers/tokenrouter-apple-postgres"
 assert_exists "${STATE_DIR}/containers/tokenrouter-apple-redis"
 assert_exists "${STATE_DIR}/running/tokenrouter-apple"
-grep -Fq 'ghcr.io/tokenflux/tokenrouter:latest' "${STATE_DIR}/commands.log" || fail "up did not use the TokenRouter application image"
+grep -Fq 'ghcr.io/kiroo92/tokenrouter:latest' "${STATE_DIR}/commands.log" || fail "up did not use the TokenRouter application image"
 "${SCRIPT}" status >/dev/null
 
 "${SCRIPT}" up --recreate

@@ -1,4 +1,10 @@
 # syntax=docker/dockerfile:1.7
+
+# Dockerfile compiles the frontend and backend for the requested image platform.
+# Build stages reuse dependency caches and embed the frontend into the executable,
+# while the runtime stage includes PostgreSQL client tools for backups and starts
+# the application through the shared entrypoint.
+
 # =============================================================================
 # TokenRouter Multi-Stage Dockerfile
 # =============================================================================
@@ -103,9 +109,9 @@ FROM ${POSTGRES_IMAGE} AS pg-client
 FROM ${ALPINE_IMAGE}
 
 # Labels
-LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"
+LABEL maintainer="kiroo92 <github.com/kiroo92>"
 LABEL description="TokenRouter - AI API Gateway Platform"
-LABEL org.opencontainers.image.source="https://github.com/TokenFlux/TokenRouter"
+LABEL org.opencontainers.image.source="https://github.com/kiroo92/TokenRouter"
 
 # Install runtime dependencies
 RUN apk add --no-cache \

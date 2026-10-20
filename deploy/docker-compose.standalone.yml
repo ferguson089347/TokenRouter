@@ -1,3 +1,8 @@
+# docker-compose.standalone.yml runs this fork's GHCR application image against
+# external PostgreSQL and Redis services. Environment settings supply connection
+# details and stable application secrets, while a named application volume
+# retains configuration and other application data across replacements.
+
 # =============================================================================
 # TokenRouter Docker Compose - Standalone Configuration
 # =============================================================================
@@ -12,7 +17,7 @@
 
 services:
   tokenrouter:
-    image: ghcr.io/tokenflux/tokenrouter:latest
+    image: ghcr.io/kiroo92/tokenrouter:latest
     # 重建前始终刷新 latest，避免容器内在线更新后从旧本地镜像回退。
     pull_policy: always
     container_name: tokenrouter

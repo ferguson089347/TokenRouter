@@ -1,4 +1,8 @@
 #!/bin/bash
+# docker-deploy.sh prepares a Compose deployment from this repository's published
+# templates. It downloads the application configuration, generates deployment
+# secrets, and creates data directories before the operator starts containers
+# with the image selected by the downloaded Compose file.
 # =============================================================================
 # TokenRouter Docker Deployment Preparation Script
 # =============================================================================
@@ -20,8 +24,9 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# GitHub raw content base URL
-GITHUB_RAW_URL="https://raw.githubusercontent.com/TokenFlux/TokenRouter/main/deploy"
+# GITHUB_RAW_URL selects this fork's Compose and environment templates so a
+# downloaded deployment uses the image published by its release workflow.
+GITHUB_RAW_URL="https://raw.githubusercontent.com/kiroo92/TokenRouter/main/deploy"
 
 # Print colored message
 print_info() {

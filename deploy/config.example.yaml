@@ -1,10 +1,15 @@
+# config.example.yaml documents application settings for file-based deployment
+# configuration. Operators adapt the server, storage, gateway, and integration
+# settings to their deployment, while the application loader combines these
+# values with its supported defaults and environment overrides.
+
 # TokenRouter Configuration File
 # TokenRouter 配置文件
 #
 # Copy this file to /etc/tokenrouter/config.yaml and modify as needed
 # 复制此文件到 /etc/tokenrouter/config.yaml 并根据需要修改
 #
-# Documentation / 文档: https://github.com/TokenFlux/TokenRouter
+# Documentation / 文档: https://github.com/kiroo92/TokenRouter
 
 # =============================================================================
 # Server Configuration

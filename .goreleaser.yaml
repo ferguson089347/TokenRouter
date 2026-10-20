@@ -1,3 +1,7 @@
+# .goreleaser.yaml packages the platform binaries and publishes Linux images
+# to the repository owner's GHCR namespace. The two image architectures feed
+# shared version and latest manifests, while GitHub Releases receives archives,
+# checksums, and installation instructions.
 version: 2
 
 project_name: tokenrouter
@@ -56,14 +60,13 @@ changelog:
 
 # Docker images
 dockers:
-  # 每个架构只构建一次，并同时附加 GHCR 与可选 DockerHub 标签。
+  # Each Linux architecture is built once for the shared GHCR manifests.
   - id: amd64
     ids: [tokenrouter]
     goos: linux
     goarch: amd64
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/tokenrouter:{{ .Version }}-amd64"
-      - '{{ if ne .Env.DOCKERHUB_USERNAME "skip" }}{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-amd64{{ end }}'
     dockerfile: Dockerfile.goreleaser
     use: buildx
     extra_files:
@@ -80,7 +83,6 @@ dockers:
     goarch: arm64
     image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/tokenrouter:{{ .Version }}-arm64"
-      - '{{ if ne .Env.DOCKERHUB_USERNAME "skip" }}{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-arm64{{ end }}'
     dockerfile: Dockerfile.goreleaser
     use: buildx
     extra_files:
@@ -93,31 +95,6 @@ dockers:
 
 # Docker manifests for multi-arch support
 docker_manifests:
-  # DockerHub manifests (skipped if DOCKERHUB_USERNAME is 'skip')
-  - name_template: "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}"
-    skip_push: '{{ if eq .Env.DOCKERHUB_USERNAME "skip" }}true{{ else }}false{{ end }}'
-    image_templates:
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-amd64"
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-arm64"
-
-  - name_template: "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:latest"
-    skip_push: '{{ if eq .Env.DOCKERHUB_USERNAME "skip" }}true{{ else }}false{{ end }}'
-    image_templates:
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-amd64"
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-arm64"
-
-  - name_template: "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Major }}.{{ .Minor }}"
-    skip_push: '{{ if eq .Env.DOCKERHUB_USERNAME "skip" }}true{{ else }}false{{ end }}'
-    image_templates:
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-amd64"
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-arm64"
-
-  - name_template: "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Major }}"
-    skip_push: '{{ if eq .Env.DOCKERHUB_USERNAME "skip" }}true{{ else }}false{{ end }}'
-    image_templates:
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-amd64"
-      - "{{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}-arm64"
-
   # GHCR manifests (owner must be lowercase)
   - name_template: "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/tokenrouter:{{ .Version }}"
     image_templates:
@@ -158,11 +135,6 @@ release:
 
     **Docker:**
     ```bash
-    {{ if ne .Env.DOCKERHUB_USERNAME "skip" -}}
-    # Docker Hub
-    docker pull {{ .Env.DOCKERHUB_USERNAME }}/tokenrouter:{{ .Version }}
-
-    {{ end -}}
     # GitHub Container Registry
     docker pull ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/tokenrouter:{{ .Version }}
     ```

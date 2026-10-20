@@ -1,6 +1,11 @@
+# tokenrouter.service runs the installed application through systemd using the
+# tokenrouter service account. The unit binds the executable to its installation
+# directory, restarts the service after failures, and limits writes to the
+# application directory through systemd security settings.
+
 [Unit]
 Description=TokenRouter - AI API Gateway Platform
-Documentation=https://github.com/TokenFlux/TokenRouter
+Documentation=https://github.com/kiroo92/TokenRouter
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
 

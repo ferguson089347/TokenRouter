@@ -1,3 +1,8 @@
+# Dockerfile builds the frontend and embeds it into the application executable
+# for deployments built from source. The separate build stages supply Node and
+# Go toolchains, while the final Alpine image carries the executable and starts
+# it through the shared deployment entrypoint.
+
 # =============================================================================
 # TokenRouter Multi-Stage Dockerfile
 # =============================================================================
@@ -82,9 +87,9 @@ RUN VERSION_VALUE="${VERSION}" && \
 FROM ${ALPINE_IMAGE}
 
 # Labels
-LABEL maintainer="TokenFlux <github.com/TokenFlux>"
+LABEL maintainer="kiroo92 <github.com/kiroo92>"
 LABEL description="TokenRouter - AI API Gateway Platform"
-LABEL org.opencontainers.image.source="https://github.com/TokenFlux/TokenRouter"
+LABEL org.opencontainers.image.source="https://github.com/kiroo92/TokenRouter"
 
 # Install runtime dependencies
 RUN apk add --no-cache \

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# apple-container.sh manages the application, PostgreSQL, and Redis through the
+# Apple container CLI. Persistent volumes and ownership labels identify the stack
+# across invocations, while the shared environment file selects credentials,
+# published images, and the host listener.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -428,12 +433,17 @@ validate_env_file_security() {
         die "Environment file must not be readable by group or others. Run: chmod 600 '${ENV_FILE}'"
 }
 
+# prepare_environment validates the shared environment file and prepares container
+# settings and private temporary files. Explicit image settings take precedence
+# over the published defaults, including supported legacy image variables.
 prepare_environment() {
     validate_env_file_security
 
     APP_IMAGE="$(read_env_value APPLE_CONTAINER_TOKENROUTER_IMAGE)"
     if [[ -z "${APP_IMAGE}" ]]; then
-        APP_IMAGE="$(read_env_value APPLE_CONTAINER_SUB2API_IMAGE ghcr.io/tokenflux/tokenrouter:latest)"
+        # Existing deployments can select an image through the legacy variable;
+        # an unset legacy value selects this repository's published GHCR image.
+        APP_IMAGE="$(read_env_value APPLE_CONTAINER_SUB2API_IMAGE ghcr.io/kiroo92/tokenrouter:latest)"
     fi
     POSTGRES_IMAGE="$(read_env_value APPLE_CONTAINER_POSTGRES_IMAGE postgres:18-alpine)"
     REDIS_IMAGE="$(read_env_value APPLE_CONTAINER_REDIS_IMAGE redis:8-alpine)"

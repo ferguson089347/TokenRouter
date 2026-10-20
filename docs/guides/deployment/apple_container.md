@@ -27,7 +27,7 @@ container --version
 ## 快速开始
 
 ```bash
-git clone https://github.com/TokenFlux/TokenRouter.git
+git clone https://github.com/kiroo92/TokenRouter.git
 cd TokenRouter/deploy
 
 # 创建 .env，并随机生成 PostgreSQL、JWT 和 TOTP 密钥。
@@ -102,7 +102,7 @@ export TOKENROUTER_ENV_FILE=/absolute/path/to/tokenrouter.env
 可以单独覆盖 Apple 容器使用的镜像：
 
 ```dotenv
-APPLE_CONTAINER_TOKENROUTER_IMAGE=ghcr.io/tokenflux/tokenrouter:latest
+APPLE_CONTAINER_TOKENROUTER_IMAGE=ghcr.io/kiroo92/tokenrouter:latest
 APPLE_CONTAINER_POSTGRES_IMAGE=postgres:18-alpine
 APPLE_CONTAINER_REDIS_IMAGE=redis:8-alpine
 ```
@@ -177,7 +177,7 @@ container exec tokenrouter-apple sh -c 'tar -C "$DATA_DIR" -czf - .' \
 
 # 只删除应用容器，以便辅助容器挂载它的命名卷。
 container delete tokenrouter-apple
-TOKENROUTER_IMAGE=ghcr.io/tokenflux/tokenrouter:latest # 应与 .env 中的 APPLE_CONTAINER_TOKENROUTER_IMAGE 一致。
+TOKENROUTER_IMAGE=ghcr.io/kiroo92/tokenrouter:latest # 应与 .env 中的 APPLE_CONTAINER_TOKENROUTER_IMAGE 一致。
 container run --rm --name tokenrouter-apple-data-restore \
   --entrypoint /bin/sh \
   --volume tokenrouter-apple-data:/restore \

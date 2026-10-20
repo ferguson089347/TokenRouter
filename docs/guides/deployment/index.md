@@ -34,7 +34,7 @@ Compose 用户保留现有的 YAML 和 `.env`，用原来的服务名升级镜�
 安装：
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/TokenFlux/TokenRouter/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/kiroo92/TokenRouter/main/deploy/install.sh | sudo bash
 ```
 
 脚本会检测系统架构、下载最新版本、把二进制安装到 `/opt/tokenrouter`、创建 systemd 服务，并配置系统用户和权限。
@@ -73,14 +73,14 @@ sudo journalctl -u tokenrouter -f
 sudo systemctl restart tokenrouter
 
 # 卸载
-curl -sSL https://raw.githubusercontent.com/TokenFlux/TokenRouter/main/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -sSL https://raw.githubusercontent.com/kiroo92/TokenRouter/main/deploy/install.sh | sudo bash -s -- uninstall -y
 ```
 
 ## Docker Compose
 
 Compose 部署包含应用、PostgreSQL 和 Redis 三个容器。
 
-官方的多架构镜像是 `ghcr.io/tokenflux/tokenrouter`。生产环境建议固定 `vX.Y.Z` 标签或镜像摘要；支持的架构和独立容器需要的变量，见 [Docker 镜像说明](../../../deploy/DOCKER.md)。
+本仓库的多架构镜像是 `ghcr.io/kiroo92/tokenrouter`。生产环境建议固定 `X.Y.Z` 标签或镜像摘要；支持的架构和独立容器需要的变量，见 [Docker 镜像说明](../../../deploy/DOCKER.md)。
 
 前置条件：Docker 20.10 或更高，Docker Compose v2 或更高。
 
@@ -91,7 +91,7 @@ Compose 部署包含应用、PostgreSQL 和 Redis 三个容器。
 mkdir -p tokenrouter-deploy && cd tokenrouter-deploy
 
 # 下载并运行部署准备脚本
-curl -sSL https://raw.githubusercontent.com/TokenFlux/TokenRouter/main/deploy/docker-deploy.sh | bash
+curl -sSL https://raw.githubusercontent.com/kiroo92/TokenRouter/main/deploy/docker-deploy.sh | bash
 
 # 启动服务
 docker compose up -d
@@ -112,7 +112,7 @@ docker compose logs -f tokenrouter
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/TokenFlux/TokenRouter.git
+git clone https://github.com/kiroo92/TokenRouter.git
 cd TokenRouter/deploy
 
 # 2. 复制环境配置文件
@@ -255,7 +255,7 @@ TokenRouter 已经停用 `datamanagementd` 接口，不再探测或连接它的 
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/TokenFlux/TokenRouter.git
+git clone https://github.com/kiroo92/TokenRouter.git
 cd TokenRouter
 
 # 2. 安装 pnpm（如果还没有安装）

@@ -13,6 +13,8 @@
 
 ## 构建与运行形态
 
+本仓库的发布镜像为 `ghcr.io/kiroo92/tokenrouter`，Compose、Apple container 和本地镜像构建脚本使用这个默认地址。部署准备脚本和 Linux 安装器从 `kiroo92/TokenRouter` 下载配置和发布产物。
+
 标准发布先生成一次前端静态资源，再由独立的 runner 把同一份前端嵌进各平台的 Go 二进制，并行交叉编译；最后的发布阶段统一归档二进制，并用 Linux `amd64` 和 `arm64` 的产物组装多架构镜像和必要的运行时工具。GitHub Release 同时发布 Linux `amd64`、Linux `arm64` 等产物，具体的矩阵以 [release workflow](../../.github/workflows/release.yml) 为准。
 
 源码镜像的前端阶段校验 `.node-version`，再按 `frontend/package.json` 的 `packageManager` 字段安装 pnpm，本地和 CI 读取同样的版本声明。默认 Node 镜像使用 26.10.0，覆盖 `NODE_IMAGE` 时仍需满足完整版本检查。Node 26 镜像通过 npm 安装声明的 pnpm 版本，冻结安装前复制 workspace 配置。

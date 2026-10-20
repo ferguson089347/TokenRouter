@@ -1,8 +1,12 @@
 #!/bin/bash
+# install.sh installs and updates the application binary from this repository's
+# GitHub Releases. It configures the systemd service around the detected install
+# paths, including legacy installations, and verifies downloaded archives before
+# replacing the installed executable.
 #
 # TokenRouter Installation Script
 # TokenRouter 安装脚本
-# Usage: curl -sSL https://raw.githubusercontent.com/TokenFlux/TokenRouter/main/deploy/install.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/kiroo92/TokenRouter/main/deploy/install.sh | bash
 #
 
 set -e
@@ -30,8 +34,9 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Configuration
-GITHUB_REPO="TokenFlux/TokenRouter"
+# GITHUB_REPO selects the release source; the remaining values describe the
+# installation identity and paths that existing-installation detection can update.
+GITHUB_REPO="kiroo92/TokenRouter"
 INSTALL_DIR="/opt/tokenrouter"
 SERVICE_NAME="tokenrouter"
 BINARY_NAME="tokenrouter"
@@ -751,7 +756,9 @@ setup_directories() {
     print_success "$(msg 'dirs_configured')"
 }
 
-# Install systemd service
+# install_service writes the systemd unit using the detected installation identity
+# and configured server address. Callers prepare the account and directories first;
+# the function reloads systemd after writing the unit.
 install_service() {
     print_info "$(msg 'installing_service')"
 
@@ -759,7 +766,7 @@ install_service() {
     cat > /etc/systemd/system/${SERVICE_NAME}.service << EOF
 [Unit]
 Description=TokenRouter - AI API Gateway Platform
-Documentation=https://github.com/TokenFlux/TokenRouter
+Documentation=https://github.com/${GITHUB_REPO}
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
 

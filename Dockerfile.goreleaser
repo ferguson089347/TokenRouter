@@ -1,3 +1,8 @@
+# Dockerfile.goreleaser packages the binary supplied by the release build matrix.
+# The runtime includes PostgreSQL client tools for application backups and the
+# shared entrypoint for volume ownership, so published images use the same
+# executable that ships in the release archives.
+
 # =============================================================================
 # TokenRouter Dockerfile for GoReleaser
 # =============================================================================
@@ -12,9 +17,9 @@ FROM ${POSTGRES_IMAGE} AS pg-client
 
 FROM ${ALPINE_IMAGE}
 
-LABEL maintainer="TokenFlux <github.com/TokenFlux>"
+LABEL maintainer="kiroo92 <github.com/kiroo92>"
 LABEL description="TokenRouter - AI API Gateway Platform"
-LABEL org.opencontainers.image.source="https://github.com/TokenFlux/TokenRouter"
+LABEL org.opencontainers.image.source="https://github.com/kiroo92/TokenRouter"
 
 # Install runtime dependencies
 RUN apk add --no-cache \

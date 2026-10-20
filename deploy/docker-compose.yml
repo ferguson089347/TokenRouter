@@ -1,3 +1,8 @@
+# docker-compose.yml runs the application with PostgreSQL and Redis using named
+# volumes. The application image comes from this fork's GHCR package, while
+# environment settings control credentials and host binding and the volumes
+# retain data across container replacements.
+
 # =============================================================================
 # TokenRouter Docker Compose Configuration
 # =============================================================================
@@ -16,7 +21,7 @@ services:
   # TokenRouter Application
   # ===========================================================================
   tokenrouter:
-    image: ghcr.io/tokenflux/tokenrouter:latest
+    image: ghcr.io/kiroo92/tokenrouter:latest
     # 重建前始终刷新 latest，避免容器内在线更新后从旧本地镜像回退。
     pull_policy: always
     container_name: tokenrouter
