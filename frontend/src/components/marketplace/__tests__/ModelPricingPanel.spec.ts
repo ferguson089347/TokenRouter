@@ -107,6 +107,8 @@ describe('ModelPricingPanel', () => {
     expect(wrapper.find('[data-testid="model-pricing-toggle"]').exists()).toBe(false)
   })
 
+  // Pricing rows mount on the first opening and remain after the panel closes.
+  // The trigger and arrow must continue to report the visible expansion state.
   it('点击触发条展开收起面板，右下角箭头同步切换方向', async () => {
     const wrapper = mountPanel(marketplaceModel('m1', tokenPricing))
     const toggle = wrapper.get('[data-testid="model-pricing-toggle"]')
