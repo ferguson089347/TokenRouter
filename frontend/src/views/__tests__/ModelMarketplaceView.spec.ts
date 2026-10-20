@@ -2,6 +2,7 @@ import { defineComponent, nextTick } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ModelMarketplaceView from '../ModelMarketplaceView.vue'
+import Pagination from '@/components/common/Pagination.vue'
 import { modelIconData } from '@/utils/modelIconData'
 import type { MarketplaceGroup, MarketplaceModelPricing } from '@/types'
 
@@ -261,6 +262,37 @@ describe('ModelMarketplaceView', () => {
     await toggles[0].trigger('click')
     expect(toggles[0].attributes('aria-expanded')).toBe('false')
     expect(sections[0].get('.motion-collapse').attributes('aria-hidden')).toBe('true')
+    wrapper.unmount()
+  })
+
+  // Large groups render a bounded page, and folding keeps those card instances.
+  // Searching still inspects models beyond that page and returns to its first result.
+  it('pages large groups, retains folded cards, and searches all models', async () => {
+    const models = Array.from({ length: 25 }, (_, index) => marketplaceModel(`model-${index}`, `Model ${index}`, tokenPricing))
+    getMarketplaceModels.mockResolvedValueOnce([marketplaceGroup(1, 'Large', models)])
+    const wrapper = await mountMarketplace(false)
+    const toggle = wrapper.get('[data-testid="marketplace-group-toggle"]')
+    await toggle.trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('article')).toHaveLength(12)
+    expect(wrapper.findAll('article')[0].text()).toContain('Model 0')
+    wrapper.getComponent(Pagination).vm.$emit('update:page', 3)
+    await flushPromises()
+    expect(wrapper.findAll('article')).toHaveLength(1)
+    const lastCard = wrapper.get('article').element
+    expect(wrapper.get('article').text()).toContain('Model 24')
+    await toggle.trigger('click')
+    await toggle.trigger('click')
+    expect(wrapper.get('article').element).toBe(lastCard)
+    await wrapper.get('[data-testid="marketplace-search"]').setValue('model-24')
+    await flushPromises()
+    expect(wrapper.findAll('article')).toHaveLength(1)
+    expect(wrapper.get('article').text()).toContain('Model 24')
+    expect(wrapper.findComponent(Pagination).exists()).toBe(false)
+    await wrapper.get('[data-testid="marketplace-search"]').setValue('')
+    await flushPromises()
+    expect(wrapper.getComponent(Pagination).props('page')).toBe(1)
+    expect(wrapper.findAll('article')).toHaveLength(12)
     wrapper.unmount()
   })
 

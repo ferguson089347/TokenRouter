@@ -20,7 +20,7 @@
         <Icon name="infoCircle" size="sm" class="h-4 w-4" />
       </button>
     </template>
-    <div class="space-y-3">
+    <div v-if="panelOpen" class="space-y-3">
       <ModelProtocolChips
         :protocols="model.protocols"
         :native-protocols="model.native_protocols"
@@ -53,6 +53,13 @@ import type { MarketplaceModel, ProtocolID } from '@/types'
 // attribute panel. Cards retain their overall modality summary while this panel
 // switches every attribute to the selected client protocol. Closing the panel
 // resets selection so another inspection starts with the full available range.
+//
+// Attribute summaries and protocol selectors mount when the tooltip opens so
+// rendering a group of model cards creates their compact triggers first. Each
+// model owns its panel state, while HelpTooltip owns anchor positioning, outside
+// dismissal, and keyboard focus. The tooltip wrapper stays mounted when its
+// detail children close, keeping the trigger and its accessibility relationship
+// available for the next inspection.
 
 const props = defineProps<{
   model: MarketplaceModel // Public model and protocol display attributes.
@@ -61,14 +68,20 @@ const { t } = useI18n()
 // Panel selection is local to this model. Older responses remain static until
 // every advertised protocol has an attribute summary, preventing partial selectors.
 const selected = ref<ProtocolID | null>(null)
+// panelOpen defers protocol selectors and attribute rows until the visitor opens
+// this model's tooltip; the HelpTooltip wrapper retains its anchor and focus handling.
+const panelOpen = ref(false)
 const selectable = computed(() => !!props.model.attributes && !!props.model.protocols?.length && !!props.model.protocol_attributes &&
   (props.model.protocols ?? []).every(protocol => !!props.model.protocol_attributes?.[protocol]))
 const activeAttributes = computed(() => selected.value && selectable.value
   ? props.model.protocol_attributes?.[selected.value]
   : props.model.attributes)
 
-// onOpenChange resets the local protocol when the attribute panel is dismissed.
+// onOpenChange mounts detail content when the tooltip reports an opening.
+// Dismissal clears the selected protocol so the next inspection starts with all
+// available protocols and their overall attributes.
 function onOpenChange(open: boolean) {
+  panelOpen.value = open
   if (!open) selected.value = null
 }
 

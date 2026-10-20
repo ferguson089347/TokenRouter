@@ -50,6 +50,7 @@ describe('ModelAttributeDetails', () => {
     const value = model()
     const price = value.pricing
     const wrapper = mount(ModelAttributeDetails, { props: { model: value }, attachTo: document.body })
+    expect(panel().querySelector('[data-protocol="all"]')).toBeNull()
     await wrapper.get('button').trigger('click')
     expect(panel().querySelector('[data-protocol="all"]')?.getAttribute('aria-pressed')).toBe('true')
     expect(panel().querySelectorAll('[data-modality^="output-"]')).toHaveLength(2)

@@ -6,7 +6,7 @@
       class="mt-3 flex w-full items-center justify-between gap-2 border-t border-gray-100 pt-3 text-sm font-medium text-primary-600 transition hover:text-primary-700 dark:border-dark-700 dark:text-primary-300 dark:hover:text-primary-200"
       data-testid="model-pricing-toggle"
       :aria-expanded="expanded"
-      @click="expanded = !expanded"
+      @click="toggleDetails"
     >
       <span class="inline-flex items-center gap-1.5">
         <Icon name="eye" size="sm" />
@@ -17,7 +17,7 @@
 
     <!-- 收起后保留上下文区间和 fast mode，退出期间同步折叠高度。 -->
     <Collapse :open="expanded">
-      <div class="pt-3">
+      <div v-if="detailsVisited" class="pt-3">
         <!-- 右上角：上下文区间、fast mode、推理档位和分时切换，定价行随选择联动。 -->
         <div
           v-if="selectableIntervals.length > 0 || hasFastPricing || hasMaxEffortPricing || timeOptions.length > 0"
@@ -149,6 +149,14 @@ import type { MarketplaceModel, MarketplaceModelPricing, MarketplacePricingInter
 // Backend quotes already contain the group multiplier; rows add the selected
 // balance unit and billing unit. Named video dimensions and the explicit default
 // retain separate labels, including when their amounts are zero.
+//
+// Model grids create this component for each visible card, so unopened details
+// contain no price rows or segmented selectors. The first detail expansion mounts
+// those controls, and subsequent closes retain them with the user's interval,
+// fast-mode, effort, and time selection. This bounds group expansion work to the
+// displayed price summaries while giving revisited details their prior choices.
+// Collapse controls visibility and transition geometry after the detail content
+// has been created by the first explicit opening.
 
 // 完整定价面板在卡片内展开、收起，并提供上下文区间与 fast mode 切换。
 const props = defineProps<{
@@ -159,6 +167,9 @@ const { t } = useI18n()
 const { balanceUnitName } = useBalanceDisplay()
 
 const expanded = ref(false)
+// detailsVisited becomes true on the first opening so hidden detail controls do
+// not consume initial grid render time, while later visits reuse their DOM.
+const detailsVisited = ref(false)
 const fastMode = ref(false)
 const maxEffortMode = ref(false)
 const selectedIntervalIndex = ref(0)
@@ -168,6 +179,14 @@ interface PricingRow {
   key: string
   label: string
   value: string
+}
+
+// toggleDetails opens or closes pricing controls and records their first use.
+// Once opened, the controls stay mounted so reopening retains the model's chosen
+// pricing interval and other local selections.
+function toggleDetails(): void {
+  detailsVisited.value = true
+  expanded.value = !expanded.value
 }
 
 function hasPositiveValue(value?: number | null): value is number {

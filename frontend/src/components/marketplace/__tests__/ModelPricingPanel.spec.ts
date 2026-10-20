@@ -113,6 +113,7 @@ describe('ModelPricingPanel', () => {
     const drawer = wrapper.get('.motion-collapse')
 
     expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[data-testid="pricing-rows"]').exists()).toBe(false)
     expect(toggle.get('.icon-stub[data-icon="chevronDown"]').exists()).toBe(true)
     expect((drawer.element as HTMLElement).style.display).toBe('none')
 
@@ -123,6 +124,7 @@ describe('ModelPricingPanel', () => {
 
     await toggle.trigger('click')
     expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[data-testid="pricing-rows"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="model-pricing-toggle"]').get('.icon-stub[data-icon="chevronDown"]').exists()).toBe(true)
   })
 
@@ -336,12 +338,15 @@ describe('ModelPricingPanel', () => {
   })
 })
 
-it('显示明确免费的图片尺寸，省略未定价尺寸', () => {
+// A free image size still has usable detail pricing behind the trigger.
+// Opening the panel exposes that size while omitted sizes stay absent.
+it('显示明确免费的图片尺寸，省略未定价尺寸', async () => {
   const wrapper = mountPanel(marketplaceModel('free-image-size', {
     pricing_mode: 'image',
     price_status: 'priced',
     image_price_1k: 0,
   }))
+  await wrapper.get('[data-testid="model-pricing-toggle"]').trigger('click')
   expect(wrapper.text()).toContain('1K')
   expect(wrapper.text()).not.toContain('2K')
   expect(wrapper.text()).not.toContain('4K')
