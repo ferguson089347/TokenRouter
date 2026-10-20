@@ -214,10 +214,11 @@
             </div>
 
             <div class="border-t border-gray-100 bg-primary-50/40 p-3 dark:border-dark-700 dark:bg-primary-500/5">
+              <!-- Page navigation scrolls here with room for the fixed header and its content spacing. -->
               <button
                 :id="`marketplace-group-toggle-${group.id}`"
                 type="button"
-                class="btn btn-primary min-h-11 w-full justify-between gap-3 px-4"
+                class="btn btn-primary min-h-11 w-full justify-between gap-3 px-4 [scroll-margin-top:calc(var(--header-h)+1rem)]"
                 data-testid="marketplace-group-toggle"
                 :aria-expanded="groupExpansion.get(group.id) === true"
                 :aria-controls="`marketplace-group-models-${group.id}`"
@@ -296,7 +297,7 @@
                   :page="group.page"
                   :page-size="MODEL_PAGE_SIZE"
                   :show-page-size-selector="false"
-                  @update:page="groupPages[group.id] = $event"
+                  @update:page="changeGroupPage(group.id, $event)"
                 />
               </div>
             </Collapse>
@@ -520,6 +521,14 @@ const hasMarketplaceResults = computed(() => filteredGroups.value.length > 0)
 // change the displayed groups.
 function toggleGroupModels(groupId: number): void {
   groupExpansion.value.set(groupId, !groupExpansion.value.get(groupId))
+}
+
+// changeGroupPage selects a group's model page and returns its toggle to view.
+// The toggle's scroll margin leaves room for the fixed application header so
+// visitors begin reading at the first card after changing pages.
+function changeGroupPage(groupId: number, page: number): void {
+  groupPages.value[groupId] = page
+  document.getElementById(`marketplace-group-toggle-${groupId}`)?.scrollIntoView({ block: 'start' })
 }
 
 function hasPositiveValue(value?: number | null): value is number {
