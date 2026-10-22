@@ -418,7 +418,7 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
 async function customizeChannels(wrapper: VueWrapper) {
   await flushPromises()
   const mode = wrapper
-    .findAllComponents({ name: 'Select' })
+    .findAllComponents({ name: 'SettingsSegmented' })
     .find((select) => select.attributes('data-test') === 'routing-mode-select')
   const hasGroups = wrapper
     .findAllComponents({ name: 'Select' })
@@ -1277,7 +1277,7 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
     await flushPromises()
-    expect(wrapper.find('ol').text()).toMatch(/1\..*OpenAI B.*2\..*OpenAI A/s)
+    expect(wrapper.find('ol').text()).toMatch(/1.*OpenAI B.*2.*OpenAI A/s)
     expect(wrapper.find('[data-test="channel-editor"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="edit-channels"]').exists()).toBe(false)
     await customizeChannels(wrapper)
@@ -1311,7 +1311,7 @@ describe('user KeysView column settings', () => {
     await getButtonByText(wrapper, 'Edit').trigger('click')
     await flushPromises()
     const mode = wrapper
-      .findAllComponents({ name: 'Select' })
+      .findAllComponents({ name: 'SettingsSegmented' })
       .find((select) => select.attributes('data-test') === 'routing-mode-select')!
     mode.vm.$emit('update:modelValue', 'auto')
     await wrapper.get('form#key-form').trigger('submit')

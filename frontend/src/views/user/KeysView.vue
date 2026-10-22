@@ -556,9 +556,17 @@
     <BaseDialog
       :show="showCreateModal || showEditModal"
       :title="showEditModal ? t('keys.editKey') : t('keys.createKey')"
+      :subtitle="t('keys.routing.subtitle')"
       width="normal"
       @close="closeModals"
     >
+      <template #header-icon>
+        <span
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400"
+        >
+          <Icon name="key" size="md" :animate-on-hover="false" />
+        </span>
+      </template>
       <form
         id="key-form"
         @submit.prevent="handleSubmit"
@@ -576,11 +584,14 @@
         </div>
 
         <div class="space-y-3">
-          <label class="input-label">{{ t('keys.routing.mode') }}</label>
-          <Select
-            v-model="formData.routing_mode"
+          <label class="input-label mb-0">{{ t('keys.routing.mode') }}</label>
+          <SettingsSegmented
+            :model-value="formData.routing_mode"
             :options="routingModeOptions"
+            :ariaLabel="t('keys.routing.mode')"
+            block
             data-test="routing-mode-select"
+            @update:model-value="formData.routing_mode = $event as 'auto' | 'single'"
           />
           <Select
             v-if="formData.routing_mode === 'single'"
@@ -590,44 +601,69 @@
             data-test="single-group-select"
           />
         </div>
-        <div v-if="formData.routing_mode === 'auto'" class="space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <label class="input-label mb-0">{{ t('keys.routing.channels') }}</label>
+
+        <!-- One ordered list presents administrator priority without repeating channel names in a summary. -->
+        <section
+          v-if="formData.routing_mode === 'auto'"
+          class="overflow-hidden rounded-surface border border-gray-200 dark:border-dark-600"
+          aria-labelledby="key-routing-order"
+        >
+          <div
+            class="border-b border-gray-100 bg-gray-50/70 px-4 py-3 dark:border-dark-600 dark:bg-dark-950"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <h4
+                id="key-routing-order"
+                class="text-sm font-medium text-gray-900 dark:text-dark-100"
+                >{{ t('keys.routing.order') }}</h4
+              >
+              <span class="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-dark-400">
+                <Icon name="lock" size="xs" :animate-on-hover="false" />
+                {{ t('keys.routing.adminManaged') }}
+              </span>
+            </div>
+            <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-dark-400">{{
+              t('keys.routing.orderHint')
+            }}</p>
           </div>
-          <p class="input-hint">{{
-            t(formData.use_default_groups ? 'keys.routing.inherited' : 'keys.routing.custom')
-          }}</p>
-          <p v-if="draftChannelNames" class="text-sm text-gray-600 dark:text-gray-400">{{
-            draftChannelNames
-          }}</p>
-          <ol class="space-y-2">
+          <ol
+            class="max-h-64 divide-y divide-gray-100 overflow-y-auto dark:divide-dark-700"
+            data-test="routing-order"
+          >
             <li
-              v-for="(binding, index) in formData.composite_groups"
-              :key="binding.group_id ?? index"
-              class="flex items-center gap-2 text-sm"
+              v-for="(channel, index) in draftChannels"
+              :key="channel.id"
+              class="flex items-center gap-3 px-4 py-2"
             >
-              <span class="text-gray-400">{{ index + 1 }}.</span>
-              <span>{{
-                groups.find((group) => group.id === binding.group_id)?.display_name ||
-                groups.find((group) => group.id === binding.group_id)?.name ||
-                `#${binding.group_id}`
-              }}</span>
+              <span
+                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-compact bg-gray-100 font-mono text-xs text-gray-500 dark:bg-dark-700 dark:text-dark-400"
+                >{{ index + 1 }}</span
+              >
+              <span
+                class="min-w-0 truncate text-sm text-gray-700 dark:text-dark-200"
+                :title="channel.name"
+                >{{ channel.name }}</span
+              >
             </li>
           </ol>
-          <p class="input-hint">{{ t('keys.routing.adminOrder') }}</p>
-        </div>
+        </section>
+
         <button
           type="button"
-          class="btn btn-secondary w-full justify-between"
+          class="flex w-full items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm text-gray-500 transition-colors hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:border-dark-700 dark:text-dark-400 dark:hover:text-dark-100"
           data-test="advanced-options-toggle"
           :aria-expanded="advancedExpanded"
+          aria-controls="key-advanced-options"
           @click="advancedExpanded = !advancedExpanded"
         >
-          {{ t('keys.routing.advanced') }}
+          <span class="inline-flex items-center gap-2">
+            <Icon name="cog" size="sm" :animate-on-hover="false" />
+            {{ t('keys.routing.advanced') }}
+          </span>
           <Icon name="chevronDown" size="sm" :class="{ 'rotate-180': advancedExpanded }" />
         </button>
         <Collapse :open="advancedExpanded">
-          <div class="space-y-5">
+          <div id="key-advanced-options" class="space-y-5">
             <div class="space-y-3">
               <label class="input-label">{{ t('keys.billing.modeLabel') }}</label>
               <Select
@@ -1348,6 +1384,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
+import SettingsSegmented from '@/components/common/settings/SettingsSegmented.vue'
 import FilterDropdown from '@/components/common/FilterDropdown.vue'
 import FilterField from '@/components/common/FilterField.vue'
 import Toggle from '@/components/common/Toggle.vue'
@@ -1822,24 +1859,25 @@ const customKeyError = computed(() => {
   return ''
 })
 
-// draftChannelNames displays channel labels in the priority order currently shown.
-// Loaded form choices supply localized names; unavailable choices retain their IDs.
-const draftChannelNames = computed(() =>
-  formData.value.composite_groups
-    .map((binding) => {
-      const group =
-        groups.value.find((group) => group.id === binding.group_id) ??
-        formGroups.value.find((group) => group.id === binding.group_id)
-      return group?.display_name || group?.name || (binding.group_id ? `#${binding.group_id}` : '')
-    })
-    .filter(Boolean)
-    .join(' · '),
+// draftChannels resolves localized group labels in administrator priority order.
+// General and subscription-filtered catalogues supply names, with numeric identities
+// retained for channels whose metadata is still unavailable in the current view.
+const draftChannels = computed(() =>
+  formData.value.composite_groups.map((binding) => {
+    const group =
+      groups.value.find((group) => group.id === binding.group_id) ??
+      formGroups.value.find((group) => group.id === binding.group_id)
+    return {
+      id: binding.local_id, // Stable draft row identity.
+      name: group?.display_name || group?.name || `#${binding.group_id}`, // Localized channel label.
+    }
+  }),
 )
 
-// routingModeOptions lets each Key choose ordered automatic channels or one group.
+// routingModeOptions supplies the two fixed routing choices and their shared icons.
 const routingModeOptions = computed(() => [
-  { value: 'auto', label: t('keys.routing.auto') },
-  { value: 'single', label: t('keys.routing.single') },
+  { value: 'auto' as const, label: t('keys.routing.auto'), icon: 'bolt' as const },
+  { value: 'single' as const, label: t('keys.routing.single'), icon: 'layers' as const },
 ])
 
 // fastModePolicyOptions offers request-following, forced-on, and forced-off policies while

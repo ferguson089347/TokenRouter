@@ -81,6 +81,10 @@ export default {
   // API Keys
   keys: {
     routing: {
+      subtitle: 'Call models by their original names',
+      order: 'Routing priority',
+      adminManaged: 'System managed',
+      orderHint: 'Matching models use the first available group in this order.',
       cooldown: 'Failed provider cooldown (seconds)',
       cooldownHint:
         'Temporarily skip failed providers for the same Key, model and endpoint. Set 0 to disable cooldown.',

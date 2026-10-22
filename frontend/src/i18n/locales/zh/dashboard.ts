@@ -81,6 +81,10 @@ export default {
   // API Keys
   keys: {
     routing: {
+      subtitle: '直接使用模型原名调用',
+      order: '路由顺序',
+      adminManaged: '系统配置',
+      orderHint: '同名模型按此顺序选择可用分组',
       cooldown: '故障提供商冷却（秒）',
       cooldownHint: '失败的提供商在当前 Key、模型和接口范围内暂时跳过。0 表示关闭冷却。',
 
