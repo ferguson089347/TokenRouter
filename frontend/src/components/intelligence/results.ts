@@ -8,8 +8,20 @@ import type { IntelligenceRun, IntelligenceTest } from '@/api/intelligence'
 // drawing URLs must match the dedicated signed content route before an iframe
 // can load them.
 
+// IntelligenceDisplayStatus separates assessed quality from diagnostics and pending work.
 export type IntelligenceDisplayStatus =
   'passed' | 'incorrect' | 'error' | 'unknown' | 'running' | 'queued'
+
+// intelligenceStatusColors supplies identical history slot colors to the legend
+// and observation bars so changing a status color updates both explanations.
+export const intelligenceStatusColors: Record<IntelligenceDisplayStatus, string> = {
+  passed: 'bg-emerald-500',
+  incorrect: 'bg-rose-500',
+  error: 'bg-amber-400',
+  unknown: 'bg-amber-400',
+  running: 'bg-gray-300 dark:bg-dark-600',
+  queued: 'bg-gray-300 dark:bg-dark-600',
+}
 
 // resultStatus derives display state from execution and assessment with error
 // and unknown precedence. Active jobs remain queued or running, and only a
@@ -26,11 +38,7 @@ export function resultStatus(run: IntelligenceRun): IntelligenceDisplayStatus {
 
 // resultColor returns the shared status color for one observed result.
 export function resultColor(run: IntelligenceRun): string {
-  const status = resultStatus(run)
-  if (status === 'passed') return 'bg-emerald-500'
-  if (status === 'incorrect') return 'bg-rose-500'
-  if (status === 'error' || status === 'unknown') return 'bg-amber-400'
-  return 'bg-gray-300 dark:bg-dark-600'
+  return intelligenceStatusColors[resultStatus(run)]
 }
 
 // recentRuns copies and sorts observations oldest first, then keeps the

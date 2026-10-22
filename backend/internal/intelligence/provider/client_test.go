@@ -90,6 +90,37 @@ func TestCreateAndGetCandy(t *testing.T) {
 	}
 }
 
+// TestHTMLAssessmentUsesPlaceholders submits artwork with deliberately supplied
+// generation secrets. The classifier receives fixed placeholder model fields,
+// the completed document, and the caller's stable assessment idempotency key.
+func TestHTMLAssessmentUsesPlaceholders(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusAccepted} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if len(body) != 5 || body["benchmark"] != "html" || body["html"] != "<html><body>art</body></html>" || body["api_key"] != "html-classification-placeholder" || body["base_url"] != "https://api.example.com/v1" || body["model"] != "gpt-6-astra" {
+					t.Fatal("HTML assessment request contains generation settings")
+				}
+				if r.Header.Get("Authorization") != "" || r.Header.Get("Idempotency-Key") != "local_html" {
+					t.Fatal("HTML assessment headers are invalid")
+				}
+				w.WriteHeader(status)
+				fmt.Fprint(w, `{"id":"assessment-task","benchmark":"html","status":"succeeded","assessment":{"quality":"normal"}}`)
+			})
+			input := createInput("html")
+			input.HTML = "<html><body>art</body></html>"
+			input.ReasoningEffort = "high"
+			result, err := client.Create(context.Background(), input, "local_html")
+			if err != nil || result.Outcome() != "passed" {
+				t.Fatalf("HTML assessment failed: %v", err)
+			}
+		})
+	}
+}
+
 // TestDrawingResultAndLegacyAssessment polls a drawing response containing a
 // legacy suspicious classification and optional measurements. HTML survives
 // decoding, explicit zero output stays distinct from absent input, and the

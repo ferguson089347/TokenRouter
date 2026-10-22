@@ -59,9 +59,11 @@ describe('画图预览隔离', () => {
     expect(wrapper.find('iframe').exists()).toBe(false)
     wrapper.unmount()
   })
-  it('列表缩略图不显示文档滚动条或捕获交互，仍保留沙箱和票据隔离', async () => {
+  // Compact cards scale the complete drawing viewport while retaining active HTML.
+  // Resizing changes display scale without requesting another signed document or disabling its controls.
+  it('最新作品缩放完整画布，保持动画与交互且不重新加载', async () => {
     const wrapper = mount(IntelligenceDrawing, {
-      props: { runId: 'run-1', title: 'drawing', thumbnail: true },
+      props: { runId: 'run-1', title: 'drawing', compact: true },
       global: { provide: { [intelligenceResultsKey as symbol]: { preview } } },
     })
     visibleCallback(
@@ -69,10 +71,19 @@ describe('画图预览隔离', () => {
       {} as IntersectionObserver,
     )
     await flushPromises()
+    Object.defineProperties(wrapper.element, {
+      clientWidth: { value: 256 },
+      clientHeight: { value: 192 },
+    })
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
     const frame = wrapper.get('iframe')
     expect(frame.attributes('scrolling')).toBe('no')
-    expect(frame.attributes('tabindex')).toBe('-1')
-    expect(frame.classes()).toContain('pointer-events-none')
+    expect(frame.attributes('style')).toContain('width: 1280px')
+    expect(frame.attributes('style')).toContain('height: 960px')
+    expect(frame.attributes('style')).toContain('scale(0.2)')
+    expect(frame.classes()).not.toContain('pointer-events-none')
+    expect(preview).toHaveBeenCalledTimes(1)
     expect(frame.attributes('sandbox')).toBe('allow-scripts')
     expect(frame.attributes('referrerpolicy')).toBe('no-referrer')
     expect(frame.attributes('srcdoc')).toBeUndefined()

@@ -10,10 +10,9 @@
       sandbox="allow-scripts"
       referrerpolicy="no-referrer"
       :title="title"
-      :scrolling="thumbnail ? 'no' : undefined"
-      :tabindex="thumbnail ? -1 : undefined"
+      :scrolling="compact ? 'no' : undefined"
       class="h-full w-full border-0 bg-white"
-      :class="{ 'pointer-events-none': thumbnail }"
+      :style="compact ? compactStyle : undefined"
       allow="
         camera 'none';
         microphone 'none';
@@ -32,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { intelligencePreviewURL } from './results'
 import { useIntelligenceResults } from './useIntelligenceResults'
@@ -43,20 +42,21 @@ import { useIntelligenceResults } from './useIntelligenceResults'
 // grants scripts inside its isolated sandbox and uses the server's dedicated
 // content policy.
 //
-// Thumbnail frames suppress scrolling, pointer interaction and keyboard focus
-// so the surrounding gallery owns navigation. Detail frames retain local
-// drawing interaction. The page-owned loader limits concurrent reads and
+// Latest previews use a desktop viewport scaled into their compact card so a
+// fixed-size drawing remains fully visible and animated. Detail frames use
+// their available viewport. The page-owned loader limits concurrent reads and
 // caches ticket responses; component teardown disconnects visibility
 // observation and prevents its pending responses from updating removed
 // content.
-// Thumbnail frames leave scrolling, pointer input and keyboard focus with the
-// gallery; detail previews allow interaction inside the isolated document.
-// Visibility, preview URL and selection revision belong to this drawing card;
-// its observer and listeners are released when the card unmounts.
+
+// Frame visibility, the signed URL and measured scale belong to this mounted
+// drawing; observers and global listeners are released together during teardown.
 const props = defineProps<{
   runId: string
   title: string
-  thumbnail?: boolean
+  // compact scales a desktop viewport into its card, keeping fixed-size
+  // documents fully visible while their scripts and pointer controls remain active.
+  compact?: boolean
 }>()
 const { t } = useI18n()
 const loader = useIntelligenceResults()
@@ -65,9 +65,30 @@ const visible = ref(false)
 const pageVisible = ref(!document.hidden)
 const url = ref('')
 const error = ref('')
+const previewScale = ref(1)
+// The full drawing viewport matches saved screenshots so compact live cards
+// show the same scene while retaining their independent HTML animation state.
+const compactStyle = computed(() => ({
+  width: '1280px',
+  height: '960px',
+  flexShrink: 0,
+  transform: `scale(${previewScale.value})`,
+}))
 let observer: IntersectionObserver | undefined
+let sizeObserver: ResizeObserver | undefined
 let revision = 0
 let disposed = false
+
+// resizePreview fits the complete desktop drawing into its latest-result card.
+// Both dimensions constrain the scale, so a fixed-size model document remains
+// visible when responsive layout or sidebar changes alter the available space.
+function resizePreview() {
+  const element = container.value
+  if (!element || !props.compact) return
+  // Use the screenshot's viewport as the scaling basis for live compact cards.
+  const scale = Math.min(element.clientWidth / 1280, element.clientHeight / 960)
+  if (scale > 0) previewScale.value = scale
+}
 // load requests a signed preview when the card and document are visible. A
 // monotonically increasing revision and disposal flag reject older
 // completions, while invalid URLs and failed requests show the unavailable-
@@ -102,6 +123,14 @@ watch(
 )
 onMounted(() => {
   document.addEventListener('visibilitychange', visibilityChanged)
+  if (props.compact) {
+    resizePreview()
+    window.addEventListener('resize', resizePreview)
+    if (typeof ResizeObserver !== 'undefined') {
+      sizeObserver = new ResizeObserver(resizePreview)
+      if (container.value) sizeObserver.observe(container.value)
+    }
+  }
   if (typeof IntersectionObserver === 'undefined') {
     visible.value = true
     void load()
@@ -121,6 +150,10 @@ onBeforeUnmount(() => {
   disposed = true
   ++revision
   observer?.disconnect()
+  // Release card measurement with visibility tracking so removed latest results
+  // cannot retain resizing callbacks after their page or model group disappears.
+  sizeObserver?.disconnect()
+  window.removeEventListener('resize', resizePreview)
   document.removeEventListener('visibilitychange', visibilityChanged)
 })
 </script>

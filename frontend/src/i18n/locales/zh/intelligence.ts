@@ -2,14 +2,21 @@
 // result diagnostics for this locale. Administrator and user pages share these
 // keys so benchmark names, feature availability, and observed outcomes use
 // consistent language throughout the feature.
-
 export default {
   intelligence: {
+    selfTest: '用户自测',
+    startSelfTest: '开始测试',
+    userTests: '用户测试',
+    siteTests: '站点检测',
+    channelModel: '渠道 / 模型',
+    selfTestHint:
+      '选择自己的个人 API Key，按该渠道的系统配置测试。结果公开显示，调用计入所选 Key 的用量。',
+    noSelfTestKeys: '暂无可测试的个人普通 Key，请使用绑定已启用系统画图检测渠道的 Key。',
     title: '降智检测',
     description: '按分组和模型查看近期测试结果与绘图作品。测试结果仅反映当次测试表现。',
     adminTitle: '降智检测',
     adminDescription:
-      '为每个分组配置多个模型，选择糖果测试或画图测试。检测通过专用站内 API Key 执行。',
+      '按分组配置模型与测试。画图测试在本站生成 HTML 后提交评价，可自定义生成提示词。',
     add: '新增测试',
     edit: '编辑测试',
     remove: '删除测试',
@@ -35,11 +42,23 @@ export default {
     benchmark: '测试类型',
     candy: '糖果测试',
     drawing: '画图测试',
+    drawingLocal: '画图测试（本站生成 HTML）',
+    candyRemote: '糖果测试（Manxue 执行）',
+    drawingWorkflowHint: '本站调用所选模型生成 HTML，保存作品后提交 Manxue 评价。',
+    candyWorkflowHint:
+      'Manxue 使用检测 Key 调用本站执行糖果问答测试。此类型不生成 HTML；需要生成作品请选择画图测试。',
     groupPlaceholder: '选择分组',
     modelPlaceholder: '选择或输入模型 ID',
     baseUrl: '本站 API 地址',
-    baseUrlHint: '填写可由检测服务访问的本站公网 HTTPS API 地址，通常以 /v1 结尾。',
+    baseUrlHint:
+      '填写本站公网 HTTPS API 地址，通常以 /v1 结尾。画图由本站后端访问，糖果由检测服务访问。',
     useCurrentSite: '使用当前网站',
+    prompt: '画图提示词',
+    promptPlaceholder: '留空使用默认的鹈鹕骑自行车 SVG 动画提示词',
+    promptHint:
+      '模型先在本站生成完整 HTML，再提交给 Manxue 评价。请要求输出单文件 HTML 并使用内联资源。自定义题目可能影响降智评价的适用性。',
+    drawingApiKeyHint:
+      '本站后端使用此 Key 调用所选模型生成 HTML，消耗该 Key 的额度。评价仅向 Manxue 提交生成的 HTML。请使用绑定当前分组的专用限额 Key。',
     selectApiKey: '选择已有 API Key',
     selectApiKeyPlaceholder: '选择当前用户的 API Key',
     selectApiKeyHint:
@@ -83,15 +102,21 @@ export default {
     resultLabel: '{time} · {status}',
     openResult: '查看 {time} 的测试详情',
     artworks: '近期画图作品',
-    artworksHint: '从左到右由新到旧，最多保留 10 个作品。',
+    artworksHint: '展示最新作品，历史截图可在测试节点查看。',
+    latestArtwork: '最新作品',
+    historyScreenshotHint: '移过历史节点切换截图，查看完整时间和首 Token 耗时。',
+    firstToken: '首 Token',
+    resultAndFirstToken: '检测结果 / 首 Token',
+    statusLegend: '历史图例',
+    noScreenshot: '这条记录暂无作品截图。',
     noArtwork: '这条测试没有可展示的作品。',
     preview: '查看作品',
     previewTitle: '画图作品',
     previewHint: '作品在隔离环境中展示，外部资源和网络请求被禁用。',
     statuses: {
-      passed: '通过',
-      incorrect: '未通过',
-      error: '异常',
+      passed: '满血',
+      incorrect: '降智',
+      error: '检测异常',
       unknown: '结果未知',
       running: '测试中',
       queued: '等待中',

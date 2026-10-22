@@ -33,6 +33,10 @@ func intelligenceFixture(t *testing.T) (*sql.DB, intelligence.IntelligenceReposi
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, string(migration))
 	require.NoError(t, err)
+	migration, err = migrations.FS.ReadFile("306_intelligence_drawing_prompt.sql")
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, string(migration))
+	require.NoError(t, err)
 	var userID, groupID, keyID int64
 	require.NoError(t, db.QueryRowContext(ctx, `INSERT INTO users(email,password_hash) VALUES($1,'test') RETURNING id`, uuid.NewString()+"@example.test").Scan(&userID))
 	require.NoError(t, db.QueryRowContext(ctx, `INSERT INTO groups(name) VALUES($1) RETURNING id`, "iq-"+uuid.NewString()).Scan(&groupID))
@@ -43,6 +47,46 @@ func intelligenceFixture(t *testing.T) (*sql.DB, intelligence.IntelligenceReposi
 	return db, repo, config
 }
 
+// TestThumbnailSurvivesWorkerWritesAndHTMLRetention captures a screenshot while
+// a worker still holds its earlier observation. The later worker save and HTML
+// pruning retain the PNG, and public detail JSON omits its private image bytes.
+func TestThumbnailSurvivesWorkerWritesAndHTMLRetention(t *testing.T) {
+	db, repo, config := intelligenceFixture(t)
+	ctx := context.Background()
+	_, err := repo.CreateRun(ctx, config.ID, time.Now().UTC())
+	require.NoError(t, err)
+	run, err := repo.ClaimRun(ctx, time.Now().UTC(), time.Now().UTC().Add(time.Minute), "screenshot-lease")
+	require.NoError(t, err)
+	run.HTML = "<html><body>artwork</body></html>"
+	firstToken := int64(1813)
+	run.FirstTokenMS = &firstToken
+	run.Status = "running"
+	_, err = repo.SaveRun(ctx, run, time.Now().UTC(), true)
+	require.NoError(t, err)
+	png := []byte("fixture-screenshot")
+	require.NoError(t, repo.SaveThumbnail(ctx, run.ID, png))
+	run.Status = "completed"
+	_, err = repo.SaveRun(ctx, run, time.Now().UTC(), false)
+	require.NoError(t, err)
+	image, err := repo.GetThumbnail(ctx, run.ID)
+	require.NoError(t, err)
+	require.Equal(t, png, image)
+	_, err = db.ExecContext(ctx, `UPDATE intelligence_test_runs SET payload=payload-'html',record=record||'{"has_artifact":false}'::jsonb WHERE id=$1`, run.ID)
+	require.NoError(t, err)
+	image, err = repo.GetThumbnail(ctx, run.ID)
+	require.NoError(t, err)
+	require.Equal(t, png, image)
+	detail, err := repo.GetRun(ctx, run.ID)
+	require.NoError(t, err)
+	require.True(t, detail.HasThumbnail)
+	require.NotNil(t, detail.FirstTokenMS)
+	require.EqualValues(t, 1813, *detail.FirstTokenMS)
+	raw, err := json.Marshal(detail)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), `"thumbnail"`)
+	require.Empty(t, detail.HTML)
+}
+
 // TestIntelligencePostgresConcurrentCreateClaimAndStaleLease competes for one
 // configuration through separate PostgreSQL operations. Exactly one active job
 // and claimant win, and an expired worker cannot overwrite the replacement
@@ -50,6 +94,11 @@ func intelligenceFixture(t *testing.T) (*sql.DB, intelligence.IntelligenceReposi
 func TestIntelligencePostgresConcurrentCreateClaimAndStaleLease(t *testing.T) {
 	integrationDB, repo, c := intelligenceFixture(t)
 	ctx := context.Background()
+	c.Prompt = "custom persisted drawing prompt"
+	require.NoError(t, repo.SaveConfig(ctx, c))
+	savedConfig, err := repo.GetConfig(ctx, c.ID)
+	require.NoError(t, err)
+	require.Equal(t, c.Prompt, savedConfig.Prompt)
 	var winners atomic.Int32
 	var wg sync.WaitGroup
 	for range 32 {
@@ -86,7 +135,7 @@ func TestIntelligencePostgresConcurrentCreateClaimAndStaleLease(t *testing.T) {
 		count++
 	}
 	require.Equal(t, 1, count)
-	_, err := integrationDB.ExecContext(ctx, `UPDATE intelligence_test_runs SET lease_until=NOW()-INTERVAL '1 second' WHERE id=$1`, old.ID)
+	_, err = integrationDB.ExecContext(ctx, `UPDATE intelligence_test_runs SET lease_until=NOW()-INTERVAL '1 second' WHERE id=$1`, old.ID)
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	fresh, err := repo.ClaimRun(ctx, now, now.Add(time.Minute), "new-lease")
@@ -101,6 +150,8 @@ func TestIntelligencePostgresConcurrentCreateClaimAndStaleLease(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	fresh.Status = "running"
+	fresh.LocalGeneration = true
+	fresh.AssessmentAttempts = 2
 	fresh.RemoteID = "remote-private-token"
 	fresh.HTML = "<svg>partial artwork</svg>"
 	fresh.Question = "partial question"
@@ -116,6 +167,8 @@ func TestIntelligencePostgresConcurrentCreateClaimAndStaleLease(t *testing.T) {
 	require.Equal(t, fresh.Question, found.Question)
 	require.Equal(t, fresh.Answer, found.Answer)
 	require.Equal(t, fresh.AssessmentReason, found.AssessmentReason)
+	require.True(t, found.LocalGeneration)
+	require.Equal(t, 2, found.AssessmentAttempts)
 	var raw, payload string
 	require.NoError(t, integrationDB.QueryRowContext(ctx, `SELECT record::text,payload::text FROM intelligence_test_runs WHERE id=$1`, fresh.ID).Scan(&raw, &payload))
 	require.NotContains(t, raw, "remote-private-token")
@@ -133,6 +186,8 @@ func TestIntelligencePostgresConcurrentCreateClaimAndStaleLease(t *testing.T) {
 	require.NotNil(t, resumed)
 	require.Equal(t, fresh.HTML, resumed.HTML)
 	require.Equal(t, fresh.Answer, resumed.Answer)
+	require.True(t, resumed.LocalGeneration)
+	require.Equal(t, 2, resumed.AssessmentAttempts)
 }
 
 // TestIntelligencePostgresHistoryAndArtifactRetention writes more completed

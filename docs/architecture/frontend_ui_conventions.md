@@ -43,6 +43,7 @@
 - 卡片 padding 有两档：独立卡片 `p-6`，嵌套面板、网格卡和统计卡 `p-4`。
 - 用户仪表盘的页头由标题、实时状态和筛选工具组成。手机指标卡收紧内部间距，环比保留“较上期”说明；请求数、Token 和消费的涨跌使用中性色，缓存命中率的升降使用状态色。快捷操作在窄屏和文档顺序中位于公告之前，桌面上仍排在公告右侧。公告标题最多两行，摘要跳过表格和代码块，优先取首段正文，详情展示完整内容。
 - header 和 main 的水平 padding 完全一致，都是 `px-4 md:px-6 lg:px-8`，两侧边缘在所有断点上对齐。
+- 用户侧栏和管理员个人导航的“模型广场”位于“仪表盘”下方，“号池列表”紧邻用户“降智检测”上方。管理导航的“降智检测”配置入口位于管理“仪表盘”上方。
 - 默认首页和控制台共用 `AppHeader`，品牌、工具按钮、余额和用户菜单都在这里。首页通过 `public-page` 隐藏侧栏开关，保留模型广场和访客登录入口，并为固定顶栏预留高度；自定义 HTML 或 iframe 首页使用全页模式。操作台的返回仪表盘图标在品牌右侧。
 - 布局尺寸 token 在 `style.css` 的 `:root` 里定义，各有一份：`--header-h`（3.5rem，顶栏高度）、`--sidebar-w`（14rem，侧栏展开宽度）、`--sidebar-w-collapsed`（4.5rem，侧栏折叠宽度）。顶栏高度、主区 `padding-top`、侧栏遮罩 `top`、侧栏宽度和主区 `lg:ml-*` 偏移都引用这些变量（例如 `h-[var(--header-h)]`），`h-14`、`top-14`、`w-56` 这类字面量会和变量脱节。吸顶偏移和锚点 `scroll-margin-top` 写成 `calc(var(--header-h) + 余量)`（参考 SettingsView 的 tabs 吸顶），并在注释里写明余量由什么组成。
 - 垂直空间由 AppLayout 的 flex 链分配：wrapper（`flex-col`，普通模式 `min-h-screen`，锁定模式 `h-full min-h-0`）→ `.app-main`（`flex-1 flex-col`）→ 页头（自然高度）+ 页面内容。需要撑满剩余高度的页面容器（例如 `TablePageLayout`、`CustomPageView` 的根元素）自己加 `flex-1 min-h-0`。手写 `calc(100vh - …)` 视口差值和用负 margin 抵消父级内边距都会破坏这条链；`--main-pad-*`、`--page-heading-space` 这类和布局重复的尺寸变量也不要引入。
@@ -93,7 +94,7 @@
 - 创作台画布上的浮层（顶部工具条、设置、历史、输入框、空画布引导的胶囊）用 `.canvas-island`：85% 不透明的白底或 `dark-900` 底、淡描边、背景模糊和一档柔和阴影，深色模式减弱阴影。浮层里的 32px 图标按钮用 `.canvas-tool-btn`，选中态加 `.canvas-tool-btn-active`，按钮组之间用 `.canvas-tool-divider`。展开的菜单和弹层用实底的 `.dropdown` 或同等样式。
 - 遮罩透明度有两档，都来自 CSS 变量：浅色模式在 `:root` 定义常规遮罩 `--overlay-bg`（black/50）和媒体灯箱等使用的强遮罩 `--overlay-bg-strong`（black/70）；深色模式在 `html.dark` 中整体加深为 black/70 和 black/85。模板写 `bg-[var(--overlay-bg)]`，`bg-black/50` 这类字面值会被门禁拦截。
 - 浮层面板的最大高度有三档，来自 `:root` 的 `--max-h-menu-sm`（15rem）、`--max-h-menu`（20rem）、`--max-h-panel`（26.25rem），模板里对应 `max-h-menu-sm/menu/panel`。像素任意值 `max-h-[Npx]` 会被门禁拦截，局部特例（例如告警表的 520px）加 `check-ui-allow` 并写明原因。vh、dvh、calc 等相对视口的值含义不同，不归入这三档，门禁也不拦截。
-- 挂载到 body 的浮层，定位只有一个实现：`utils/floatingPanel.ts` 的 `getFloatingPanelPosition`。翻转、对齐、夹取和窄屏行为都通过 options 控制：固定高度的菜单用 `fixedHeight`，左对齐面板用 `align: 'left'`，菜单类传 `pinLeftOnMobile: false`。组件里自己计算 rect 和 spaceBelow 做翻转，会和这个实现产生分歧。JS 侧的面板尺寸常量在 `constants/overlay.ts`（`SELECT_PANEL_MAX_HEIGHT`、`MIN_COMFORTABLE_PANEL_HEIGHT`），和样式档位取值一致。
+- 挂载到 body、跟随触发元素定位的浮层，定位只有一个实现：`utils/floatingPanel.ts` 的 `getFloatingPanelPosition`。翻转、对齐、夹取和窄屏行为都通过 options 控制：固定高度的菜单用 `fixedHeight`，左对齐面板用 `align: 'left'`，菜单类传 `pinLeftOnMobile: false`。组件里自己计算 rect 和 spaceBelow 做翻转，会和这个实现产生分歧。居中的媒体悬浮预览使用 CSS 固定在视口中心，并按视口宽高限制图片尺寸。JS 侧的面板尺寸常量在 `constants/overlay.ts`（`SELECT_PANEL_MAX_HEIGHT`、`MIN_COMFORTABLE_PANEL_HEIGHT`），和样式档位取值一致。
 
 ## 断点
 

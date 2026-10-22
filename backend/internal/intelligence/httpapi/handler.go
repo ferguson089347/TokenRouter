@@ -11,8 +11,8 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/server/httpx"
 )
 
-// handler.go serves administrator quality-check commands and user result
-// reads. Each endpoint verifies the current panel identity before invoking the
+// handler.go serves administrator quality-check commands, authenticated user
+// submissions, and shared result reads. Each endpoint verifies panel identity before invoking the
 // service, and administrator commands also require the administrator role.
 // Submitted configuration JSON is bounded before credential validation.
 
@@ -27,6 +27,28 @@ type IntelligenceHandler struct {
 // service implementation.
 func NewIntelligenceHandler(svc *intelligence.IntelligenceService) *IntelligenceHandler {
 	return &IntelligenceHandler{svc: svc}
+}
+
+// UserRun queues an authenticated user's drawing using the channel's site settings.
+// The request selects a Key identifier owned by that user. The service supplies
+// all execution parameters from the first enabled site drawing for its group.
+func (h *IntelligenceHandler) UserRun(c *gin.Context) {
+	userID, ok := intelligenceActor(c, false)
+	if !ok {
+		return
+	}
+	var input intelligence.IntelligenceSelfTestInput
+	// Bound identifier requests before decoding so invalid payloads cannot allocate
+	// arbitrary request bodies while waiting for the service's credential ownership check.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
+	if err := c.ShouldBindJSON(&input); err != nil {
+		httpx.BadRequest(c, "Invalid intelligence test request")
+		return
+	}
+	run, err := h.svc.CommunityRun(c.Request.Context(), userID, input)
+	if !httpx.ErrorFrom(c, err) {
+		httpx.Accepted(c, run)
+	}
 }
 
 // intelligenceActor obtains the current panel user and checks the required
@@ -90,7 +112,7 @@ func (h *IntelligenceHandler) AdminSave(c *gin.Context) {
 	}
 	var in intelligence.IntelligenceConfigInput
 	// Bound administrator payloads before decoding credential-bearing configuration input.
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16*1024)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64*1024)
 	if err := c.ShouldBindJSON(&in); err != nil {
 		httpx.BadRequest(c, "Invalid intelligence test configuration")
 		return

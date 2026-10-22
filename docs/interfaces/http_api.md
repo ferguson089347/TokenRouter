@@ -402,4 +402,4 @@ Grok 请求缓存开关使用 `X-TokenRouter-Grok-Client-Tool-Cache`，没有新
 
 ## 降智检测接口
 
-`/api/v1/admin/intelligence-tests` 提供配置、手动执行和历史查询；`/api/v1/intelligence-tests` 为登录用户提供只读结果。`/api/v1/intelligence-tests/preview-content/:ticket` 使用短期作品票据，并重新校验当前权限。操作列表与隔离规则见[降智检测](../domains/intelligence_tests.md)。
+`/api/v1/admin/intelligence-tests` 提供配置、手动执行和历史查询；`/api/v1/intelligence-tests` 为登录用户提供站点检测和共享用户测试结果。POST `/api/v1/intelligence-tests/run` 使用当前用户自己的个人普通 Key ID 创建画图自测，请求仅含 `api_key_id`，执行参数与 API 地址取自所属渠道的第一个启用系统画图配置；成功返回 202。`/api/v1/intelligence-tests/preview-content/:ticket` 使用短期作品票据，并重新校验当前权限。用户和管理员的 `/runs/:id/thumbnail` 返回 PNG，每次校验当前权限；无截图且仍有 HTML 时补生成并保存。操作列表与隔离规则见[降智检测](../domains/intelligence_tests.md)。

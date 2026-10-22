@@ -226,16 +226,34 @@ describe('AppSidebar styling', () => {
 })
 
 describe('AppSidebar navigation', () => {
-  // Admin personal navigation keeps the dashboard before model browsing. Its
-  // ordering is checked on rendered links after the separate administrator section.
-  it('places the personal dashboard before models for administrators', () => {
-    state.isAdmin = true
-    const paths = mountSidebar()
-      .findAll('router-link-stub')
-      .map((link) => link.attributes('to'))
-    expect(paths.indexOf('/dashboard')).toBeGreaterThanOrEqual(0)
-    expect(paths.indexOf('/models')).toBeGreaterThan(paths.indexOf('/dashboard'))
-  })
+  // Both roles keep the marketplace beside the personal dashboard. The account
+  // pool appears directly before user quality checks in that same navigation section.
+  it.each([false, true])(
+    'places the account pool before user quality checks for admin=%s',
+    (isAdmin) => {
+      state.isAdmin = isAdmin
+      state.settings.intelligence_enabled = true
+      const wrapper = mountSidebar()
+      const sections = wrapper.findAll('.sidebar-section')
+      const personalSection = sections[isAdmin ? 1 : 0]
+      const paths = personalSection.findAll('router-link-stub').map((link) => link.attributes('to'))
+      expect(paths.filter((path) => path === '/models')).toHaveLength(1)
+      expect(paths.slice(0, 2)).toEqual(['/dashboard', '/models'])
+      expect(paths.filter((path) => path === '/account-pool')).toHaveLength(1)
+      expect(paths.indexOf('/account-pool')).toBe(paths.indexOf('/intelligence') - 1)
+      if (isAdmin) {
+        const managementPaths = sections[0]
+          .findAll('router-link-stub')
+          .map((link) => link.attributes('to'))
+        expect(managementPaths).not.toContain('/models')
+        expect(managementPaths).not.toContain('/account-pool')
+        expect(managementPaths.slice(0, 2)).toEqual([
+          '/admin/intelligence-tests',
+          '/admin/dashboard',
+        ])
+      }
+    },
+  )
 
   // Team visibility uses the public switch for both ordinary and administrator
   // entries. Missing settings retain team access, while an explicit false hides it.

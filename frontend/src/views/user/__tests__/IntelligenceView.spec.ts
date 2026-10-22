@@ -29,6 +29,12 @@ const mountPage = () =>
           props: ['runId'],
           template: '<div class="drawing" :data-id="runId" />',
         },
+        IntelligenceSelfTestDialog: {
+          name: 'IntelligenceSelfTestDialog',
+          props: ['show', 'tests'],
+          emits: ['close', 'submitted'],
+          template: '<div v-if="show" data-testid="self-test-dialog" />',
+        },
         IntelligenceRunDialog: {
           props: ['show', 'run', 'loading', 'error'],
           template: '<div v-if="show" data-testid="detail">{{ run?.id }} {{ error }}</div>',
@@ -43,7 +49,7 @@ describe('用户降智检测页面', () => {
     detail.mockReset()
     preview.mockReset()
   })
-  it('分组与模型标题聚合，作品最新在左且仅10个，不触发检测提交', async () => {
+  it('分组与模型标题聚合，仅播放最新作品，不触发检测提交', async () => {
     const artifacts = Array.from({ length: 12 }, (_, i) =>
       runFixture({
         id: `art-${i}`,
@@ -59,16 +65,35 @@ describe('用户降智检测页面', () => {
     ])
     const wrapper = mountPage()
     await flushPromises()
-    expect(wrapper.findAll('h2').map((item) => item.text())).toEqual(['Group A'])
-    expect(wrapper.findAll('h3').map((item) => item.text())).toEqual(['model-a', 'model-b'])
+    expect(wrapper.findAll('article')).toHaveLength(4)
+    expect(wrapper.findAll('h2').every((item) => item.text() === 'Group A')).toBe(true)
+    expect(wrapper.text()).toContain('intelligence.userTests')
+    expect(wrapper.text()).toContain('model-b')
     const drawings = wrapper.findAll('.drawing')
-    expect(drawings).toHaveLength(10)
+    expect(drawings).toHaveLength(1)
     expect(drawings[0].attributes('data-id')).toBe('art-11')
-    expect(drawings[9].attributes('data-id')).toBe('art-2')
     expect(preview).not.toHaveBeenCalled()
     wrapper.unmount()
   })
-  it('条目详情只请求点击的run，未返回问题不编造问题', async () => {
+  // Authenticated self-test submission refreshes the public user row in place.
+  // The page uses the dialog's explicit action and never queues work merely by loading.
+  it('页头打开自测入口，受理后刷新共享结果', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'intelligence.selfTest')!
+      .trigger('click')
+    expect(wrapper.find('[data-testid="self-test-dialog"]').exists()).toBe(true)
+    wrapper.getComponent({ name: 'IntelligenceSelfTestDialog' }).vm.$emit('submitted', runFixture())
+    await flushPromises()
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('intelligence.submitted')
+    wrapper.unmount()
+  })
+  // Result nodes are inspected through hover and focus previews on this page.
+  // Clicking a node issues no detail request and opens no result dialog.
+  it('点击历史节点不再请求详情或打开弹窗', async () => {
     const run = runFixture({ id: 'specific-run' })
     list.mockResolvedValue([testFixture({ runs: [run] })])
     detail.mockResolvedValue({ ...run, answer: 'response' })
@@ -76,8 +101,8 @@ describe('用户降智检测页面', () => {
     await flushPromises()
     await wrapper.get('[data-run-id="specific-run"]').trigger('click')
     await flushPromises()
-    expect(detail).toHaveBeenCalledWith('specific-run', false, expect.any(AbortSignal))
-    expect(wrapper.get('[data-testid="detail"]').text()).toContain('specific-run')
+    expect(detail).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="detail"]').exists()).toBe(false)
     wrapper.unmount()
   })
   it('重新读取403时清理旧结果，避免展示已撤销访问的分组', async () => {

@@ -30,12 +30,14 @@ export const testFixture = (overrides: Partial<IntelligenceTest> = {}): Intellig
   artifacts: [],
   ...overrides,
 })
+// configFixture supplies an editable configuration with optional drawing instructions.
 export const configFixture = (overrides: Partial<IntelligenceConfig> = {}): IntelligenceConfig => ({
   id: 1,
   group_id: 1,
   group_name: 'Group A',
   model: 'model-a',
   benchmark: 'candy',
+  prompt: '',
   base_url: 'https://gateway.example/v1',
   api_key_configured: true,
   protocol: 'responses',

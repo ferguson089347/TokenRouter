@@ -22,12 +22,13 @@ type intelligenceRepoStub struct {
 	// IntelligenceRepository supplies unimplemented fixture methods. Expected operations are
 	// overridden below; unexpected calls fail immediately through nil embedding.
 	IntelligenceRepository
-	config   *IntelligenceConfig // current fixture configuration
-	run      *IntelligenceRun    // current fixture observation
-	runs     []IntelligenceRun   // fixture observation history
-	saves    []IntelligenceRun   // captured persisted observations
-	denySave bool                // injected lease rejection
-	nextPoll time.Time           // captured poll deadline
+	community []IntelligenceConfig // public user-test rows
+	config    *IntelligenceConfig  // current fixture configuration
+	run       *IntelligenceRun     // current fixture observation
+	runs      []IntelligenceRun    // fixture observation history
+	saves     []IntelligenceRun    // captured persisted observations
+	denySave  bool                 // injected lease rejection
+	nextPoll  time.Time            // captured poll deadline
 }
 
 // intelligenceKeyStub supplies one current personal Key for credential checks.
@@ -51,10 +52,19 @@ type intelligenceGroupStub struct {
 // intelligenceClientStub records creation and polling calls with injected
 // remote outcomes.
 type intelligenceClientStub struct {
-	creates, gets int                                                    // creates: creation attempt count; gets: polling attempt count
-	create        func(remote.CreateRequest) (*remote.TestResult, error) // injected creation callback
-	result        *remote.TestResult                                     // remote fixture observation
-	err           error                                                  // injected fixture failure
+	creates, gets int                                                               // creates: creation attempt count; gets: polling attempt count
+	create        func(remote.CreateRequest) (*remote.TestResult, error)            // injected creation callback
+	result        *remote.TestResult                                                // remote fixture observation
+	err           error                                                             // injected fixture failure
+	generates     int                                                               // gateway generation count
+	generate      func(remote.CreateRequest, string) (*remote.DrawingResult, error) // injected generation callback
+	createKeys    []string                                                          // submitted idempotency identities
+}
+
+// Generate records a gateway attempt and returns injected local artwork.
+func (c *intelligenceClientStub) Generate(_ context.Context, in remote.CreateRequest, prompt string) (*remote.DrawingResult, error) {
+	c.generates++
+	return c.generate(in, prompt)
 }
 
 // GetConfig returns the fixture configuration or the module not-found error.
@@ -73,6 +83,11 @@ func (r *intelligenceRepoStub) ListConfigs(context.Context) ([]IntelligenceConfi
 		return []IntelligenceConfig{}, nil
 	}
 	return []IntelligenceConfig{*r.config}, nil
+}
+
+// ListCommunityConfigs returns the fixture’s publicly shared user-test configurations.
+func (r *intelligenceRepoStub) ListCommunityConfigs(context.Context) ([]IntelligenceConfig, error) {
+	return append([]IntelligenceConfig(nil), r.community...), nil
 }
 
 // SaveConfig records the submitted configuration for subsequent fixture reads.
@@ -145,8 +160,9 @@ func (r intelligenceGroupStub) GetAvailableGroups(context.Context, int64) ([]rou
 }
 
 // Create records a creation attempt and invokes its injected fixture response.
-func (c *intelligenceClientStub) Create(_ context.Context, in remote.CreateRequest, _ string) (*remote.TestResult, error) {
+func (c *intelligenceClientStub) Create(_ context.Context, in remote.CreateRequest, key string) (*remote.TestResult, error) {
 	c.creates++
+	c.createKeys = append(c.createKeys, key)
 	if c.create != nil {
 		return c.create(in)
 	}
@@ -172,7 +188,7 @@ func newIntelligenceFixture() (*IntelligenceService, *intelligenceRepoStub, *int
 	repo := &intelligenceRepoStub{config: cfg}
 	client := &intelligenceClientStub{}
 	groups := intelligenceGroupStub{group: &routing.Group{ID: gid, Name: "测试组", Status: "active"}, visible: []routing.Group{{ID: gid}}}
-	s := NewIntelligenceService(repo, intelligenceKeyStub{key: key}, groups, groups, client, func(context.Context) bool { return true }, func(string) error { return nil })
+	s := NewIntelligenceService(repo, intelligenceKeyStub{key: key}, groups, groups, client, func(context.Context) bool { return true }, func(string) error { return nil }, nil)
 	s.resolvePublicHost = func(string) error { return nil }
 	return s, repo, client, key
 }
@@ -314,12 +330,26 @@ func TestIntelligenceCreateOnceAfterDurableState(t *testing.T) {
 	run := intelligenceQueued()
 	repo.config.Benchmark = "drawing"
 	run.Benchmark = "drawing"
+	client.generate = func(in remote.CreateRequest, prompt string) (*remote.DrawingResult, error) {
+		require.Equal(t, "gpt-test", in.Model)
+		require.Equal(t, defaultDrawingPrompt, prompt)
+		require.Equal(t, "generating", repo.run.Phase)
+		return &remote.DrawingResult{HTML: "<html><body>art</body></html>"}, nil
+	}
 	client.create = func(in remote.CreateRequest) (*remote.TestResult, error) {
-		require.Equal(t, "pelican", in.Benchmark)
+		require.Equal(t, "html", in.Benchmark)
+		require.Empty(t, in.APIKey)
+		require.Empty(t, in.BaseURL)
+		require.Empty(t, in.Model)
+		require.Equal(t, "<html><body>art</body></html>", in.HTML)
+		require.Equal(t, in.HTML, repo.run.HTML)
 		require.Equal(t, "submitting", repo.run.Status)
 		require.Empty(t, repo.run.RemoteID)
-		return &remote.TestResult{ID: "remote", Benchmark: "pelican", Status: "running"}, nil
+		return &remote.TestResult{ID: "remote", Benchmark: "html", Status: "running"}, nil
 	}
+	s.execute(context.Background(), run)
+	require.Zero(t, client.creates)
+	require.Equal(t, "generated", repo.run.Phase)
 	s.execute(context.Background(), run)
 	require.Equal(t, 1, client.creates)
 	require.Equal(t, "running", repo.run.Status)
@@ -328,6 +358,150 @@ func TestIntelligenceCreateOnceAfterDurableState(t *testing.T) {
 	s.execute(context.Background(), run)
 	require.Equal(t, 1, client.creates)
 	require.Equal(t, 1, client.gets)
+	require.Equal(t, 1, client.generates)
+}
+
+// TestIntelligenceDrawingRecoveryRetainsGeneration retries assessment after a
+// transport failure and a worker restart. The saved prompt, document, and usage
+// survive classifier output, while gateway generation runs exactly once.
+func TestIntelligenceDrawingRecoveryRetainsGeneration(t *testing.T) {
+	s, repo, client, key := newIntelligenceFixture()
+	repo.config.Benchmark = "drawing"
+	repo.config.Prompt = "Draw a custom animation"
+	run := intelligenceQueued()
+	run.Benchmark = "drawing"
+	tokens := int64(123)
+	firstToken := int64(1813)
+	client.generate = func(in remote.CreateRequest, prompt string) (*remote.DrawingResult, error) {
+		require.Equal(t, key.Key, in.APIKey)
+		require.Equal(t, repo.config.Prompt, prompt)
+		return &remote.DrawingResult{HTML: "<html><body>" + key.Key + "</body></html>", OutputTokens: &tokens, FirstTokenMS: &firstToken}, nil
+	}
+	s.execute(context.Background(), run)
+	require.NotContains(t, repo.run.HTML, key.Key)
+	require.Equal(t, repo.config.Prompt, repo.run.Question)
+	client.err = &remote.TransportError{Timeout: true}
+	s.execute(context.Background(), run)
+	require.Equal(t, "generated", repo.run.Phase)
+	require.Equal(t, 1, repo.run.AssessmentAttempts)
+	require.True(t, repo.run.HasArtifact)
+	// Resume using the persisted observation, modeling replacement of the worker
+	// between generation and assessment, reading its saved artifact and retry state.
+	resumed := *repo.run
+	client.err = nil
+	client.result = &remote.TestResult{ID: "assessment", Benchmark: "html", Status: "running"}
+	s.enabled = func(context.Context) bool { return false }
+	s.execute(context.Background(), &resumed)
+	require.Equal(t, "assessment", repo.run.RemoteID)
+	client.result = &remote.TestResult{ID: "assessment", Benchmark: "pelican", Status: "succeeded", Result: &remote.DrawingResult{HTML: "remote replacement", Prompt: "remote prompt"}, Assessment: &remote.Assessment{Quality: "normal"}}
+	s.execute(context.Background(), &resumed)
+	require.Equal(t, "completed", repo.run.Status)
+	require.Equal(t, "passed", repo.run.Verdict)
+	require.Contains(t, repo.run.HTML, "[已隐藏密钥]")
+	require.Equal(t, repo.config.Prompt, repo.run.Question)
+	require.EqualValues(t, 123, *repo.run.OutputTokens)
+	require.EqualValues(t, 1813, *repo.run.FirstTokenMS)
+	require.Equal(t, 1, client.generates)
+	require.Equal(t, 2, client.creates)
+	require.Len(t, client.createKeys, 2)
+	require.Equal(t, client.createKeys[0], client.createKeys[1])
+	require.Regexp(t, `^html-gallery-[0-9a-f]{64}$`, client.createKeys[0])
+}
+
+// TestIntelligenceDrawingFailuresKeepArtifacts exercises generation failure,
+// rejected assessment ownership, and exhausted classifier attempts. Failed model
+// calls never submit assessment, and classifier failures leave generated artwork
+// available to result readers.
+func TestIntelligenceDrawingFailuresKeepArtifacts(t *testing.T) {
+	t.Run("generation fails", func(t *testing.T) {
+		s, repo, client, _ := newIntelligenceFixture()
+		repo.config.Benchmark = "drawing"
+		client.generate = func(remote.CreateRequest, string) (*remote.DrawingResult, error) {
+			return nil, &remote.HTTPError{StatusCode: 403, Diagnostic: &remote.RemoteError{Code: "quota", HTTPStatus: 403}}
+		}
+		run := intelligenceQueued()
+		run.Benchmark = "drawing"
+		s.execute(context.Background(), run)
+		require.Equal(t, "error", repo.run.Status)
+		require.Contains(t, repo.run.ErrorMessage, "403")
+		require.Contains(t, repo.run.ErrorMessage, "余额或额度不足")
+		require.Zero(t, client.creates)
+	})
+	t.Run("assessment cannot outlive ownership or retry budget", func(t *testing.T) {
+		s, repo, client, _ := newIntelligenceFixture()
+		run := intelligenceQueued()
+		run.Status = "running"
+		run.Benchmark = "drawing"
+		run.LocalGeneration = true
+		run.HTML = "<html><body>saved art</body></html>"
+		run.HasArtifact = true
+		repo.denySave = true
+		s.execute(context.Background(), run)
+		require.Zero(t, client.creates)
+		repo.denySave = false
+		client.err = &remote.HTTPError{StatusCode: 400}
+		s.execute(context.Background(), run)
+		require.Equal(t, "unknown", repo.run.Verdict)
+		require.Equal(t, run.HTML, repo.run.HTML)
+		require.True(t, repo.run.HasArtifact)
+		require.Zero(t, client.generates)
+		run.AssessmentAttempts = 5
+		s.execute(context.Background(), run)
+		require.Equal(t, 1, client.creates)
+	})
+	t.Run("expired assessment reuses artwork", func(t *testing.T) {
+		s, repo, client, _ := newIntelligenceFixture()
+		run := intelligenceQueued()
+		run.Status = "running"
+		run.Benchmark = "drawing"
+		run.LocalGeneration = true
+		run.RemoteID = "expired-assessment"
+		run.HTML = "<html><body>retained art</body></html>"
+		run.AssessmentAttempts = 2
+		client.err = &remote.HTTPError{StatusCode: 404}
+		s.execute(context.Background(), run)
+		require.Empty(t, repo.run.RemoteID)
+		require.Equal(t, run.HTML, repo.run.HTML)
+		client.err = nil
+		client.result = &remote.TestResult{ID: "replacement-assessment", Benchmark: "html", Status: "succeeded", Assessment: &remote.Assessment{Quality: "normal"}}
+		s.execute(context.Background(), run)
+		require.Equal(t, "passed", repo.run.Verdict)
+		require.Equal(t, 3, repo.run.AssessmentAttempts)
+		require.Equal(t, 1, client.creates)
+		require.Zero(t, client.generates)
+	})
+	t.Run("retry hints respect observation deadline", func(t *testing.T) {
+		s, repo, client, _ := newIntelligenceFixture()
+		run := intelligenceQueued()
+		run.Status = "running"
+		run.LocalGeneration = true
+		run.HTML = "<html><body>retained art</body></html>"
+		client.err = &remote.HTTPError{StatusCode: 429, RetryAfter: 24 * time.Hour}
+		s.execute(context.Background(), run)
+		require.WithinDuration(t, run.CreatedAt.Add(30*time.Minute), repo.nextPoll, time.Second)
+		require.Equal(t, "running", repo.run.Status)
+		require.Zero(t, client.generates)
+	})
+}
+
+// TestIntelligenceDrawingPromptConfiguration validates optional instructions at
+// the administrator entry point. Empty input selects the runtime default, custom
+// text is trimmed and saved, and excessive or candy-only text is rejected.
+func TestIntelligenceDrawingPromptConfiguration(t *testing.T) {
+	s, _, _, key := newIntelligenceFixture()
+	in := intelligenceInput(key.Key)
+	in.Benchmark = "drawing"
+	in.Prompt = "  custom SVG animation  "
+	saved, err := s.SaveConfig(context.Background(), 0, in)
+	require.NoError(t, err)
+	require.Equal(t, "custom SVG animation", saved.Prompt)
+	in.Prompt = strings.Repeat("a", 32769)
+	_, err = s.SaveConfig(context.Background(), 0, in)
+	require.Error(t, err)
+	in.Benchmark = "candy"
+	in.Prompt = "unsupported"
+	_, err = s.SaveConfig(context.Background(), 0, in)
+	require.Error(t, err)
 }
 
 // TestIntelligenceRecoveryDoesNotResubmit resumes submitting and running
@@ -697,4 +871,26 @@ func TestIntelligencePollFailureKeepsRemoteTask(t *testing.T) {
 	body := strings.Repeat("a", 512*1024)
 	s.applyResult(context.Background(), run, &remote.TestResult{ID: "remote", Benchmark: "pelican", Status: "succeeded", Result: &remote.DrawingResult{HTML: body}, Assessment: &remote.Assessment{Quality: "good"}}, "")
 	require.Equal(t, body, repo.run.HTML)
+}
+
+// TestUserHistoriesShareCommunityResultsWithinCurrentGroup combines a site row
+// with another user's public submission. Both are visible to a second authorized
+// viewer, while removing that viewer's group access removes community detail too.
+func TestUserHistoriesShareCommunityResultsWithinCurrentGroup(t *testing.T) {
+	service, original, _, _ := newIntelligenceFixture()
+	community := *original.config
+	community.ID = 2
+	community.Source = "user"
+	original.community = []IntelligenceConfig{community}
+	tests, err := service.UserList(context.Background(), 25)
+	require.NoError(t, err)
+	require.Len(t, tests, 2)
+	require.Equal(t, "user", tests[1].Source)
+	original.config = &community
+	original.run = &IntelligenceRun{ID: "community", ConfigID: 2, GroupID: community.GroupID}
+	_, err = service.UserDetail(context.Background(), 25, "community")
+	require.NoError(t, err)
+	service.available = intelligenceGroupStub{}
+	_, err = service.UserDetail(context.Background(), 25, "community")
+	require.ErrorIs(t, err, ErrIntelligenceNotFound)
 }

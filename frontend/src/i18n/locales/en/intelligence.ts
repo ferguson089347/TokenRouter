@@ -2,15 +2,23 @@
 // result diagnostics for this locale. Administrator and user pages share these
 // keys so benchmark names, feature availability, and observed outcomes use
 // consistent language throughout the feature.
-
 export default {
   intelligence: {
+    selfTest: 'Test a model',
+    startSelfTest: 'Start test',
+    userTests: 'User tests',
+    siteTests: 'Site checks',
+    channelModel: 'Channel / Model',
+    selfTestHint:
+      'Select your personal API key to test with the system settings for this channel. Results are public, and calls count toward usage for the selected key.',
+    noSelfTestKeys:
+      'No eligible personal keys. Use a key bound to a channel with an enabled system drawing check.',
     title: 'Intelligence checks',
     description:
       'Review recent model checks and drawing results by group. Each result reflects only that individual test.',
     adminTitle: 'Intelligence checks',
     adminDescription:
-      'Configure multiple models per group for candy or drawing tests using dedicated site API keys.',
+      'Configure models and tests by group. Drawing tests generate HTML on this site before evaluation and support custom prompts.',
     add: 'Add test',
     edit: 'Edit test',
     remove: 'Delete test',
@@ -37,12 +45,24 @@ export default {
     benchmark: 'Test type',
     candy: 'Candy test',
     drawing: 'Drawing test',
+    drawingLocal: 'Drawing test (HTML generated on this site)',
+    candyRemote: 'Candy test (run by Manxue)',
+    drawingWorkflowHint:
+      'This site calls the selected model, saves its HTML, then submits the artwork to Manxue for evaluation.',
+    candyWorkflowHint:
+      'Manxue uses the test key to call this site for a candy question-and-answer test. This type produces no HTML; select a drawing test to generate artwork.',
     groupPlaceholder: 'Select a group',
     modelPlaceholder: 'Select or enter a model ID',
     baseUrl: 'Site API URL',
     baseUrlHint:
-      'Use the public HTTPS API URL of this site accessible to the test service, usually ending in /v1.',
+      'Use this site’s public HTTPS API URL, usually ending in /v1. Drawing requests come from this server; candy requests come from the test service.',
     useCurrentSite: 'Use current site',
+    prompt: 'Drawing prompt',
+    promptPlaceholder: 'Leave blank for the default SVG animation of a pelican riding a bicycle',
+    promptHint:
+      'This site generates complete HTML before submitting it to Manxue for evaluation. Request a single HTML file with inline resources. Custom tasks may affect the relevance of the assessment.',
+    drawingApiKeyHint:
+      "This server uses the key to call the selected model and generate HTML, consuming the key's quota. Evaluation sends the generated HTML to Manxue. Use a dedicated key with a quota limit bound to this group.",
     selectApiKey: 'Select an existing API key',
     selectApiKeyPlaceholder: 'Select one of your API keys',
     selectApiKeyHint:
@@ -51,9 +71,9 @@ export default {
     loadApiKeysFailed: 'Failed to load API keys. Refresh to retry or enter a key manually.',
     apiKey: 'Dedicated site API key',
     apiKeyHint:
-      'Tests send this key and API URL to Manxue, which calls this site and consumes the key’s quota. Use a dedicated, quota-limited key bound to this group. Users viewing test results cannot read the key.',
+      "Tests send this key and API URL to Manxue, which calls this site and consumes the key's quota. Use a dedicated, quota-limited key bound to this group. Users viewing test results cannot read the key.",
     apiKeyFallbackHint:
-      'Tests follow the key’s automatic fallback setting. If the group is disabled during a test, requests may use a fallback group. Turn this option off in key management to test only the selected group.',
+      "Tests follow the key's automatic fallback setting. If the group is disabled during a test, requests may use a fallback group. Turn this option off in key management to test only the selected group.",
     apiKeyKeep: 'Key saved; leave blank to keep it',
     apiKeyRequired: 'Enter a dedicated site API key',
     protocol: 'Request protocol',
@@ -88,17 +108,24 @@ export default {
     resultLabel: '{time} · {status}',
     openResult: 'View test details from {time}',
     artworks: 'Recent drawing results',
-    artworksHint: 'Newest on the left, with up to 10 saved results.',
+    artworksHint: 'View the latest artwork here and saved screenshots on history nodes.',
+    latestArtwork: 'Latest drawing',
+    historyScreenshotHint:
+      'Move across history nodes to switch screenshots and view the full timestamp and first-token latency.',
+    firstToken: 'First token',
+    resultAndFirstToken: 'Result / First token',
+    statusLegend: 'History legend',
+    noScreenshot: 'No screenshot is available for this result.',
     noArtwork: 'This test has no drawing available.',
     preview: 'View drawing',
     previewTitle: 'Drawing result',
     previewHint:
       'Drawings run in an isolated frame with external resources and network requests disabled.',
     statuses: {
-      passed: 'Passed',
-      incorrect: 'Not passed',
-      error: 'Error',
-      unknown: 'Unknown',
+      passed: 'Full strength',
+      incorrect: 'Degraded',
+      error: 'Check error',
+      unknown: 'Undetermined',
       running: 'Running',
       queued: 'Queued',
     },

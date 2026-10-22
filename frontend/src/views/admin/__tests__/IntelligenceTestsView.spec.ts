@@ -135,6 +135,44 @@ describe('管理员降智检测', () => {
     appStore.showSuccess.mockReset()
     appStore.showError.mockReset()
   })
+  // Drawing edits expose saved generation instructions and submit the administrator's
+  // updated prompt. Candy forms hide that field and submit an empty prompt instead.
+  it('画图配置可编辑提示词，糖果配置不显示提示词', async () => {
+    configs.mockResolvedValue([
+      configFixture({ benchmark: 'drawing', prompt: 'saved animation prompt' }),
+    ])
+    const wrapper = mountPage()
+    await flushPromises()
+    await clickText(wrapper, 'common.edit')
+    expect((wrapper.get('#intelligence-prompt').element as HTMLTextAreaElement).value).toBe(
+      'saved animation prompt',
+    )
+    expect(wrapper.text()).toContain('intelligence.drawingApiKeyHint')
+    await wrapper.get('#intelligence-prompt').setValue('  custom bicycle animation  ')
+    await wrapper.get('#intelligence-config-form').trigger('submit')
+    await flushPromises()
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'model-a',
+        benchmark: 'drawing',
+        prompt: 'custom bicycle animation',
+      }),
+      1,
+    )
+    wrapper.unmount()
+    configs.mockResolvedValue([configFixture()])
+    const candy = mountPage()
+    await flushPromises()
+    await clickText(candy, 'common.edit')
+    expect(candy.find('#intelligence-prompt').exists()).toBe(false)
+    await candy.get('#intelligence-config-form').trigger('submit')
+    await flushPromises()
+    expect(save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ benchmark: 'candy', prompt: '' }),
+      1,
+    )
+    candy.unmount()
+  })
   it('开关关闭仍能配置但不能运行，打开页面不会自动提交测试', async () => {
     const wrapper = mountPage()
     await flushPromises()
@@ -322,13 +360,18 @@ describe('管理员降智检测', () => {
     )
     wrapper.unmount()
   })
-  it('新配置默认仅手动60分钟，糖果只允许Responses', async () => {
+  // New configurations submit the drawing benchmark with manual scheduling.
+  // The editor exposes local HTML instructions before any model request can run.
+  it('新配置默认画图和Responses，仅手动60分钟', async () => {
     const wrapper = mountPage()
     await flushPromises()
     await clickText(wrapper, 'intelligence.add')
+    expect(wrapper.getComponent('#intelligence-benchmark').props('modelValue')).toBe('drawing')
+    expect(wrapper.find('#intelligence-prompt').exists()).toBe(true)
+    expect(wrapper.text()).toContain('intelligence.drawingWorkflowHint')
     expect(wrapper.getComponent('#intelligence-schedule').props('modelValue')).toBe(false)
     expect(wrapper.getComponent('#intelligence-protocol').props('modelValue')).toBe('responses')
-    expect(wrapper.getComponent('#intelligence-protocol').props('disabled')).toBe(true)
+    expect(wrapper.getComponent('#intelligence-protocol').props('disabled')).toBe(false)
     wrapper.getComponent('#intelligence-group').vm.$emit('update:modelValue', 1)
     await flushPromises()
     wrapper.getComponent('#intelligence-model').vm.$emit('update:modelValue', 'model-b')
@@ -340,12 +383,27 @@ describe('管理员降智检测', () => {
       expect.objectContaining({
         group_id: 1,
         model: 'model-b',
+        benchmark: 'drawing',
         schedule_enabled: false,
         interval_minutes: 60,
         api_key: 'test-secret-not-real',
       }),
       undefined,
     )
+    expect(run).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+  // Choosing candy changes the visible workflow and restricts protocol selection.
+  // Drawing prompt controls disappear so administrators can identify the remote question test.
+  it('切换糖果时说明远端问答流程并限定Responses', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    await clickText(wrapper, 'intelligence.add')
+    wrapper.getComponent('#intelligence-benchmark').vm.$emit('update:modelValue', 'candy')
+    await flushPromises()
+    expect(wrapper.text()).toContain('intelligence.candyWorkflowHint')
+    expect(wrapper.find('#intelligence-prompt').exists()).toBe(false)
+    expect(wrapper.getComponent('#intelligence-protocol').props('disabled')).toBe(true)
     expect(run).not.toHaveBeenCalled()
     wrapper.unmount()
   })

@@ -214,16 +214,17 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import { sanitizeSvg } from '@/utils/sanitize'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 
-// AppSidebar.vue builds role-specific navigation from public and administrator settings.
-// Feature predicates filter optional destinations, custom links retain their configured
-// order, and administrator groups highlight the current exact child route. The mobile
-// drawer closes after route changes and also handles clicks on the current route.
+// AppSidebar.vue renders user and administrator navigation with the shared icon
+// and menu styles. Role checks and public feature settings determine available
+// destinations, while custom menu entries and grouped administrator links share
+// the same expansion and mobile dismissal behavior. Personal navigation places
+// the model marketplace after its dashboard and the account pool before quality checks.
 //
-// Group expansion uses route activity until the user supplies a local override; that
-// override can keep an active group collapsed. The sidebar saves its scroll position
-// into application state before unmount and restores it after the next mounted render.
-// Collapsed labels remain in the layout for transitions while accessibility attributes
-// hide their text.
+// Route changes dismiss the mobile drawer, while clicks on the current route
+// dismiss it immediately because they produce no navigation event. Expansion
+// overrides let users close an active group until they choose another state.
+// The store retains sidebar scroll position across page mounts, and feature
+// settings are reevaluated when public or administrator configuration changes.
 
 // NavItem represents a destination or collapsible group in sidebar navigation.
 interface NavItem {
@@ -300,8 +301,8 @@ const flagTeamAccess = () => appStore.cachedPublicSettings?.team_enabled !== fal
 const flagUsageRankingAccess = () => appStore.cachedPublicSettings?.usage_ranking_enabled !== false
 
 // userNavItems builds the regular user menu from public feature settings and
-// administrator-configured links. The ticket entry follows custom links so
-// support remains the final destination when the feature is enabled.
+// administrator-configured links. The model marketplace follows the dashboard,
+// the account pool precedes intelligence checks, and enabled support appears last.
 const userNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
@@ -312,7 +313,6 @@ const userNavItems = computed((): NavItem[] => {
       icon: 'ranking' as const,
       featureFlag: flagUsageRankingAccess,
     },
-    { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
     {
@@ -373,6 +373,7 @@ const userNavItems = computed((): NavItem[] => {
       icon: null,
       iconSvg: item.icon_svg,
     })),
+    { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     {
       path: '/intelligence',
       label: t('intelligence.title'),
@@ -391,8 +392,8 @@ const userNavItems = computed((): NavItem[] => {
 })
 
 // personalNavItems builds the administrator's personal account menu with the
-// public feature settings applied. Personal tickets follow the configured
-// custom links and appear last when ticket access is enabled.
+// public feature settings applied. The model marketplace follows the dashboard,
+// and the account pool precedes user intelligence checks after configured custom links.
 const personalNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: 'dashboard' as const },
@@ -403,7 +404,6 @@ const personalNavItems = computed((): NavItem[] => {
       icon: 'ranking' as const,
       featureFlag: flagUsageRankingAccess,
     },
-    { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
     {
@@ -464,6 +464,7 @@ const personalNavItems = computed((): NavItem[] => {
       icon: null,
       iconSvg: item.icon_svg,
     })),
+    { path: '/account-pool', label: t('remotePool.title'), icon: 'server' as const },
     {
       path: '/intelligence',
       label: t('intelligence.title'),
@@ -499,8 +500,8 @@ const customMenuItemsForAdmin = computed(() => {
 })
 
 // adminNavItems builds management navigation using the current feature settings.
-// Ticket management follows settings and administrator custom links, placing
-// support at the end of the management section when ticket access is enabled.
+// Intelligence settings lead the management section. Ticket management follows
+// settings and custom links at the end of that section when support is enabled.
 const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     {

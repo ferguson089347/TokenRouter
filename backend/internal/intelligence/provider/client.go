@@ -46,8 +46,9 @@ var (
 // Client submits and polls checks using bounded, redirect-disabled HTTP
 // requests.
 type Client struct {
-	httpClient *http.Client // bounded HTTP client
-	baseURL    string       // fixed service origin
+	httpClient       *http.Client // bounded HTTP client
+	baseURL          string       // fixed service origin
+	generationClient *http.Client // bounded gateway client
 }
 
 // NewClient creates a client for the fixed production Manxue origin. A
@@ -74,7 +75,8 @@ func NewClientWithBaseURL(httpClient *http.Client, baseURL string) (*Client, err
 // newClient copies caller HTTP options and applies bounded request isolation.
 // The returned client shares the caller's transport but owns its client
 // configuration, disables cookies, and rejects redirects before credentials
-// can be forwarded.
+// can be forwarded. Generation uses a five-minute default timeout, while an
+// explicit source timeout applies to both gateway and classifier requests.
 func newClient(source *http.Client, baseURL string) *Client {
 	var cloned http.Client
 	if source != nil {
@@ -87,19 +89,39 @@ func newClient(source *http.Client, baseURL string) *Client {
 	// remain confined to the configured creation endpoint.
 	cloned.Jar = nil
 	cloned.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
-	return &Client{httpClient: &cloned, baseURL: baseURL}
+	generation := cloned
+	if source == nil || source.Timeout <= 0 {
+		generation.Timeout = 5 * time.Minute
+	}
+	return &Client{httpClient: &cloned, baseURL: baseURL, generationClient: &generation}
 }
 
 // Create submits one validated check with the supplied persistent idempotency
-// identity. An omitted protocol selects Responses, and the benchmark controls
-// the allowed protocol and reasoning values. Request replay is disabled before
-// transmission because a connection failure can leave acceptance uncertain.
+// identity. An omitted generation protocol selects Responses, and the benchmark
+// controls the allowed protocol and reasoning values. HTML assessments submit
+// the document with fixed placeholder credentials and omit generation parameters.
+// Request replay is disabled before transmission because a connection failure
+// can leave acceptance uncertain.
 //
 // An accepted response must contain a valid task identifier and a compatible
 // benchmark. Omitted response benchmark uses the submitted value, allowing the
 // service to interpret later observations consistently.
 func (c *Client) Create(ctx context.Context, input remote.CreateRequest, idempotencyKey string) (*remote.TestResult, error) {
-	if input.Protocol == "" {
+	if input.Benchmark == "html" {
+		if strings.TrimSpace(input.HTML) == "" || len(input.HTML) > remote.MaxHTMLBytes {
+			return nil, remote.ErrInvalidRequest
+		}
+		// HTML evaluation requires placeholder model fields. Replace every supplied
+		// generation setting before serialization so gateway credentials stay local.
+		input = remote.CreateRequest{
+			Benchmark: "html",
+			BaseURL:   "https://api.example.com/v1",
+			APIKey:    "html-classification-placeholder",
+			Model:     "gpt-6-astra",
+			HTML:      input.HTML,
+		}
+	}
+	if input.Protocol == "" && input.Benchmark != "html" {
 		input.Protocol = "responses"
 	}
 	if err := validateCreate(input, idempotencyKey); err != nil {
@@ -121,7 +143,13 @@ func (c *Client) Create(ctx context.Context, input remote.CreateRequest, idempot
 	// otherwise repeat an accepted creation and cause another charged gateway
 	// request.
 	req.GetBody = nil
-	result, err := c.do(req, http.StatusAccepted)
+	expectedStatus := http.StatusAccepted
+	// HTML submissions may return an already completed assessment on a repeated
+	// idempotency key, so all successful HTTP status codes still require JSON validation.
+	if input.Benchmark == "html" {
+		expectedStatus = 0
+	}
+	result, err := c.do(req, expectedStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -165,10 +193,11 @@ func ValidTaskID(id string) bool { return idPattern.MatchString(id) }
 // before transmission; credentials remain available solely for the validated
 // creation body.
 func validateCreate(input remote.CreateRequest, key string) error {
-	if input.Benchmark != "candy" && input.Benchmark != "pelican" {
+	if input.Benchmark != "candy" && input.Benchmark != "pelican" && input.Benchmark != "html" {
 		return remote.ErrInvalidRequest
 	}
-	if input.Protocol != "responses" && input.Protocol != "chat_completions" {
+	validProtocol := input.Protocol == "responses" || input.Protocol == "chat_completions" || (input.Benchmark == "html" && input.Protocol == "")
+	if !validProtocol {
 		return remote.ErrInvalidRequest
 	}
 	if input.Benchmark == "candy" && input.Protocol != "responses" {
@@ -201,8 +230,9 @@ func validateCreate(input remote.CreateRequest, key string) error {
 }
 
 // do sends a request and decodes its bounded successful JSON response.
-// Redirects and unexpected status codes become safe errors; response-body and
-// HTML limits are checked before returning complete observations to callers.
+// An expectedStatus of zero accepts any 2xx result for HTML assessment creation,
+// including completed or repeated submissions. Redirects and other status codes
+// become safe errors, and response-body limits reject incomplete observations.
 func (c *Client) do(req *http.Request, expectedStatus int) (*remote.TestResult, error) {
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
@@ -213,7 +243,8 @@ func (c *Client) do(req *http.Request, expectedStatus int) (*remote.TestResult, 
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		return nil, remote.ErrRedirect
 	}
-	if resp.StatusCode != expectedStatus {
+	accepted := resp.StatusCode == expectedStatus || (expectedStatus == 0 && resp.StatusCode >= 200 && resp.StatusCode < 300)
+	if !accepted {
 		return nil, &remote.HTTPError{StatusCode: resp.StatusCode, RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"), time.Now())}
 	}
 	// Read one extra byte to distinguish oversized content from a complete

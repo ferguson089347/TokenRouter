@@ -2,11 +2,12 @@ import { apiClient } from './client'
 
 // intelligence.ts defines the panel configuration, history, and preview
 // response types and their HTTP calls. Administrator writes and manual
-// execution use protected administrator endpoints, while user calls read
-// existing observations and signed preview grants through the ordinary panel
-// client.
+// execution use protected administrator endpoints. User calls submit owned
+// credential identifiers and read shared observations and signed preview grants
+// through the ordinary authenticated panel client.
 
-// Panel requests use the authenticated application API; the backend owns remote creation and transmission of the configured gateway credential.
+// Panel requests use the authenticated application API; the backend generates
+// drawing HTML locally and submits completed documents for remote evaluation.
 // IntelligenceBenchmark identifies the candy or drawing benchmark selected for
 // a check.
 export type IntelligenceBenchmark = 'candy' | 'drawing'
@@ -33,10 +34,12 @@ export interface IntelligenceRun {
   output_tokens?: number | null // reported output tokens
   reasoning_tokens?: number | null // reported reasoning tokens
   duration_ms?: number | null // reported duration milliseconds
+  first_token_ms?: number | null // first token milliseconds
   assessment_reason?: string // remote assessment explanation
   error_message?: string // safe local diagnostic
   has_detail?: boolean // available observation detail
   has_artifact?: boolean // retained drawing presence
+  has_thumbnail?: boolean // retained screenshot presence
   created_at: string // record creation timestamp
   updated_at: string // latest observation timestamp
   finished_at?: string | null // terminal observation timestamp
@@ -50,6 +53,9 @@ export interface IntelligenceConfig {
   group_name: string // current group name
   model: string // requested model identifier
   benchmark: IntelligenceBenchmark // selected benchmark type
+  // prompt supplies drawing instructions. Empty values select the backend's
+  // default pelican animation, and candy configurations submit an empty value.
+  prompt: string // optional drawing instruction
   base_url: string // public gateway endpoint
   api_key_configured: boolean // saved credential presence
   protocol: 'responses' | 'chat_completions' // remote model protocol
@@ -72,6 +78,7 @@ export type IntelligenceConfigInput = Pick<
   | 'group_id'
   | 'model'
   | 'benchmark'
+  | 'prompt'
   | 'base_url'
   | 'protocol'
   | 'reasoning_effort'
@@ -84,6 +91,7 @@ export type IntelligenceConfigInput = Pick<
 // IntelligenceTest groups authorized model history and retained artifacts for
 // user display.
 export interface IntelligenceTest {
+  source?: 'site' | 'user' // observed submission source
   id: number // local record identifier
   group_id: number // configured routing group
   group_name: string // current group name
@@ -91,6 +99,13 @@ export interface IntelligenceTest {
   benchmark: IntelligenceBenchmark // selected benchmark type
   runs: IntelligenceRun[] // lightweight execution history
   artifacts: IntelligenceRun[] // retained artwork summaries
+}
+
+// IntelligenceSelfTestInput selects a personal Key for the channel's system drawing.
+// The server checks ownership and copies the first enabled site drawing's execution
+// parameters before queuing a publicly shared result under the user's credential.
+export interface IntelligenceSelfTestInput {
+  api_key_id: number // selected personal credential
 }
 
 // IntelligencePreview grants short-lived access to one sandboxed drawing
@@ -103,6 +118,23 @@ export interface IntelligencePreview {
 // intelligenceAPI sends authenticated panel requests for authorized results,
 // configuration management, manual execution, and signed artifact access.
 export const intelligenceAPI = {
+  // selfTest queues a drawing using the authenticated user's selected personal Key.
+  // Results join the public user-test history for the Key's group and model;
+  // credential text stays on the server and creation returns a queued observation.
+  async selfTest(input: IntelligenceSelfTestInput): Promise<IntelligenceRun> {
+    return (await apiClient.post<IntelligenceRun>('/intelligence-tests/run', input)).data
+  },
+  // thumbnail reads an authorized PNG snapshot using the ordinary panel bearer
+  // credential. The backend captures a missing image from retained HTML and
+  // stores it before responding; callers own any object URL created from the blob.
+  async thumbnail(id: string, admin = false, signal?: AbortSignal): Promise<Blob> {
+    return (
+      await apiClient.get<Blob>(
+        `${admin ? '/admin' : ''}/intelligence-tests/runs/${encodeURIComponent(id)}/thumbnail`,
+        { signal, responseType: 'blob' },
+      )
+    ).data
+  },
   // list reads the current user's authorized quality-check histories and
   // artifact summaries.
   async list(signal?: AbortSignal): Promise<IntelligenceTest[]> {

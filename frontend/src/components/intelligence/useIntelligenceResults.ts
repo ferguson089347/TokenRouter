@@ -5,6 +5,8 @@ import { intelligenceAPI, type IntelligencePreview, type IntelligenceRun } from 
 // one mounted page. Pending reads with the same key share a promise, and at
 // most two remote reads occupy slots while additional requests wait in order.
 // Completed details are cached, while active observations remain refreshable.
+// PNG reads share the same queue and retain page-owned object URLs for hover
+// panels, keeping historical HTML out of the browser's active document tree.
 //
 // Disposal aborts running HTTP requests and drains waiting callbacks so their
 // promises settle. Preview tickets refresh before expiration, and bounded per-
@@ -22,6 +24,10 @@ export interface IntelligenceResultsLoader {
   // grants refresh before expiration; the content request still performs its own
   // current user and artifact authorization checks.
   preview(id: string): Promise<IntelligencePreview>
+  // thumbnail returns a page-owned PNG object URL shared by history popovers.
+  // The URL remains valid until cache eviction or page disposal; consumers render
+  // it as an image and leave cleanup to this loader.
+  thumbnail(id: string): Promise<string>
   // dispose cancels active HTTP reads and rejects queued work before releasing
   // cached observations. The page calls it on unmount, preventing request
   // results from being retained by another page instance.
@@ -43,6 +49,7 @@ export function createIntelligenceResultsLoader(admin = false): IntelligenceResu
   const controller = new AbortController()
   const details = new Map<string, IntelligenceRun>()
   const previews = new Map<string, IntelligencePreview>()
+  const thumbnails = new Map<string, string>()
   const pending = new Map<string, Promise<unknown>>()
   const queue: Array<() => void> = []
   let active = 0
@@ -68,7 +75,7 @@ export function createIntelligenceResultsLoader(admin = false): IntelligenceResu
           .then(resolve, reject)
           .finally(() => {
             // Release this slot before starting the next queued read, including
-            // failures, so request errors cannot stall the remaining gallery cards.
+            // failures, so request errors cannot stall the remaining preview and screenshot reads.
             active--
             queue.shift()?.()
           })
@@ -89,6 +96,28 @@ export function createIntelligenceResultsLoader(admin = false): IntelligenceResu
     return value
   }
   return {
+    // thumbnail shares pending image reads and retains at most eighty object URLs.
+    // Aborted completions cannot allocate URLs, and cache eviction releases the
+    // image allocation before a new entry takes its place.
+    thumbnail(id) {
+      const cached = thumbnails.get(id)
+      if (cached) return Promise.resolve(cached)
+      return schedule(`thumbnail:${id}`, async () => {
+        const blob = await intelligenceAPI.thumbnail(id, admin, controller.signal)
+        if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError')
+        if (blob.type !== 'image/png') throw new Error('Invalid drawing screenshot')
+        const url = URL.createObjectURL(blob)
+        // When PNGs leave the page's hover cache, revoke their object URLs
+        // before forgetting them so scrolling through many histories releases browser memory.
+        if (thumbnails.size >= 80) {
+          const oldest = thumbnails.keys().next().value!
+          URL.revokeObjectURL(thumbnails.get(oldest)!)
+          thumbnails.delete(oldest)
+        }
+        thumbnails.set(id, url)
+        return url
+      })
+    },
     // detail returns cached terminal observations and deduplicates outstanding
     // reads. Active observations continue through the bounded request scheduler
     // so later polling can return their completed content.
@@ -122,6 +151,8 @@ export function createIntelligenceResultsLoader(admin = false): IntelligenceResu
       controller.abort()
       details.clear()
       previews.clear()
+      for (const url of thumbnails.values()) URL.revokeObjectURL(url)
+      thumbnails.clear()
       while (queue.length) queue.shift()?.()
     },
   }

@@ -24,11 +24,12 @@ import (
 // Unknown completed assessments remain unknown so missing evaluation cannot
 // become a passing result.
 
-// Response limits bound complete remote JSON and drawing documents before
-// callers retain observations or serve model-generated content to browsers.
+// Content limits bound remote JSON, drawing documents, and configured prompts
+// before callers submit model tasks, retain observations, or serve browser previews.
 const (
 	MaxResponseBytes = 4 << 20
 	MaxHTMLBytes     = 2 << 20
+	MaxPromptBytes   = 32 << 10
 )
 
 var (
@@ -72,6 +73,7 @@ type CreateRequest struct {
 	Protocol        string `json:"protocol,omitempty"`         // remote model protocol
 	ReasoningEffort string `json:"reasoning_effort,omitempty"` // requested reasoning level
 	ServiceTier     string `json:"service_tier,omitempty"`     // requested service tier
+	HTML            string `json:"html,omitempty"`             // completed drawing document
 }
 
 // TestResult retains known remote observation fields before local privacy and
@@ -111,13 +113,16 @@ type CandyResult struct {
 // DrawingResult carries untrusted drawing HTML and optional reported model
 // measurements.
 type DrawingResult struct {
-	HTML            string `json:"html,omitempty"`             // untrusted drawing document
-	HasHTML         *bool  `json:"has_html,omitempty"`         // reported drawing presence
-	Title           string `json:"title,omitempty"`            // remote drawing title
-	Prompt          string `json:"prompt,omitempty"`           // reported drawing prompt
-	StartedAt       string `json:"started_at,omitempty"`       // remote start timestamp
-	FinishedAt      string `json:"finished_at,omitempty"`      // terminal observation timestamp
-	DurationMS      *int64 `json:"duration_ms,omitempty"`      // reported duration milliseconds
+	HTML       string `json:"html,omitempty"`        // untrusted drawing document
+	HasHTML    *bool  `json:"has_html,omitempty"`    // reported drawing presence
+	Title      string `json:"title,omitempty"`       // remote drawing title
+	Prompt     string `json:"prompt,omitempty"`      // reported drawing prompt
+	StartedAt  string `json:"started_at,omitempty"`  // remote start timestamp
+	FinishedAt string `json:"finished_at,omitempty"` // terminal observation timestamp
+	DurationMS *int64 `json:"duration_ms,omitempty"` // reported duration milliseconds
+	// FirstTokenMS records a locally observed first text or reasoning delta delay.
+	// Buffered responses and historical results omit this value when timing is unavailable.
+	FirstTokenMS    *int64 `json:"first_token_ms,omitempty"`   // first token milliseconds
 	InputTokens     *int64 `json:"input_tokens,omitempty"`     // reported input tokens
 	OutputTokens    *int64 `json:"output_tokens,omitempty"`    // reported output tokens
 	ReasoningTokens *int64 `json:"reasoning_tokens,omitempty"` // reported reasoning tokens
@@ -140,10 +145,13 @@ type RemoteError struct {
 	HTTPStatus int    `json:"http_status,omitempty"` // recognized failure status
 }
 
-// HTTPError describes a remote HTTP failure using its status and retry delay.
+// HTTPError describes a classifier or gateway HTTP failure using safe details.
 type HTTPError struct {
 	StatusCode int           // remote HTTP status
 	RetryAfter time.Duration // requested poll delay
+	// Diagnostic contains an allowlisted gateway classification after arbitrary
+	// response content is discarded. Classifier requests leave this field nil.
+	Diagnostic *RemoteError // safe gateway classification
 }
 
 // TransportError identifies network failure, cancellation, or timeout with
@@ -429,7 +437,7 @@ func (r *TestResult) Outcome() string {
 		case "error":
 			return "error"
 		}
-	case "pelican":
+	case "pelican", "html":
 		if r.Assessment == nil {
 			return "unknown"
 		}

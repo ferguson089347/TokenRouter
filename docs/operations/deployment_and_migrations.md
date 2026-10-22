@@ -33,6 +33,8 @@ Go 构建使用 1.27.3，后端模块、两个开发工具模块和三份源码 
 | 源码开发 Compose | `deploy/docker-compose.dev.yml` | 在本地构建应用，并启动配套的依赖 |
 | Apple Container | `deploy/apple-container.sh` | 独立脚本管理容器、卷和健康状态 |
 
+运行镜像包含降智检测截图使用的 Chromium。独立二进制部署如需历史截图，安装 Chromium 并按需用 `CHROMIUM_PATH` 指定路径；未安装时最新 HTML 仍可展示，截图读取返回暂不可用。
+
 应用至少依赖 PostgreSQL 和 Redis。`/app/data` 或等价的 `DATA_DIR` 保存配置、安装锁和本地的运维产物；数据库、Redis 和对象存储各有自己的生命周期，只备份应用数据目录，不算完成了系统备份。
 
 逐步操作见[中文部署指南](../guides/deployment/index.md)、[Docker 镜像说明](../../deploy/DOCKER.md)和 [Apple Container 指南](../guides/deployment/apple_container.md)。这些是给部署者的手册，本文的工程约束在它们之上。
@@ -94,6 +96,10 @@ Apple container 的新栈使用 `org.tokenrouter.stack` 标签；已有的 `sub2
 `304_intelligence_tests.sql` 创建独立的检测配置和任务表，包含活动任务唯一索引及轮询、历史索引。迁移为追加表结构，旧二进制可以继续使用既有表；功能默认关闭。回退应用前先关闭检测并等待在途任务结束，避免暂停远端结果的查询。凭据、权限、历史保留和恢复规则见[降智检测](../domains/intelligence_tests.md)。
 
 `305_users_id_start_at_1000.sql` 推进新用户 ID 的分配序列，已有用户行和关联保持原值。锁等待、验证查询和回退规则见[新用户 ID 起点](upgrade_notes.md#user_id_start)。
+
+`306_intelligence_drawing_prompt.sql` 为检测配置增加空字符串默认值的 `prompt` 列；画图在本站生成 HTML 后提交评价。已有远端任务继续查询；回退到远端生成版本前，关闭检测并等待活动任务结束，避免旧工作者把本地生成阶段当作未知提交。
+
+`307_intelligence_user_tests.sql` 为配置增加 `source`，既有记录默认为 `site`。唯一身份改为来源、分组、模型、测试类型，使用户自测使用独立的共享历史。回退到不识别来源的二进制前须停用用户测试并核对配置数量；旧列表查询会把用户配置与站点配置一起读取。
 
 ## 升级与恢复
 

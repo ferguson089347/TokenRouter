@@ -6,11 +6,8 @@
     <p v-else-if="error" role="alert" class="text-red-600">{{ error }}</p>
     <div v-else-if="run" class="space-y-5">
       <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span class="inline-flex items-center gap-2"
-          ><span class="h-2.5 w-2.5 rounded-full" :class="resultColor(run)" />{{
-            t(`intelligence.statuses.${resultStatus(run)}`)
-          }}</span
-        ><span class="text-gray-500">{{ formatDateTime(run.created_at) }}</span>
+        <IntelligenceStatusBadge :status="resultStatus(run)" />
+        <span class="text-gray-500">{{ formatDateTime(run.created_at) }}</span>
       </div>
       <dl
         class="grid grid-cols-2 gap-x-6 gap-y-4 rounded-control bg-gray-50 p-4 text-sm dark:bg-dark-900 sm:grid-cols-3"
@@ -18,6 +15,10 @@
         <div class="min-w-0">
           <dt class="text-gray-500">{{ t('intelligence.model') }}</dt>
           <dd class="mt-1 break-all font-medium">{{ run.model }}</dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">{{ t('intelligence.benchmark') }}</dt>
+          <dd class="mt-1 font-medium">{{ t(`intelligence.${run.benchmark}`) }}</dd>
         </div>
         <div v-for="stat in stats" :key="stat.label">
           <dt class="text-gray-500">{{ t(`intelligence.${stat.label}`) }}</dt>
@@ -75,12 +76,15 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { IntelligenceRun } from '@/api/intelligence'
 import { formatDateTime } from '@/utils/format'
 import IntelligenceDrawing from './IntelligenceDrawing.vue'
-import { resultColor, resultMarkdown, resultStatus } from './results'
+import { resultMarkdown, resultStatus } from './results'
+import IntelligenceStatusBadge from './IntelligenceStatusBadge.vue'
 
 // IntelligenceRunDialog.vue displays a saved observation with sanitized
 // question and answer text, safe diagnostics and optional measured usage.
-// Drawing results use the same isolated preview component as gallery cards,
-// and absent measurements stay visibly unknown instead of becoming zero.
+// The benchmark identifies the selected test alongside the model. Drawing
+// results use the same isolated preview component as the latest artwork, and absent
+// measurements stay visibly unknown for observations that report no statistics.
+// The shared badge keeps quality outcomes distinct from execution diagnostics.
 
 // The selected run supplies optional measurements, benchmark content and
 // diagnostics; dialog closure delegates selection cleanup to its owning

@@ -8,16 +8,35 @@ import { runFixture } from './fixtures'
 // preview renewal, and queue admission while keeping administrator and user results in
 // separate scopes.
 
-const { detail, preview } = vi.hoisted(() => ({
+const { detail, preview, thumbnail } = vi.hoisted(() => ({
   detail: vi.fn(),
   preview: vi.fn(),
+  thumbnail: vi.fn(),
 }))
-vi.mock('@/api/intelligence', () => ({ intelligenceAPI: { detail, preview } }))
+vi.mock('@/api/intelligence', () => ({ intelligenceAPI: { detail, preview, thumbnail } }))
 
 describe('检测产物按需加载', () => {
   beforeEach(() => {
     detail.mockReset()
     preview.mockReset()
+    thumbnail.mockReset()
+  })
+
+  // Hover consumers share a PNG read and its page-owned URL allocation.
+  // Disposing the loader releases that allocation before another user can open the page.
+  it('历史截图去重缓存并在页面退出时释放图片URL', async () => {
+    const create = vi.fn(() => 'blob:screenshot')
+    const revoke = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: create })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
+    thumbnail.mockResolvedValue(new Blob(['png'], { type: 'image/png' }))
+    const loader = createIntelligenceResultsLoader()
+    await Promise.all([loader.thumbnail('drawing'), loader.thumbnail('drawing')])
+    expect(await loader.thumbnail('drawing')).toBe('blob:screenshot')
+    expect(thumbnail).toHaveBeenCalledTimes(1)
+    expect(create).toHaveBeenCalledTimes(1)
+    loader.dispose()
+    expect(revoke).toHaveBeenCalledWith('blob:screenshot')
   })
 
   it('同记录合并并发读取，终态详情缓存，管理员域独立', async () => {

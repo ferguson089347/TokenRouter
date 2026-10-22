@@ -92,9 +92,7 @@
                 v-if="config.latest_run"
                 class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500"
               >
-                <span class="h-2 w-2 rounded-full" :class="resultColor(config.latest_run)" />{{
-                  t(`intelligence.statuses.${resultStatus(config.latest_run)}`)
-                }}
+                <IntelligenceStatusBadge :status="resultStatus(config.latest_run)" />
                 · {{ formatDateTime(config.latest_run.created_at) }}
               </p>
             </div>
@@ -181,6 +179,15 @@
                 :options="benchmarkOptions"
                 :disabled="saving || !!editingID"
               />
+              <p class="input-hint">
+                {{
+                  t(
+                    form.benchmark === 'drawing'
+                      ? 'intelligence.drawingWorkflowHint'
+                      : 'intelligence.candyWorkflowHint',
+                  )
+                }}
+              </p>
             </div>
             <div>
               <label for="intelligence-protocol" class="input-label">{{
@@ -196,6 +203,21 @@
                 {{ t('intelligence.candyProtocolHint') }}
               </p>
             </div>
+          </div>
+          <div v-if="form.benchmark === 'drawing'">
+            <label for="intelligence-prompt" class="input-label">{{
+              t('intelligence.prompt')
+            }}</label>
+            <textarea
+              id="intelligence-prompt"
+              v-model="form.prompt"
+              class="input min-h-32"
+              rows="5"
+              maxlength="8192"
+              :disabled="saving"
+              :placeholder="t('intelligence.promptPlaceholder')"
+            />
+            <p class="input-hint">{{ t('intelligence.promptHint') }}</p>
           </div>
           <div>
             <label for="intelligence-base-url" class="input-label">{{
@@ -287,7 +309,13 @@
               @input="selectedKeyID = null"
             />
             <p class="mt-2 text-xs text-gray-500">
-              {{ t('intelligence.apiKeyHint') }}
+              {{
+                t(
+                  form.benchmark === 'drawing'
+                    ? 'intelligence.drawingApiKeyHint'
+                    : 'intelligence.apiKeyHint',
+                )
+              }}
             </p>
             <p class="mt-2 text-xs text-gray-500">
               {{ t('intelligence.apiKeyFallbackHint') }}
@@ -399,7 +427,7 @@
           {{ historyError }}
         </p>
         <template v-else
-          ><IntelligenceResultBar :runs="history" @select="openRun" />
+          ><IntelligenceResultBar :runs="history" />
           <div class="mt-4 divide-y divide-gray-100 dark:divide-dark-700">
             <button
               v-for="run in history"
@@ -408,16 +436,10 @@
               class="flex w-full items-center justify-between gap-4 py-3 text-left text-sm hover:text-primary-500"
               @click="openRun(run)"
             >
-              <span>{{ formatDateTime(run.created_at) }}</span
-              ><span class="inline-flex items-center gap-2"
-                ><span class="h-2.5 w-2.5 rounded-full" :class="resultColor(run)" />{{
-                  t(`intelligence.statuses.${resultStatus(run)}`)
-                }}</span
-              >
-            </button>
-          </div></template
-        ></BaseDialog
-      >
+              <span>{{ formatDateTime(run.created_at) }}</span>
+              <IntelligenceStatusBadge :status="resultStatus(run)" />
+            </button> </div></template
+      ></BaseDialog>
       <IntelligenceRunDialog
         :show="showDetail"
         :run="selectedRun"
@@ -438,7 +460,8 @@ import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import IntelligenceResultBar from '@/components/intelligence/IntelligenceResultBar.vue'
 import IntelligenceRunDialog from '@/components/intelligence/IntelligenceRunDialog.vue'
-import { resultColor, resultStatus } from '@/components/intelligence/results'
+import { resultStatus } from '@/components/intelligence/results'
+import IntelligenceStatusBadge from '@/components/intelligence/IntelligenceStatusBadge.vue'
 import {
   intelligenceAPI,
   type IntelligenceConfig,
@@ -455,9 +478,9 @@ import { formatDateTime } from '@/utils/format'
 import { provideIntelligenceResults } from '@/components/intelligence/useIntelligenceResults'
 
 // IntelligenceTestsView.vue manages model quality configurations and explicit
-// paid test submissions. The form selects personal ordinary Keys belonging to
-// the selected group, displays credential-free option labels, and clears
-// transient secrets when group or dialog state changes. Existing configuration
+// paid test submissions with configurable drawing prompts. The form selects
+// personal ordinary Keys belonging to the selected group, displays credential-free
+// option labels, and clears transient secrets when group or dialog state changes. Existing configuration
 // identity remains fixed while execution settings can change during idle
 // periods.
 //
@@ -507,13 +530,15 @@ let modelRevision = 0
 let disposed = false
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
-// defaultForm creates an enabled manual Responses check with a sixty-minute
-// interval. Credential text starts empty, and scheduled execution requires the
-// administrator to opt into recurring paid checks.
+// defaultForm creates an enabled manual drawing check using Responses and a
+// sixty-minute interval. An empty prompt selects the default local HTML task;
+// credential text starts empty, and recurring paid checks require administrator
+// opt-in through the schedule control.
 const defaultForm = (): IntelligenceConfigInput => ({
   group_id: 0,
   model: '',
-  benchmark: 'candy',
+  benchmark: 'drawing',
+  prompt: '',
   base_url: '',
   api_key: '',
   protocol: 'responses',
@@ -566,8 +591,8 @@ const apiKeyOptions = computed(() =>
   })),
 )
 const benchmarkOptions = computed(() => [
-  { value: 'candy', label: t('intelligence.candy') },
-  { value: 'drawing', label: t('intelligence.drawing') },
+  { value: 'drawing', label: t('intelligence.drawingLocal') },
+  { value: 'candy', label: t('intelligence.candyRemote') },
 ])
 const protocolOptions = [
   { value: 'responses', label: 'Responses' },
@@ -764,6 +789,7 @@ function openForm(config?: IntelligenceConfig, groupID = 0) {
           group_id: config.group_id,
           model: config.model,
           benchmark: config.benchmark,
+          prompt: config.prompt || '',
           base_url: config.base_url,
           protocol: config.protocol,
           reasoning_effort: config.reasoning_effort,
@@ -805,6 +831,7 @@ async function save() {
         model: form.model.trim(),
         base_url: form.base_url.trim(),
         api_key: form.api_key.trim(),
+        prompt: form.benchmark === 'drawing' ? form.prompt.trim() : '',
       },
       editingID.value,
     )

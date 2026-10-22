@@ -29,6 +29,7 @@ describe('检测详情保留真实观测', () => {
     expect(wrapper.findAll('h4')).toHaveLength(0)
     expect(wrapper.findAll('dd').map((item) => item.text())).toEqual([
       'model-a',
+      'intelligence.candy',
       '—',
       '—',
       '—',
@@ -36,9 +37,12 @@ describe('检测详情保留真实观测', () => {
     ])
     wrapper.unmount()
   })
-  it('只提供答案时只渲染答案，明确零统计保留为零', () => {
+  // A drawing observation identifies its saved benchmark beside the model.
+  // Reported zeros remain zero while absent measurements stay unknown in the detail grid.
+  it('画图记录显示类型，只提供答案时保留零统计', () => {
     const wrapper = mountDialog(
       runFixture({
+        benchmark: 'drawing',
         answer: '**answer only**',
         input_tokens: 0,
         output_tokens: 10,
@@ -50,6 +54,7 @@ describe('检测详情保留真实观测', () => {
     expect(wrapper.text()).not.toContain('intelligence.noAnswer')
     expect(wrapper.findAll('dd').map((item) => item.text())).toEqual([
       'model-a',
+      'intelligence.drawing',
       '0.0 s',
       '0',
       '10',
@@ -61,7 +66,10 @@ describe('检测详情保留真实观测', () => {
     const wrapper = mountDialog(runFixture({ status, verdict: status }))
     expect(wrapper.text()).toContain(`intelligence.statuses.${status}`)
     expect(wrapper.text()).not.toContain('intelligence.statuses.incorrect')
-    expect(wrapper.find('.bg-amber-400').exists()).toBe(true)
+    expect(wrapper.get(`[data-intelligence-status="${status}"]`).classes()).toContain(
+      'text-amber-800',
+    )
+    expect(wrapper.find('[data-intelligence-status="incorrect"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })

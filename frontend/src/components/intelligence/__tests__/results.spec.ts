@@ -58,15 +58,17 @@ describe('检测结果展示契约', () => {
     expect(grouped[0].models[0].tests).toHaveLength(2)
   })
 
-  it('点击竖条返回对应run，没有详情时不能点击', async () => {
+  // History nodes expose observations for inspection even when details are missing.
+  // Pointer activation does not emit a result selection or open another page.
+  it('历史节点可聚焦检查，点击不发出选择事件', async () => {
     const first = runFixture()
     const second = runFixture({ id: 'run-2', has_detail: false })
     const wrapper = mount(IntelligenceResultBar, {
       props: { runs: [first, second] },
     })
     await wrapper.get('[data-run-id="run-1"]').trigger('click')
-    expect(wrapper.emitted('select')?.[0]).toEqual([first])
-    expect(wrapper.get('[data-run-id="run-2"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(wrapper.get('[data-run-id="run-2"]').attributes('tabindex')).toBe('0')
     wrapper.unmount()
   })
 

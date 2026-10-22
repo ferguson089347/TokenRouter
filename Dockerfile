@@ -116,6 +116,7 @@ LABEL org.opencontainers.image.source="https://github.com/kiroo92/TokenRouter"
 # Install runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
+    chromium \
     tzdata \
     su-exec \
     libpq \

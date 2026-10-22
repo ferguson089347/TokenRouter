@@ -57,7 +57,8 @@ github.com/patrickmn/go-cache golang.org/x/sync/errgroup`, Tests: `github.com/DA
 github.com/stretchr/testify/require github.com/stretchr/testify/suite
 github.com/testcontainers/testcontainers-go/modules/postgres
 github.com/testcontainers/testcontainers-go/modules/redis modernc.org/sqlite`},
-		"provider": {Production: `github.com/alibabacloud-go/captcha-20230305/client
+		"provider": {Production: `github.com/chromedp/chromedp github.com/chromedp/cdproto/cdp github.com/chromedp/cdproto/fetch
+github.com/alibabacloud-go/captcha-20230305/client
 github.com/alibabacloud-go/darabonba-openapi/v2/utils github.com/alibabacloud-go/tea/dara
 github.com/alibabacloud-go/tea/tea github.com/aws/aws-sdk-go-v2/aws
 github.com/aws/aws-sdk-go-v2/aws/signer/v4 github.com/aws/aws-sdk-go-v2/config
@@ -408,6 +409,8 @@ internal/upstream/zhipu/...`, Tests: ""},
 
 	// 窄权限属于指定文件，不能由相邻文件或目标子包继承。
 	filePermissions = []filePermission{
+		// Browser control is limited to the isolated drawing screenshot adapter.
+		{Scope: "internal/intelligence/provider", Imports: "github.com/chromedp/chromedp github.com/chromedp/cdproto/cdp github.com/chromedp/cdproto/fetch", Files: "thumbnail.go"},
 		{Scope: "internal/ticket", Imports: "github.com/pdfcpu/pdfcpu/pkg/pdfcpu github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types", Files: "attachment_pdf.go"},
 		{Scope: "internal/gateway", Imports: "internal/modelcatalog/testkit", Files: "httpapi/grok_media_execution_test.go httpapi/helpers_test.go provider/creative_catalog_test.go provider/googleforward/gemini_attempts_external_test.go provider/googleforward/gemini_openai_external_test.go provider/googleforward/helpers_external_test.go provider/grok_codec_test.go provider/model_attributes_test.go provider/model_qualification_test.go provider/selection/candidate_policy_test.go testkit/runtime_settings.go ws/httpapi/openai_ws_http_bridge_test.go"},
 		// Protocol-event inspection is confined to the performance observer and its existing HTTP fixture.

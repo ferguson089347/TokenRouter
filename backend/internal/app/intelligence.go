@@ -38,6 +38,7 @@ func provideIntelligence(db *sql.DB, keys apikey.APIKeyRepository, groups routin
 		provider.NewClient(nil),
 		enabled,
 		httpclient.ValidateResolvedIP,
+		provider.NewThumbnailRenderer(),
 	)
 	manager.Register(lifecycle.Hook{
 		Name:       "IntelligenceTests",

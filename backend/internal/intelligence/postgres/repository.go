@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"time"
@@ -24,11 +25,13 @@ import (
 // before changing any observation or applying retention. Small summaries stay
 // separate from question, answer, assessment, and HTML payloads, letting list
 // queries avoid large stored values. Completed history is bounded to sixty
-// records and ten retained drawing bodies.
+// records and ten retained drawing bodies. PNG snapshots stay in private
+// payload fields, survive worker updates, and follow the sixty-record history
+// lifetime even after full HTML is removed.
 
 // intelligenceConfigColumns fixes the joined column order shared by configuration
 // listing, row locking and scanners, keeping persisted and display identities aligned.
-const intelligenceConfigColumns = `c.id,c.group_id,g.name,c.model,c.benchmark,c.base_url,c.api_key_id,c.protocol,c.reasoning_effort,c.service_tier,c.enabled,c.schedule_enabled,c.interval_minutes,c.next_run_at,c.created_at,c.updated_at`
+const intelligenceConfigColumns = `c.id,c.group_id,g.name,c.model,c.benchmark,c.base_url,c.api_key_id,c.protocol,c.reasoning_effort,c.service_tier,c.enabled,c.schedule_enabled,c.interval_minutes,c.next_run_at,c.created_at,c.updated_at,c.prompt,c.source`
 
 // intelligenceRepository implements durable quality-check persistence using a
 // shared SQL connection pool.
@@ -50,6 +53,11 @@ type intelligenceRunPayload struct {
 	Question         string `json:"question,omitempty"`          // reported benchmark prompt
 	Answer           string `json:"answer,omitempty"`            // reported model answer
 	AssessmentReason string `json:"assessment_reason,omitempty"` // remote assessment explanation
+	// LocalGeneration and AssessmentAttempts are restored by detail and worker
+	// queries. They identify reusable artwork and bound evaluation retries across
+	// process restarts and worker replacements.
+	LocalGeneration    bool `json:"local_generation,omitempty"`    // local artwork ownership
+	AssessmentAttempts int  `json:"assessment_attempts,omitempty"` // HTML submission attempt count
 }
 
 // NewIntelligenceRepository constructs persistence using the caller's shared
@@ -64,7 +72,12 @@ func NewIntelligenceRepository(db *sql.DB) intelligence.IntelligenceRepository {
 // keeping detail and mutation callers consistent.
 func scanIntelligenceConfig(row intelligenceScanner) (*intelligence.IntelligenceConfig, error) {
 	c := &intelligence.IntelligenceConfig{}
-	err := row.Scan(&c.ID, &c.GroupID, &c.GroupName, &c.Model, &c.Benchmark, &c.BaseURL, &c.APIKeyID, &c.Protocol, &c.ReasoningEffort, &c.ServiceTier, &c.Enabled, &c.ScheduleEnabled, &c.IntervalMinutes, &c.NextRunAt, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(
+		&c.ID, &c.GroupID, &c.GroupName, &c.Model, &c.Benchmark,
+		&c.BaseURL, &c.APIKeyID, &c.Protocol, &c.ReasoningEffort, &c.ServiceTier,
+		&c.Enabled, &c.ScheduleEnabled, &c.IntervalMinutes, &c.NextRunAt,
+		&c.CreatedAt, &c.UpdatedAt, &c.Prompt, &c.Source,
+	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, intelligence.ErrIntelligenceNotFound
 	}
@@ -74,7 +87,7 @@ func scanIntelligenceConfig(row intelligenceScanner) (*intelligence.Intelligence
 
 // ListConfigs returns up to two hundred configurations in group display order.
 func (r *intelligenceRepository) ListConfigs(ctx context.Context) ([]intelligence.IntelligenceConfig, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+intelligenceConfigColumns+` FROM intelligence_test_configs c JOIN groups g ON g.id=c.group_id ORDER BY g.sort_order,g.id,c.id LIMIT 200`)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+intelligenceConfigColumns+` FROM intelligence_test_configs c JOIN groups g ON g.id=c.group_id WHERE c.source='site' ORDER BY g.sort_order,g.id,c.id LIMIT 200`)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +133,7 @@ func (r *intelligenceRepository) SaveConfig(ctx context.Context, c *intelligence
 			return err
 		}
 	}
-	args := []any{c.GroupID, c.Model, c.Benchmark, c.BaseURL, c.APIKeyID, c.Protocol, c.ReasoningEffort, c.ServiceTier, c.Enabled, c.ScheduleEnabled, c.IntervalMinutes}
+	args := []any{c.GroupID, c.Model, c.Benchmark, c.BaseURL, c.APIKeyID, c.Protocol, c.ReasoningEffort, c.ServiceTier, c.Enabled, c.ScheduleEnabled, c.IntervalMinutes, c.Prompt}
 	if c.ID == 0 {
 		// Serialize counting with insertion so concurrent administrators cannot create
 		// chargeable configurations beyond the two-hundred-item limit exposed by
@@ -129,20 +142,20 @@ func (r *intelligenceRepository) SaveConfig(ctx context.Context, c *intelligence
 			return err
 		}
 		var count int
-		if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM intelligence_test_configs`).Scan(&count); err != nil {
+		if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM intelligence_test_configs WHERE source='site'`).Scan(&count); err != nil {
 			return err
 		}
 		if count >= 200 {
 			return apperror.Conflict("INTELLIGENCE_CONFIG_LIMIT", "最多支持200条检测配置")
 		}
-		err = tx.QueryRowContext(ctx, `INSERT INTO intelligence_test_configs(group_id,model,benchmark,base_url,api_key_id,protocol,reasoning_effort,service_tier,enabled,schedule_enabled,interval_minutes,next_run_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,CASE WHEN $10 THEN NOW()+($11::integer * INTERVAL '1 minute') ELSE NULL END)
+		err = tx.QueryRowContext(ctx, `INSERT INTO intelligence_test_configs(group_id,model,benchmark,base_url,api_key_id,protocol,reasoning_effort,service_tier,enabled,schedule_enabled,interval_minutes,prompt,next_run_at)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CASE WHEN $10 THEN NOW()+($11::integer * INTERVAL '1 minute') ELSE NULL END)
 RETURNING id,created_at,updated_at,next_run_at`, args...).Scan(&c.ID, &c.CreatedAt, &c.UpdatedAt, &c.NextRunAt)
 	} else {
 		args = append(args, c.ID)
 		err = tx.QueryRowContext(ctx, `UPDATE intelligence_test_configs
-SET group_id=$1,model=$2,benchmark=$3,base_url=$4,api_key_id=$5,protocol=$6,reasoning_effort=$7,service_tier=$8,enabled=$9,schedule_enabled=$10,interval_minutes=$11,next_run_at=CASE WHEN $10 THEN NOW()+($11::integer * INTERVAL '1 minute') ELSE NULL END,updated_at=NOW()
-WHERE id=$12
+SET group_id=$1,model=$2,benchmark=$3,base_url=$4,api_key_id=$5,protocol=$6,reasoning_effort=$7,service_tier=$8,enabled=$9,schedule_enabled=$10,interval_minutes=$11,prompt=$12,next_run_at=CASE WHEN $10 THEN NOW()+($11::integer * INTERVAL '1 minute') ELSE NULL END,updated_at=NOW()
+WHERE id=$13
 RETURNING created_at,updated_at,next_run_at`, args...).Scan(&c.CreatedAt, &c.UpdatedAt, &c.NextRunAt)
 	}
 	if err != nil {
@@ -292,7 +305,7 @@ func (r *intelligenceRepository) ScheduleDue(ctx context.Context, now time.Time,
 	defer func() { _ = tx.Rollback() }()
 	rows, err := tx.QueryContext(ctx, `SELECT `+intelligenceConfigColumns+`
 FROM intelligence_test_configs c JOIN groups g ON g.id=c.group_id
-WHERE c.enabled AND c.schedule_enabled AND g.deleted_at IS NULL AND g.status='active' AND (c.next_run_at IS NULL OR c.next_run_at<=$1)
+WHERE c.source='site' AND c.enabled AND c.schedule_enabled AND g.deleted_at IS NULL AND g.status='active' AND (c.next_run_at IS NULL OR c.next_run_at<=$1)
 AND NOT EXISTS(SELECT 1
 FROM intelligence_test_runs r
 WHERE r.config_id=c.id AND r.status IN ('queued','submitting','running'))
@@ -325,7 +338,8 @@ UPDATE OF c SKIP LOCKED`, now, limit)
 
 // marshalIntelligenceRun encodes a result into a small record and separate
 // large payload. Public JSON tags exclude remote IDs and lease tokens from
-// both objects, while dedicated SQL columns retain them for recovery. The
+// both objects, while dedicated SQL columns retain them for recovery. Local
+// generation and assessment retry state are stored in the private payload. The
 // summary derives artifact availability from the actual HTML content.
 //
 // A copied record loses question, answer, HTML, and assessment text before
@@ -345,14 +359,22 @@ func marshalIntelligenceRun(run *intelligence.IntelligenceRun) ([]byte, []byte, 
 	if err != nil {
 		return nil, nil, err
 	}
-	payload, err := json.Marshal(intelligenceRunPayload{HTML: run.HTML, Question: run.Question, Answer: run.Answer, AssessmentReason: run.AssessmentReason})
+	payload, err := json.Marshal(intelligenceRunPayload{
+		HTML:               run.HTML,
+		Question:           run.Question,
+		Answer:             run.Answer,
+		AssessmentReason:   run.AssessmentReason,
+		LocalGeneration:    run.LocalGeneration,
+		AssessmentAttempts: run.AssessmentAttempts,
+	})
 	return record, payload, err
 }
 
 // scanIntelligenceRun decodes result JSON and restores private state from SQL
 // columns. Status, remote ID and lease token come from their authoritative
 // columns after decoding, including when payload JSON was combined for a
-// detail or recovery query.
+// detail or recovery query. Local generation and assessment attempts are restored
+// from payload fields excluded by the public run representation.
 //
 // List callers select only the small record, while workers and detail readers
 // request record plus payload. SQL no-rows becomes the module not-found error;
@@ -370,6 +392,15 @@ func scanIntelligenceRun(row intelligenceScanner) (*intelligence.IntelligenceRun
 	if err := json.Unmarshal(raw, run); err != nil {
 		return nil, err
 	}
+	var private struct {
+		LocalGeneration    bool `json:"local_generation"`    // local artwork ownership
+		AssessmentAttempts int  `json:"assessment_attempts"` // HTML submission attempt count
+	}
+	if err := json.Unmarshal(raw, &private); err != nil {
+		return nil, err
+	}
+	run.LocalGeneration = private.LocalGeneration
+	run.AssessmentAttempts = private.AssessmentAttempts
 	run.Status = status
 	run.RemoteID = remote
 	run.LeaseToken = lease
@@ -426,7 +457,7 @@ func (r *intelligenceRepository) SaveRun(ctx context.Context, run *intelligence.
 	// artifact flags and stored HTML remain consistent with the saved history.
 	defer func() { _ = tx.Rollback() }()
 	result, err := tx.ExecContext(ctx, `UPDATE intelligence_test_runs
-SET status=$3,remote_id=$4,record=$5::jsonb,payload=$6::jsonb,next_poll_at=$7,updated_at=NOW(),lease_until=CASE WHEN $8 THEN lease_until ELSE NULL END,lease_token=CASE WHEN $8 THEN lease_token ELSE '' END
+SET status=$3,remote_id=$4,record=$5::jsonb||CASE WHEN record->>'has_thumbnail'='true' THEN '{"has_thumbnail":true}'::jsonb ELSE '{}'::jsonb END,payload=$6::jsonb||CASE WHEN payload ? 'thumbnail' THEN jsonb_build_object('thumbnail',payload->'thumbnail') ELSE '{}'::jsonb END,next_poll_at=$7,updated_at=NOW(),lease_until=CASE WHEN $8 THEN lease_until ELSE NULL END,lease_token=CASE WHEN $8 THEN lease_token ELSE '' END
 WHERE id=$1 AND lease_token=$2 AND lease_until>NOW()`, run.ID, run.LeaseToken, run.Status, run.RemoteID, string(raw), string(payload), next, keepLease)
 	if err != nil {
 		return false, err
@@ -437,7 +468,8 @@ WHERE id=$1 AND lease_token=$2 AND lease_until>NOW()`, run.ID, run.LeaseToken, r
 	}
 	if !keepLease {
 		// Prune older HTML and terminal history in the same transaction as this
-		// observation so display metadata matches retained payloads.
+		// observation so display metadata matches retained payloads. Screenshot bytes
+		// and their availability flag survive HTML pruning for older history nodes.
 		if _, err = tx.ExecContext(ctx, `UPDATE intelligence_test_runs
 SET payload=payload-'html',record=record||'{"has_artifact":false}'::jsonb
 WHERE id IN(SELECT id
@@ -459,6 +491,39 @@ ORDER BY created_at DESC,id DESC OFFSET 10)`, run.ConfigID); err != nil {
 // GetRun returns the full stored payload and private worker recovery fields.
 func (r *intelligenceRepository) GetRun(ctx context.Context, id string) (*intelligence.IntelligenceRun, error) {
 	return scanIntelligenceRun(r.db.QueryRowContext(ctx, `SELECT (record||payload),status,remote_id,lease_token FROM intelligence_test_runs WHERE id=$1`, id))
+}
+
+// GetThumbnail returns the saved PNG decoded from the private payload field.
+// An existing observation with no screenshot returns nil, while a deleted run
+// returns the module not-found error used by authorized detail reads.
+func (r *intelligenceRepository) GetThumbnail(ctx context.Context, id string) ([]byte, error) {
+	var encoded sql.NullString
+	err := r.db.QueryRowContext(ctx, `SELECT payload->>'thumbnail' FROM intelligence_test_runs WHERE id=$1`, id).Scan(&encoded)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, intelligence.ErrIntelligenceNotFound
+	}
+	if err != nil || !encoded.Valid {
+		return nil, err
+	}
+	return base64.StdEncoding.DecodeString(encoded.String)
+}
+
+// SaveThumbnail stores a captured PNG beside its retained drawing document.
+// The update keeps worker state and measurement fields intact. Empty or oversized
+// PNGs are rejected, and a removed document prevents storing a newly rendered frame.
+func (r *intelligenceRepository) SaveThumbnail(ctx context.Context, id string, png []byte) error {
+	if len(png) == 0 || len(png) > 2<<20 {
+		return apperror.BadRequest("INTELLIGENCE_THUMBNAIL_INVALID", "作品截图大小无效")
+	}
+	result, err := r.db.ExecContext(ctx, `UPDATE intelligence_test_runs SET payload=payload||jsonb_build_object('thumbnail',$2::text),record=record||'{"has_thumbnail":true}'::jsonb WHERE id=$1 AND record->>'has_artifact'='true'`, id, base64.StdEncoding.EncodeToString(png))
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err == nil && count == 0 {
+		return intelligence.ErrIntelligenceNotFound
+	}
+	return err
 }
 
 // ListRuns returns the sixty newest lightweight summaries for one

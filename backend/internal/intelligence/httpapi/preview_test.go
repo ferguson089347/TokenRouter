@@ -28,6 +28,7 @@ type intelligencePreviewTestRepo struct {
 	run    *intelligence.IntelligenceRun    // current fixture observation
 	config *intelligence.IntelligenceConfig // current fixture configuration
 	runErr error                            // injected observation failure
+	png    []byte                           // saved fixture screenshot
 }
 
 // intelligencePreviewTestUsers supplies mutable current user lifecycle and
@@ -56,6 +57,11 @@ type intelligencePreviewFixture struct {
 	users   *intelligencePreviewTestUsers  // fixture user reader
 	groups  *intelligencePreviewTestGroups // visible fixture groups
 	enabled bool                           // fixture feature switch
+}
+
+// GetThumbnail returns a copied screenshot after fixture authorization completes.
+func (r *intelligencePreviewTestRepo) GetThumbnail(context.Context, string) ([]byte, error) {
+	return append([]byte(nil), r.png...), nil
 }
 
 // GetRun returns the fixture observation or the module not-found error.
@@ -109,7 +115,7 @@ func newIntelligencePreviewFixture(t *testing.T) *intelligencePreviewFixture {
 	f.users = &intelligencePreviewTestUsers{user: &identity.User{ID: 7, Role: "user", Status: "active"}}
 	f.groups = &intelligencePreviewTestGroups{groups: []routing.Group{{ID: 11, Status: "active"}}}
 	enabled := func(context.Context) bool { return f.enabled }
-	svc := intelligence.NewIntelligenceService(f.repo, nil, nil, f.groups, nil, enabled, func(string) error { return nil })
+	svc := intelligence.NewIntelligenceService(f.repo, nil, nil, f.groups, nil, enabled, func(string) error { return nil }, nil)
 	f.handler = NewIntelligenceHandler(svc)
 	f.handler.preview = &intelligencePreviewAccess{secret: []byte("unit-preview-secret"), users: f.users, enabled: enabled}
 	f.router = gin.New()
@@ -126,7 +132,29 @@ func newIntelligencePreviewFixture(t *testing.T) *intelligencePreviewFixture {
 	f.router.GET("/runs/:id/preview", f.handler.UserPreview)
 	f.router.GET("/admin/runs/:id/preview", f.handler.AdminPreview)
 	f.router.GET("/api/v1/intelligence-tests/preview-content/:ticket", f.handler.PreviewContent)
+	f.router.GET("/runs/:id/thumbnail", f.handler.UserThumbnail)
+	f.router.GET("/admin/runs/:id/thumbnail", f.handler.AdminThumbnail)
 	return f
+}
+
+// TestThumbnailRechecksFeatureAndGroupAccess serves an already captured PNG
+// through the authenticated history endpoint. Feature closure, missing identity,
+// removed group access, and an ordinary user on the admin path deny that image.
+func TestThumbnailRechecksFeatureAndGroupAccess(t *testing.T) {
+	f := newIntelligencePreviewFixture(t)
+	f.repo.png = []byte("fixture-png")
+	path := "/runs/iq_local_result/thumbnail"
+	response := f.request(path, "user")
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Equal(t, "image/png", response.Header().Get("Content-Type"))
+	require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+	require.Equal(t, f.repo.png, response.Body.Bytes())
+	require.Equal(t, http.StatusUnauthorized, f.request(path, "").Code)
+	require.Equal(t, http.StatusForbidden, f.request("/admin"+path, "user").Code)
+	f.groups.groups = nil
+	require.Equal(t, http.StatusNotFound, f.request(path, "user").Code)
+	f.enabled = false
+	require.Equal(t, http.StatusForbidden, f.request(path, "user").Code)
 }
 
 // request sends a fixture request with the supplied synthetic panel role.

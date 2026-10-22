@@ -28,7 +28,9 @@ import (
 // sandbox and a policy restricting scripts to the isolated document while
 // blocking network, forms, frames, and device permissions. Ticket URLs are
 // marked noncacheable and use no-referrer behavior; the shared request loggers
-// redact their credential-bearing path component.
+// redact their credential-bearing path component. Authenticated thumbnail reads
+// authorize the same observation before serving a stored PNG or requesting a
+// bounded capture; image responses remain outside the active HTML content route.
 
 const (
 	// Drawing tickets expire quickly, while their content policy confines active
@@ -119,6 +121,45 @@ func (h *IntelligenceHandler) UserPreview(c *gin.Context) { h.issuePreview(c, fa
 // AdminPreview issues a drawing ticket after checking the current
 // administrator role.
 func (h *IntelligenceHandler) AdminPreview(c *gin.Context) { h.issuePreview(c, true) }
+
+// UserThumbnail serves a saved PNG after checking the user's current group access.
+func (h *IntelligenceHandler) UserThumbnail(c *gin.Context) { h.serveThumbnail(c, false) }
+
+// AdminThumbnail serves a saved PNG after checking the current administrator identity.
+func (h *IntelligenceHandler) AdminThumbnail(c *gin.Context) { h.serveThumbnail(c, true) }
+
+// serveThumbnail authorizes a drawing observation before reading its PNG snapshot.
+// Missing screenshots are generated from retained HTML through the service's
+// bounded renderer. Global feature closure and revoked permissions deny cached
+// screenshots as well as new renders, and successful responses disable browser caching.
+func (h *IntelligenceHandler) serveThumbnail(c *gin.Context, admin bool) {
+	c.Header("Cache-Control", "no-store")
+	userID, ok := intelligenceActor(c, admin)
+	if !ok {
+		return
+	}
+	if h.preview == nil || !h.preview.enabled(c.Request.Context()) {
+		httpx.Forbidden(c, "Intelligence preview is disabled")
+		return
+	}
+	var run *intelligence.IntelligenceRun
+	var err error
+	if admin {
+		run, err = h.svc.AdminDetail(c.Request.Context(), c.Param("id"))
+	} else {
+		run, err = h.svc.UserDetail(c.Request.Context(), userID, c.Param("id"))
+	}
+	if httpx.ErrorFrom(c, err) {
+		return
+	}
+	png, err := h.svc.Thumbnail(c.Request.Context(), run)
+	if httpx.ErrorFrom(c, err) {
+		return
+	}
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Content-Security-Policy", "default-src 'none'; sandbox")
+	c.Data(http.StatusOK, "image/png", png)
+}
 
 // previewRun reads a drawing using the access scope recorded in the ticket.
 // User scope delegates to current group authorization, while administrator

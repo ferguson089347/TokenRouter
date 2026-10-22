@@ -20,17 +20,18 @@ import (
 )
 
 // service.go validates quality-check configurations and advances durable
-// remote jobs. Administrators supply a personal Key and a public gateway URL,
+// jobs. Administrators supply a personal Key and a public gateway URL,
 // and users read only results for groups currently available to them.
 // Configuration identity stays fixed so existing history continues to describe
-// the same group, model, and benchmark. Gateway calls made by the remote
-// tester use the Key's ordinary routing and billing rules.
+// the same group, model, and benchmark. Drawing generation calls the gateway
+// locally, and candy checks let the remote tester call the gateway. Both use
+// the Key's ordinary routing and billing rules.
 //
-// Workers record submitting before sending a creation request, and ambiguous
-// submissions finish as unknown. Recovery polls a saved remote ID, while
-// leases protect result writes across instances. Closing the global switch
-// blocks new submissions and user reads but leaves submitted jobs able to
-// finish polling.
+// Workers record submitting before chargeable requests, and ambiguous generation
+// finishes as unknown. Completed local HTML is persisted before assessment and
+// can be evaluated again after classifier failure. Recovery polls a saved remote
+// ID, while leases protect writes across instances. Closing the global switch
+// blocks queued generations and user reads; accepted jobs finish their evaluation.
 
 var (
 	// Module errors distinguish unavailable access, missing records and occupied
@@ -45,19 +46,21 @@ var (
 )
 
 // IntelligenceService validates configurations, authorizes reads, and advances
-// durable remote checks.
+// durable model checks.
 type IntelligenceService struct {
-	repo              IntelligenceRepository     // durable job persistence
-	keys              KeyReader                  // current credential reader
-	groups            GroupReader                // current group reader
-	available         IntelligenceGroupReader    // personal group permissions
-	client            IntelligenceClient         // remote test client
-	enabled           func(context.Context) bool // current global switch
-	resolvePublicHost func(string) error         // submission DNS validator
-	ctx               context.Context            // worker cancellation context
-	cancel            context.CancelFunc         // worker cancellation function
-	start             sync.Once                  // worker start guard
-	stop              sync.Once                  // worker stop guard
+	repo              IntelligenceRepository        // durable job persistence
+	keys              KeyReader                     // current credential reader
+	groups            GroupReader                   // current group reader
+	available         IntelligenceGroupReader       // personal group permissions
+	client            IntelligenceClient            // remote test client
+	thumbnails        IntelligenceThumbnailRenderer // isolated drawing renderer
+	thumbnailSlot     chan struct{}                 // serial screenshot admission
+	enabled           func(context.Context) bool    // current global switch
+	resolvePublicHost func(string) error            // submission DNS validator
+	ctx               context.Context               // worker cancellation context
+	cancel            context.CancelFunc            // worker cancellation function
+	start             sync.Once                     // worker start guard
+	stop              sync.Once                     // worker stop guard
 	// wg tracks workers launched once by Start. Lifecycle calls Stop after
 	// startup, then waits before closing their dependencies.
 	wg sync.WaitGroup // worker completion counter
@@ -65,11 +68,24 @@ type IntelligenceService struct {
 
 // NewIntelligenceService constructs quality checks with caller-supplied
 // storage, credential readers, remote client, feature switch, and DNS
-// validation. Call Start after assembly and Stop before closing shared
+// validation. A nil screenshot renderer keeps saved images readable but disables
+// capturing new ones. Call Start after assembly and Stop before closing shared
 // dependencies; each instance owns its worker cancellation context.
-func NewIntelligenceService(repo IntelligenceRepository, keys KeyReader, groups GroupReader, available IntelligenceGroupReader, client IntelligenceClient, enabled func(context.Context) bool, resolvePublicHost func(string) error) *IntelligenceService {
+func NewIntelligenceService(repo IntelligenceRepository, keys KeyReader, groups GroupReader, available IntelligenceGroupReader, client IntelligenceClient, enabled func(context.Context) bool, resolvePublicHost func(string) error, thumbnails IntelligenceThumbnailRenderer) *IntelligenceService {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &IntelligenceService{repo: repo, keys: keys, groups: groups, available: available, client: client, enabled: enabled, resolvePublicHost: resolvePublicHost, ctx: ctx, cancel: cancel}
+	return &IntelligenceService{
+		repo:              repo,
+		keys:              keys,
+		groups:            groups,
+		available:         available,
+		client:            client,
+		enabled:           enabled,
+		resolvePublicHost: resolvePublicHost,
+		thumbnails:        thumbnails,
+		thumbnailSlot:     make(chan struct{}, 1),
+		ctx:               ctx,
+		cancel:            cancel,
+	}
 }
 
 // isEnabled reports whether the injected global switch permits feature access.
@@ -112,6 +128,10 @@ func (s *IntelligenceService) SaveConfig(ctx context.Context, id int64, in Intel
 	in.Model = strings.TrimSpace(in.Model)
 	in.BaseURL = strings.TrimSpace(in.BaseURL)
 	in.APIKey = strings.TrimSpace(in.APIKey)
+	in.Prompt = strings.TrimSpace(in.Prompt)
+	if len(in.Prompt) > remote.MaxPromptBytes || (in.Benchmark != "drawing" && in.Prompt != "") {
+		return nil, intelligenceInvalid("自定义提示词仅用于画图测试，最多32KiB")
+	}
 	if in.GroupID <= 0 || in.Model == "" || len(in.Model) > 255 || (in.Benchmark != "candy" && in.Benchmark != "drawing") {
 		return nil, intelligenceInvalid("请选择有效分组、模型和测试类型")
 	}
@@ -141,7 +161,22 @@ func (s *IntelligenceService) SaveConfig(ctx context.Context, id int64, in Intel
 	if err != nil || group == nil || group.Status != "active" {
 		return nil, intelligenceInvalid("分组不存在或已停用")
 	}
-	c := &IntelligenceConfig{ID: id, GroupID: in.GroupID, GroupName: group.Name, Model: in.Model, Benchmark: in.Benchmark, BaseURL: base, Protocol: in.Protocol, ReasoningEffort: in.ReasoningEffort, ServiceTier: in.ServiceTier, Enabled: in.Enabled, ScheduleEnabled: in.ScheduleEnabled, IntervalMinutes: in.IntervalMinutes}
+	c := &IntelligenceConfig{
+		ID:              id,
+		GroupID:         in.GroupID,
+		GroupName:       group.Name,
+		Model:           in.Model,
+		Benchmark:       in.Benchmark,
+		Source:          "site",
+		Prompt:          in.Prompt,
+		BaseURL:         base,
+		Protocol:        in.Protocol,
+		ReasoningEffort: in.ReasoningEffort,
+		ServiceTier:     in.ServiceTier,
+		Enabled:         in.Enabled,
+		ScheduleEnabled: in.ScheduleEnabled,
+		IntervalMinutes: in.IntervalMinutes,
+	}
 	if id > 0 {
 		old, e := s.repo.GetConfig(ctx, id)
 		if e != nil {
@@ -291,7 +326,8 @@ func (s *IntelligenceService) visibleGroups(ctx context.Context, userID int64) (
 
 // UserList returns enabled checks belonging to the user's currently available
 // groups. The global switch gates access, histories contain lightweight
-// summaries, and each check exposes at most ten retained drawing artifacts.
+// summaries from both site checks and public user submissions, and each check
+// exposes at most ten retained drawing artifacts.
 func (s *IntelligenceService) UserList(ctx context.Context, userID int64) ([]IntelligenceTest, error) {
 	if !s.isEnabled(ctx) {
 		return nil, ErrIntelligenceDisabled
@@ -304,6 +340,11 @@ func (s *IntelligenceService) UserList(ctx context.Context, userID int64) ([]Int
 	if err != nil {
 		return nil, err
 	}
+	community, err := s.repo.ListCommunityConfigs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	configs = append(configs, community...)
 	out := make([]IntelligenceTest, 0)
 	for _, c := range configs {
 		if !c.Enabled || !visible[c.GroupID] {
@@ -313,7 +354,7 @@ func (s *IntelligenceService) UserList(ctx context.Context, userID int64) ([]Int
 		if err != nil {
 			return nil, err
 		}
-		test := IntelligenceTest{ID: c.ID, GroupID: c.GroupID, GroupName: c.GroupName, Model: c.Model, Benchmark: c.Benchmark, Runs: make([]IntelligenceRun, 0, len(runs)), Artifacts: make([]IntelligenceRun, 0)}
+		test := IntelligenceTest{ID: c.ID, GroupID: c.GroupID, GroupName: c.GroupName, Model: c.Model, Benchmark: c.Benchmark, Source: c.Source, Runs: make([]IntelligenceRun, 0, len(runs)), Artifacts: make([]IntelligenceRun, 0)}
 		for _, run := range runs {
 			test.Runs = append(test.Runs, intelligenceSummary(run))
 			if run.HasArtifact && len(test.Artifacts) < 10 {
@@ -388,14 +429,16 @@ func (s *IntelligenceService) worker(index int) {
 		case <-s.ctx.Done():
 			return
 		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(s.ctx, 75*time.Second)
+			// Keep the operation budget below its lease so cancellation and bounded
+			// result persistence finish before another worker may replace this claim.
+			ctx, cancel := context.WithTimeout(s.ctx, 6*time.Minute)
 			if index == 0 && s.isEnabled(ctx) {
 				// Scheduling failures leave configurations due for the next tick, so an
 				// interrupted scan can be retried without creating remote requests.
 				_ = s.repo.ScheduleDue(ctx, time.Now().UTC(), 2)
 			}
 			now := time.Now().UTC()
-			run, err := s.repo.ClaimRun(ctx, now, now.Add(2*time.Minute), uuid.NewString())
+			run, err := s.repo.ClaimRun(ctx, now, now.Add(7*time.Minute), uuid.NewString())
 			// A failed claim leaves durable work available for a later tick; an idle scan
 			// likewise waits before querying the queue again.
 			if err == nil && run != nil {
@@ -428,15 +471,17 @@ func (s *IntelligenceService) finish(ctx context.Context, run *IntelligenceRun, 
 
 // execute advances a claimed run using its current durable submission state. A
 // queued job validates its current configuration, Key, group and DNS before
-// persisting submitting and attempting one remote creation request. A
-// recovered submitting job lacking a remote ID becomes unknown, because
-// repeating creation could issue another charged model request.
+// persisting submitting and attempting one chargeable generation request.
+// Recovery marks interrupted generation unknown when neither a remote task ID
+// nor a completed local document was saved, since repeating it could incur costs.
 //
-// Jobs with remote IDs use read-only polling and bounded delays until
-// completion or the observation deadline. Every write carries the claim token
+// Locally generated HTML is saved before submission for assessment. Recovery can
+// repeat HTML evaluation using that saved artwork, while jobs with remote IDs use
+// read-only polling and bounded delays until completion or the observation
+// deadline. Every write carries the claim token
 // so a superseded worker cannot replace a newer observation.
 func (s *IntelligenceService) execute(ctx context.Context, run *IntelligenceRun) {
-	if run.Status == "submitting" && run.RemoteID == "" {
+	if run.Status == "submitting" && run.RemoteID == "" && (!run.LocalGeneration || run.HTML == "") {
 		s.finish(ctx, run, "unknown", "unknown", "上次提交结果不确定，未自动重新发起检测，请先核对使用记录")
 		return
 	}
@@ -444,6 +489,10 @@ func (s *IntelligenceService) execute(ctx context.Context, run *IntelligenceRun)
 	// unfamiliar or nonterminal states for the same accepted task.
 	if time.Since(run.CreatedAt) > 30*time.Minute {
 		s.finish(ctx, run, "error", "error", "检测超过等待时限，未自动重试")
+		return
+	}
+	if run.LocalGeneration && run.HTML != "" && run.RemoteID == "" {
+		s.assessDrawing(ctx, run)
 		return
 	}
 	if run.Status == "queued" {
@@ -474,18 +523,28 @@ func (s *IntelligenceService) execute(ctx context.Context, run *IntelligenceRun)
 		// Persist submission intent while retaining the lease before network creation;
 		// recovery treats an interrupted attempt as unknown rather than repeating it.
 		run.Status = "submitting"
+		if c.Benchmark == "drawing" {
+			run.LocalGeneration = true
+			run.Phase = "generating"
+		}
 		run.UpdatedAt = time.Now().UTC()
 		ok, err := s.repo.SaveRun(ctx, run, time.Now().UTC(), true)
 		if err != nil || !ok {
 			return
 		}
-		benchmark := c.Benchmark
-		// Manxue names its drawing benchmark pelican, while panel configuration uses
-		// drawing for the same saved test identity and result display.
-		if benchmark == "drawing" {
-			benchmark = "pelican"
+		if c.Benchmark == "drawing" {
+			s.generateDrawing(ctx, run, c, key.Key)
+			return
 		}
-		result, err := s.client.Create(ctx, remote.CreateRequest{Benchmark: benchmark, BaseURL: c.BaseURL, APIKey: key.Key, Model: c.Model, Protocol: c.Protocol, ReasoningEffort: c.ReasoningEffort, ServiceTier: c.ServiceTier}, run.ID)
+		result, err := s.client.Create(ctx, remote.CreateRequest{
+			Benchmark:       c.Benchmark,
+			BaseURL:         c.BaseURL,
+			APIKey:          key.Key,
+			Model:           c.Model,
+			Protocol:        c.Protocol,
+			ReasoningEffort: c.ReasoningEffort,
+			ServiceTier:     c.ServiceTier,
+		}, run.ID)
 		if err != nil {
 			status := "unknown"
 			var httpErr *remote.HTTPError
@@ -511,6 +570,15 @@ func (s *IntelligenceService) execute(ctx context.Context, run *IntelligenceRun)
 	if err != nil {
 		var he *remote.HTTPError
 		if errors.As(err, &he) && (he.StatusCode == 404 || he.StatusCode == 410) {
+			if run.LocalGeneration && run.HTML != "" && run.AssessmentAttempts < 5 {
+				// Recreate an expired HTML assessment from the retained document. Clearing
+				// its polling identity cannot initiate another chargeable gateway generation.
+				run.RemoteID = ""
+				run.Phase = "generated"
+				run.UpdatedAt = time.Now().UTC()
+				_, _ = s.repo.SaveRun(ctx, run, time.Now().Add(15*time.Second), false)
+				return
+			}
 			s.finish(ctx, run, "error", "error", "检测服务中的结果已失效")
 			return
 		}
@@ -566,7 +634,13 @@ func (s *IntelligenceService) applyResult(ctx context.Context, run *Intelligence
 	if expectedBenchmark == "drawing" {
 		expectedBenchmark = "pelican"
 	}
-	if result == nil || result.ID != run.RemoteID || (result.Benchmark != "" && result.Benchmark != expectedBenchmark) {
+	if run.LocalGeneration {
+		expectedBenchmark = "html"
+	}
+	// HTML assessment polling can identify the classifier as pelican. Accept that
+	// documented response label while keeping legacy remote drawing jobs compatible.
+	compatible := result != nil && (result.Benchmark == "" || result.Benchmark == expectedBenchmark || (run.LocalGeneration && result.Benchmark == "pelican"))
+	if !compatible || result.ID != run.RemoteID {
 		s.finish(ctx, run, "error", "error", "检测服务返回的任务信息不一致")
 		return
 	}
@@ -585,16 +659,8 @@ func (s *IntelligenceService) applyResult(ctx context.Context, run *Intelligence
 	run.Verdict = result.Outcome()
 	run.Status = "running"
 	run.ErrorMessage = ""
-	redact := func(v string) string {
-		if run.RemoteID != "" {
-			v = strings.ReplaceAll(v, run.RemoteID, "[已隐藏任务凭证]")
-		}
-		if secret != "" {
-			v = strings.ReplaceAll(v, secret, "[已隐藏密钥]")
-		}
-		return intelligenceKeyPattern.ReplaceAllString(v, "[已隐藏密钥]")
-	}
-	if result.Candy != nil {
+	redact := func(v string) string { return redactIntelligenceText(v, secret, run.RemoteID) }
+	if result.Candy != nil && !run.LocalGeneration {
 		run.Question = redact(result.Candy.Question)
 		run.Answer = redact(result.Candy.Answer)
 		run.InputTokens = result.Candy.InputTokens
@@ -602,7 +668,7 @@ func (s *IntelligenceService) applyResult(ctx context.Context, run *Intelligence
 		run.ReasoningTokens = result.Candy.ReasoningTokens
 		run.DurationMS = result.Candy.DurationMS
 	}
-	if result.Result != nil {
+	if result.Result != nil && !run.LocalGeneration {
 		run.Question = redact(result.Result.Prompt)
 		run.HTML = redact(result.Result.HTML)
 		run.InputTokens = result.Result.InputTokens

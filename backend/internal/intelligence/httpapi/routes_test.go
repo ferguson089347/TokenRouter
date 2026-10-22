@@ -27,11 +27,11 @@ func (*intelligenceRouteRepo) ListConfigs(context.Context) ([]intelligence.Intel
 }
 
 // TestIntelligenceRoutesAccess mounts administrator commands and user result
-// routes with test panel identities. Anonymous and ordinary users cannot issue
-// paid checks, while disabled features retain administrator configuration
-// access.
+// routes with test panel identities. Anonymous submissions and ordinary users'
+// administrator commands are denied, while disabled features retain administrator
+// configuration access for editing saved site settings.
 func TestIntelligenceRoutesAccess(t *testing.T) {
-	svc := intelligence.NewIntelligenceService(&intelligenceRouteRepo{}, nil, nil, nil, nil, func(context.Context) bool { return false }, func(string) error { return nil })
+	svc := intelligence.NewIntelligenceService(&intelligenceRouteRepo{}, nil, nil, nil, nil, func(context.Context) bool { return false }, func(string) error { return nil }, nil)
 	defer svc.Stop()
 	h := NewIntelligenceHandler(svc)
 	for _, tc := range []struct {
@@ -39,6 +39,7 @@ func TestIntelligenceRoutesAccess(t *testing.T) {
 		status                   int    // expected HTTP status
 	}{
 		{"匿名用户列表", "", "GET", "/intelligence-tests", 401},
+		{"匿名不能自测", "", "POST", "/intelligence-tests/run", 401},
 		{"匿名管理配置", "", "POST", "/admin/intelligence-tests", 401},
 		{"用户不能列管理配置", "user", "GET", "/admin/intelligence-tests", 403},
 		{"用户不能创建配置", "user", "POST", "/admin/intelligence-tests", 403},
@@ -54,7 +55,7 @@ func TestIntelligenceRoutesAccess(t *testing.T) {
 		{"关闭后保留配置读取", "admin", "GET", "/admin/intelligence-tests", 200},
 		{"关闭后管理员不能触发", "admin", "POST", "/admin/intelligence-tests/1/run", 403},
 		{"用户无创建接口", "user", "POST", "/intelligence-tests", 404},
-		{"用户无触发接口", "user", "POST", "/intelligence-tests/1/run", 404},
+		{"用户无配置执行接口", "user", "POST", "/intelligence-tests/1/run", 404},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := gin.New()
