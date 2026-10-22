@@ -598,8 +598,31 @@
             v-model="formData.group_id"
             :options="formGroupOptions"
             :placeholder="t('keys.selectGroup')"
+            searchable
             data-test="single-group-select"
-          />
+          >
+            <template #selected>
+              <GroupBadge
+                v-if="selectedFormGroup"
+                :name="selectedFormGroup.label"
+                :display-brand="selectedFormGroup.displayBrand"
+                :rate-multiplier="selectedFormGroup.rate"
+                :user-rate-multiplier="selectedFormGroup.userRate"
+                class="max-w-full"
+              />
+              <span v-else>{{ t('keys.selectGroup') }}</span>
+            </template>
+            <template #option="{ option, selected }">
+              <GroupOptionItem
+                :name="option.label"
+                :display-brand="option.displayBrand"
+                :description="option.description"
+                :rate-multiplier="option.rate"
+                :user-rate-multiplier="option.userRate"
+                :selected="selected"
+              />
+            </template>
+          </Select>
         </div>
 
         <!-- One ordered list presents administrator priority without repeating channel names in a summary. -->
@@ -633,17 +656,20 @@
             <li
               v-for="(channel, index) in draftChannels"
               :key="channel.id"
-              class="flex items-center gap-3 px-4 py-2"
+              class="flex items-start gap-3 px-4 py-3"
             >
               <span
                 class="flex h-6 w-6 shrink-0 items-center justify-center rounded-compact bg-gray-100 font-mono text-xs text-gray-500 dark:bg-dark-700 dark:text-dark-400"
                 >{{ index + 1 }}</span
               >
-              <span
-                class="min-w-0 truncate text-sm text-gray-700 dark:text-dark-200"
-                :title="channel.name"
-                >{{ channel.name }}</span
-              >
+              <GroupOptionItem
+                :name="channel.name"
+                :display-brand="channel.displayBrand"
+                :description="channel.description"
+                :rate-multiplier="channel.rate"
+                :user-rate-multiplier="channel.userRate"
+                :show-checkmark="false"
+              />
             </li>
           </ol>
         </section>
@@ -1384,6 +1410,8 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
+import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import SettingsSegmented from '@/components/common/settings/SettingsSegmented.vue'
 import FilterDropdown from '@/components/common/FilterDropdown.vue'
 import FilterField from '@/components/common/FilterField.vue'
@@ -1859,9 +1887,10 @@ const customKeyError = computed(() => {
   return ''
 })
 
-// draftChannels resolves localized group labels in administrator priority order.
-// General and subscription-filtered catalogues supply names, with numeric identities
-// retained for channels whose metadata is still unavailable in the current view.
+// draftChannels resolves group presentation in administrator priority order.
+// General and subscription-filtered catalogues supply localized labels, configured
+// brands, descriptions and billing rates for the same presentation as group choices.
+// Missing metadata retains the numeric group label until its catalogue is available.
 const draftChannels = computed(() =>
   formData.value.composite_groups.map((binding) => {
     const group =
@@ -1870,6 +1899,10 @@ const draftChannels = computed(() =>
     return {
       id: binding.local_id, // Stable draft row identity.
       name: group?.display_name || group?.name || `#${binding.group_id}`, // Localized channel label.
+      displayBrand: group?.display_brand?.trim() || null, // Configured provider brand.
+      description: group?.description, // Administrator channel description.
+      rate: group?.rate_multiplier, // Ordinary billing multiplier.
+      userRate: group ? (userGroupRates.value[group.id] ?? null) : null, // Account-specific billing multiplier.
     }
   }),
 )
@@ -2009,6 +2042,11 @@ const buildGroupOptions = (source: Group[]) =>
 // formGroupOptions presents only server-approved channels for the current draft.
 // Subscription selection narrows this list while table filters retain visible groups.
 const formGroupOptions = computed(() => buildGroupOptions(formGroups.value))
+
+// selectedFormGroup supplies typed presentation metadata for the fixed-group trigger.
+const selectedFormGroup = computed(() =>
+  formGroupOptions.value.find((option) => option.value === formData.value.group_id),
+)
 
 // compositeFormError validates the one user-selectable routing target.
 // Automatic routing uses administrator settings, while single mode requires a group.

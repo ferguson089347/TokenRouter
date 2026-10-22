@@ -352,7 +352,14 @@ const IconStub = {
 const GroupOptionItemStub = {
   name: 'GroupOptionItem',
   inheritAttrs: false,
-  props: ['name', 'capacity'],
+  props: [
+    'name',
+    'capacity',
+    'displayBrand',
+    'description',
+    'rateMultiplier',
+    'userRateMultiplier',
+  ],
   template:
     '<span data-test="group-option-item" :data-has-capacity="capacity ? \'true\' : \'false\'">{{ name }}</span>',
 }
@@ -1266,18 +1273,31 @@ describe('user KeysView column settings', () => {
     expect(payload).not.toHaveProperty('composite_groups')
   })
 
-  // Automatic routing exposes administrator priorities as an ordered read-only list.
-  // Users can switch to one fixed group, but no channel editor or reorder controls exist.
+  // Automatic routing shows branded group details in administrator priority order.
+  // The existing selector can switch to one fixed group while automatic order stays read-only.
   it('shows administrator route order and allows single-group mode', async () => {
     getAvailableGroups.mockResolvedValue([
-      { id: 42, name: 'OpenAI A' },
-      { id: 43, name: 'OpenAI B' },
+      { id: 42, name: 'OpenAI A', display_brand: 'openai', rate_multiplier: 5 },
+      {
+        id: 43,
+        name: 'OpenAI B',
+        display_brand: 'openai',
+        description: 'Discount group',
+        rate_multiplier: 3,
+      },
     ])
+    getUserGroupRates.mockResolvedValue({ 43: 2 })
     getRoutingOptions.mockResolvedValue({ group_ids: [43, 42] })
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
     await flushPromises()
     expect(wrapper.find('ol').text()).toMatch(/1.*OpenAI B.*2.*OpenAI A/s)
+    expect(wrapper.find('ol').findComponent({ name: 'GroupOptionItem' }).props()).toMatchObject({
+      displayBrand: 'openai',
+      description: 'Discount group',
+      rateMultiplier: 3,
+      userRateMultiplier: 2,
+    })
     expect(wrapper.find('[data-test="channel-editor"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="edit-channels"]').exists()).toBe(false)
     await customizeChannels(wrapper)
