@@ -2,9 +2,11 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/TokenFlux/TokenRouter/internal/gateway/requeststate"
 	infraerrors "github.com/TokenFlux/TokenRouter/internal/pkg/apperror"
 )
 
@@ -91,9 +93,34 @@ func EnsureIsolation(ctx context.Context, cache OwnerStore, input IsolationInput
 	targetGroupID := input.GroupID
 	targetIsolationEnabled := input.Enabled
 
-	// Record ownership before applying the target policy so a session first
-	// used by a permissive group still has an owner for later isolated targets.
-	written, err := cache.SetSessionOwnerGroupID(ctx, userID, source, sessionHash, targetGroupID, ttl)
+	attempt := requeststate.ChannelAttemptFromContext(ctx)
+	identity := fmt.Sprintf("%d:%s:%s:%d", userID, source, sessionHash, targetGroupID)
+	if attempt != nil && attempt.OwnsClaim(identity) {
+		return nil
+	}
+	claim := func() (bool, error) {
+		store, ok := cache.(interface {
+			ClaimChannelSessionOwner(context.Context, int64, string, string, int64, string, time.Duration) (bool, error)
+			FinishChannelSessionOwner(context.Context, int64, string, string, int64, string, bool) error
+		})
+		if attempt == nil || !ok {
+			written, err := cache.SetSessionOwnerGroupID(ctx, userID, source, sessionHash, targetGroupID, ttl)
+			if written && attempt != nil {
+				requeststate.BlockChannelReplay(ctx)
+			}
+			return written, err
+		}
+		written, err := store.ClaimChannelSessionOwner(ctx, userID, source, sessionHash, targetGroupID, attempt.Token, ttl)
+		if written {
+			attempt.RegisterClaim(identity, func(cleanup context.Context, release bool) error {
+				return store.FinishChannelSessionOwner(cleanup, userID, source, sessionHash, targetGroupID, attempt.Token, release)
+			})
+		}
+		return written, err
+	}
+	// Automatic attempts register token-checked ownership before model forwarding,
+	// allowing only their own temporary claim to be released before another channel.
+	written, err := claim()
 	if err != nil {
 		return err
 	}
@@ -105,7 +132,7 @@ func EnsureIsolation(ctx context.Context, cache OwnerStore, input IsolationInput
 	if err != nil {
 		// A failed owner read may follow expiration after the first insertion
 		// lost. Retry insertion once before asking for the surviving owner again.
-		written, setErr := cache.SetSessionOwnerGroupID(ctx, userID, source, sessionHash, targetGroupID, ttl)
+		written, setErr := claim()
 		if setErr != nil {
 			return setErr
 		}

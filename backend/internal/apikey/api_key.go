@@ -65,12 +65,15 @@ type APIKey struct {
 	Key               string // authentication credential text
 	Name              string // saved console display name
 	// GroupID binds an ordinary Key; IsComposite and CompositeGroups instead
-	// store its ordered prefix choices. Request selection fills GroupID on an
+	// store its ordered channel choices. Request selection fills GroupID on an
 	// effective composite view before the gateway checks that selected group.
-	GroupID         *int64                 // ordinary or selected request group
-	IsComposite     bool                   // prefix-selected group mode
-	CompositeGroups []APIKeyCompositeGroup // ordered prefix group bindings
-	Status          string                 // stored credential lifecycle state
+	GroupID     *int64 // ordinary or selected request group
+	IsComposite bool   // multi-channel credential storage shape
+	// UseDefaultGroups reloads administrator channel order on credential reads;
+	// custom Keys use their own persisted CompositeGroups when this is false.
+	UseDefaultGroups bool                   // follow administrator channel order
+	CompositeGroups  []APIKeyCompositeGroup // ordered channel group bindings
+	Status           string                 // stored credential lifecycle state
 	// FastModePolicy supplies request acceleration preference to gateway policy
 	// processing. Higher priority group or global choices can affect forwarding.
 	FastModePolicy string
@@ -140,16 +143,16 @@ type APIKey struct {
 	Window7dStart *time.Time // saved seven-day window start
 }
 
-// APIKeyCompositeGroup binds one normalized model prefix to a selectable group.
+// APIKeyCompositeGroup binds one ordered channel to its selectable routing group.
 type APIKeyCompositeGroup struct {
 	ID       int64 // persisted mapping row identifier
 	APIKeyID int64 // owning composite Key identifier
 	GroupID  int64 // configured target group identifier
-	// Prefix and NormalizedPrefix retain the displayed label and lowercase lookup
-	// value for the same binding. SortOrder records submitted order for storage
+	// Prefix and NormalizedPrefix retain internal row labels used by storage's
+	// uniqueness constraint. SortOrder records submitted channel order for storage
 	// reads and aggregated model lists, which use these bindings in sequence.
-	Prefix           string // displayed group selection prefix
-	NormalizedPrefix string // lowercase prefix lookup text
+	Prefix           string // internal channel storage label
+	NormalizedPrefix string // normalized internal storage label
 	SortOrder        int    // configured mapping order index
 	// UserGroupRPMOverride is payer-specific request data prefetched into the
 	// authentication snapshot. Nil requests a later override lookup for admission.
@@ -164,6 +167,9 @@ type APIKeyListFilters struct {
 	// GroupID selects unbound ordinary keys at zero, all groups when nil, and
 	// direct or composite bindings when a nonzero ID is supplied.
 	GroupID *int64
+	// MatchInheritedGroups includes inheriting Keys for a positive GroupID only
+	// after the service confirms that channel in current administrator defaults.
+	MatchInheritedGroups bool // internally resolved default membership
 	// Scope accepts personal or team in the PostgreSQL query. Other values,
 	// including an omitted value, leave both scopes eligible for listing.
 	Scope string

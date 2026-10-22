@@ -41,6 +41,8 @@ type APIKey struct {
 	GroupID *int64 `json:"group_id,omitempty"`
 	// Routes across groups using model prefixes
 	IsComposite bool `json:"is_composite,omitempty"`
+	// UseDefaultGroups holds the value of the "use_default_groups" field.
+	UseDefaultGroups bool `json:"use_default_groups,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// API key Fast mode policy: follow_request, force_on, or force_off
@@ -170,7 +172,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case apikey.FieldModelMapping, apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
-		case apikey.FieldTeamOwnerDisabled, apikey.FieldIsComposite, apikey.FieldFallbackWhenGroupUnavailable:
+		case apikey.FieldTeamOwnerDisabled, apikey.FieldIsComposite, apikey.FieldUseDefaultGroups, apikey.FieldFallbackWhenGroupUnavailable:
 			values[i] = new(sql.NullBool)
 		case apikey.FieldQuota, apikey.FieldQuotaUsed, apikey.FieldRateLimit5h, apikey.FieldRateLimit1d, apikey.FieldRateLimit7d, apikey.FieldUsage5h, apikey.FieldUsage1d, apikey.FieldUsage7d:
 			values[i] = new(sql.NullFloat64)
@@ -263,6 +265,12 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field is_composite", values[i])
 			} else if value.Valid {
 				_m.IsComposite = value.Bool
+			}
+		case apikey.FieldUseDefaultGroups:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field use_default_groups", values[i])
+			} else if value.Valid {
+				_m.UseDefaultGroups = value.Bool
 			}
 		case apikey.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -517,6 +525,9 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_composite=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsComposite))
+	builder.WriteString(", ")
+	builder.WriteString("use_default_groups=")
+	builder.WriteString(fmt.Sprintf("%v", _m.UseDefaultGroups))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

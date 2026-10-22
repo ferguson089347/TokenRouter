@@ -19,6 +19,7 @@ const {
   getAvailableGroups,
   getUserGroupRates,
   getBillingOptions,
+  getRoutingOptions,
   showError,
   showSuccess,
   copyToClipboard,
@@ -36,6 +37,7 @@ const {
   getAvailableGroups: vi.fn(),
   getUserGroupRates: vi.fn(),
   getBillingOptions: vi.fn(),
+  getRoutingOptions: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   copyToClipboard: vi.fn(),
@@ -130,6 +132,7 @@ vi.mock('@/api', () => ({
     delete: vi.fn(),
     toggleStatus,
     getBillingOptions,
+    getRoutingOptions,
   },
   authAPI: {
     getPublicSettings,
@@ -193,6 +196,8 @@ vi.mock('vue-i18n', async () => {
 // fields. Cases override status, bindings, limits, or secrets while retaining the required
 // API record shape.
 const createApiKey = (): ApiKey => ({
+  use_default_groups: true,
+  groups: [{ group_id: 42 }],
   id: 1,
   user_id: 1,
   key: 'sk-test-key',
@@ -408,6 +413,21 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
   return button
 }
 
+// customizeChannels selects the fixed-group editor for tests that change a target.
+// Automatic route priority stays read-only and is tested through its default summary.
+async function customizeChannels(wrapper: VueWrapper) {
+  await flushPromises()
+  const mode = wrapper
+    .findAllComponents({ name: 'Select' })
+    .find((select) => select.attributes('data-test') === 'routing-mode-select')
+  const hasGroups = wrapper
+    .findAllComponents({ name: 'Select' })
+    .some((select) => select.props('options')?.some((option: any) => option.value === 42))
+  if (!hasGroups) return
+  mode!.vm.$emit('update:modelValue', 'single')
+  await nextTick()
+}
+
 describe('user KeysView column settings', () => {
   afterEach(() => vi.restoreAllMocks())
 
@@ -420,6 +440,7 @@ describe('user KeysView column settings', () => {
     getAvailableGroups.mockReset()
     getUserGroupRates.mockReset()
     getBillingOptions.mockReset()
+    getRoutingOptions.mockReset().mockResolvedValue({ group_ids: [42] })
     showError.mockReset()
     showSuccess.mockReset()
     copyToClipboard.mockReset()
@@ -552,7 +573,10 @@ describe('user KeysView column settings', () => {
       site_name: 'MoonUp',
       api_base_url: 'https://api.example.test/gateway/v1/',
     })
-    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 4 }], total: 1 })
+    listKeys.mockResolvedValue({
+      items: [{ ...createApiKey(), groups: [{ group_id: 4 }] }],
+      total: 1,
+    })
     getAvailableGroups.mockResolvedValue([
       { id: 4, name: 'Responses', allowed_protocols: ['openai_responses'] },
     ])
@@ -592,16 +616,13 @@ describe('user KeysView column settings', () => {
       items: [
         {
           ...createApiKey(),
-          is_composite: true,
-          composite_groups: [
+          groups: [
             {
               group_id: 4,
-              prefix: 'GPT',
               group: { id: 4, allowed_protocols: ['openai_chat_completions'] },
             },
             {
               group_id: 5,
-              prefix: 'Claude',
               group: { id: 5, allowed_protocols: ['anthropic_messages'] },
             },
           ],
@@ -628,7 +649,10 @@ describe('user KeysView column settings', () => {
   // explains the unavailable import and leaves browser navigation unchanged.
   it('shows an error for keys without a supported Magpie protocol', async () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
-    listKeys.mockResolvedValue({ items: [{ ...createApiKey(), group_id: 4 }], total: 1 })
+    listKeys.mockResolvedValue({
+      items: [{ ...createApiKey(), groups: [{ group_id: 4 }] }],
+      total: 1,
+    })
     getAvailableGroups.mockResolvedValue([
       { id: 4, name: 'Images', allowed_protocols: ['image_batches'] },
     ])
@@ -880,6 +904,7 @@ describe('user KeysView column settings', () => {
     expect(wrapper.findAll('button').some((button) => button.text() === 'Enable')).toBe(false)
 
     await getButtonByText(wrapper, 'Edit').trigger('click')
+    await customizeChannels(wrapper)
     await nextTick()
 
     expect(wrapper.get('[data-test="key-status-toggle"]').attributes('disabled')).toBeDefined()
@@ -897,7 +922,7 @@ describe('user KeysView column settings', () => {
   // protects submission of the inactive value with the selected key identity.
   it('updates the key status through the edit switch', async () => {
     listKeys.mockResolvedValueOnce({
-      items: [{ ...createApiKey(), group_id: 42 }],
+      items: [{ ...createApiKey(), groups: [{ group_id: 42 }] }],
       total: 1,
       page: 1,
       page_size: 20,
@@ -907,6 +932,7 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Edit').trigger('click')
+    await customizeChannels(wrapper)
     await nextTick()
     await wrapper.get('[data-test="key-status-toggle"]').trigger('click')
     await wrapper.get('form#key-form').trigger('submit')
@@ -966,6 +992,7 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await nextTick()
 
     const dialog = wrapper.findComponent({ name: 'BaseDialog' })
@@ -983,10 +1010,11 @@ describe('user KeysView column settings', () => {
     ])
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await nextTick()
     const select = wrapper
       .findAllComponents({ name: 'Select' })
-      .find((item) => item.attributes('data-tour') === 'key-form-group')
+      .find((item) => item.attributes('data-test') === 'single-group-select')
     expect(select?.props('options')[0].label).toBe('English group')
   })
 
@@ -1017,17 +1045,12 @@ describe('user KeysView column settings', () => {
     ])
     const wrapper = await mountView()
 
-    await wrapper.get('[title="keys.clickToChangeGroup"]').trigger('click')
-    await nextTick()
-    expect(wrapper.get('[data-test="group-option-item"]').attributes('data-has-capacity')).toBe(
-      'false',
-    )
-
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await nextTick()
     const groupSelect = wrapper
       .findAllComponents({ name: 'Select' })
-      .find((select) => select.attributes('data-tour') === 'key-form-group')
+      .find((select) => select.attributes('data-test') === 'single-group-select')
     expect(groupSelect?.props('options')[0]).not.toHaveProperty('capacity')
   })
 
@@ -1036,7 +1059,7 @@ describe('user KeysView column settings', () => {
   // choices.
   it('指定订阅后仅保留套餐允许的表单分组', async () => {
     listKeys.mockResolvedValueOnce({
-      items: [{ ...createApiKey(), group_id: 43 }],
+      items: [{ ...createApiKey(), use_default_groups: false, groups: [{ group_id: 43 }] }],
       total: 1,
       page: 1,
       page_size: 20,
@@ -1063,6 +1086,7 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Edit').trigger('click')
+    await customizeChannels(wrapper)
     await flushPromises()
 
     const billingMode = wrapper
@@ -1081,12 +1105,13 @@ describe('user KeysView column settings', () => {
 
     const groupSelect = wrapper
       .findAllComponents({ name: 'Select' })
-      .find((select) => select.attributes('data-tour') === 'key-form-group')
-    expect(groupSelect?.props('modelValue')).toBeNull()
-    expect(groupSelect?.props('options')).toEqual(
+      .find((select) => select.attributes('data-test') === 'single-group-select')
+    const channel = groupSelect
+    expect(channel?.props('modelValue')).toBeNull()
+    expect(channel?.props('options')).toEqual(
       expect.arrayContaining([expect.objectContaining({ value: 42 })]),
     )
-    expect(groupSelect?.props('options')).not.toEqual(
+    expect(channel?.props('options')).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ value: 43 })]),
     )
     expect(getAvailableGroups).toHaveBeenCalledWith('personal', 71)
@@ -1151,12 +1176,13 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await nextTick()
     await wrapper.get('[data-tour="key-form-name"]').setValue('fast-key')
 
     const selects = wrapper.findAllComponents({ name: 'Select' })
     const groupSelect = selects.find(
-      (select) => select.attributes('data-tour') === 'key-form-group',
+      (select) => select.attributes('data-test') === 'single-group-select',
     )
     const fastSelect = selects.find(
       (select) => select.attributes('data-test') === 'fast-mode-policy-select',
@@ -1174,6 +1200,8 @@ describe('user KeysView column settings', () => {
       expect.objectContaining({
         name: 'fast-key',
         group_id: 42,
+        routing_mode: 'single',
+        use_default_groups: false,
         fast_mode_policy: 'force_on',
         concurrency_limit: 2,
         rpm_limit: 30,
@@ -1205,11 +1233,12 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await nextTick()
     await wrapper.get('[data-tour="key-form-name"]').setValue('limited-key')
     const groupSelect = wrapper
       .findAllComponents({ name: 'Select' })
-      .find((select) => select.attributes('data-tour') === 'key-form-group')
+      .find((select) => select.attributes('data-test') === 'single-group-select')
     expect(groupSelect).toBeDefined()
     await groupSelect!.vm.$emit('update:modelValue', 42)
     await wrapper.get('form#key-form').trigger('submit')
@@ -1218,181 +1247,78 @@ describe('user KeysView column settings', () => {
     expect(showError).toHaveBeenCalledWith('API key limit reached')
   })
 
-  // The user creates a composite key with two distinct prefix mappings. The test protects
-  // their submitted order and suppression of an unrelated single-group assignment.
-  it('creates a composite key with ordered group prefix mappings', async () => {
-    getAvailableGroups.mockResolvedValueOnce([
-      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1 },
-      { id: 43, name: 'Claude', platform: 'anthropic', rate_multiplier: 1 },
-    ])
+  // Creation needs only an optional name when administrator defaults are available.
+  // Advanced settings begin folded, and the request uses the universal routing shape.
+  it('creates an inherited universal Key with advanced options collapsed', async () => {
     const wrapper = await mountView()
-
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
-    await wrapper.get('[data-tour="key-form-name"]').setValue('composite-key')
-    await wrapper.get('[data-test="composite-key-toggle"]').trigger('click')
-    await nextTick()
-
-    let editor = wrapper.get('[data-test="composite-group-editor"]')
-    await editor.findAllComponents({ name: 'Select' })[0]!.vm.$emit('update:modelValue', 42)
-    await editor.findAll('input')[0]!.setValue('GPT')
-    await getButtonByText(wrapper, 'Add group mapping').trigger('click')
-    await nextTick()
-
-    editor = wrapper.get('[data-test="composite-group-editor"]')
-    await editor.findAllComponents({ name: 'Select' })[1]!.vm.$emit('update:modelValue', 43)
-    await editor.findAll('input')[1]!.setValue('Claude')
+    await flushPromises()
+    const advanced = wrapper.get('[data-test="advanced-options-toggle"]')
+    expect(advanced.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[data-test="composite-key-toggle"]').exists()).toBe(false)
     await wrapper.get('form#key-form').trigger('submit')
     await flushPromises()
-
-    expect(createKey).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'composite-key',
-        group_id: undefined,
-        is_composite: true,
-        composite_groups: [
-          { group_id: 42, prefix: 'GPT' },
-          { group_id: 43, prefix: 'Claude' },
-        ],
-      }),
-    )
+    expect(createKey).toHaveBeenCalledWith(expect.objectContaining({ use_default_groups: true }))
+    const payload = createKey.mock.calls[0][0]
+    expect(payload.group_ids).toBeUndefined()
+    expect(payload).not.toHaveProperty('is_composite')
+    expect(payload.group_id).toBeUndefined()
+    expect(payload).not.toHaveProperty('composite_groups')
   })
 
-  // A listed key has multiple composite mappings with prefix and group metadata. The test
-  // protects compact summary content and opening the complete mapping editor from that row.
-  it('shows composite mappings in the group column and opens full editing', async () => {
-    listKeys.mockResolvedValueOnce({
-      items: [
-        {
-          ...createApiKey(),
-          is_composite: true,
-          composite_groups: [
-            { group_id: 42, prefix: 'GPT', group: { id: 42, name: 'OpenAI', platform: 'openai' } },
-            {
-              group_id: 43,
-              prefix: 'Claude',
-              group: { id: 43, name: 'Claude', platform: 'anthropic' },
-            },
-          ],
-        },
-      ],
-      total: 1,
-      page: 1,
-      page_size: 20,
-      pages: 1,
-    })
-    const wrapper = await mountView()
-
-    expect(wrapper.get('[data-test="group"]').text()).toContain('GPT')
-    expect(wrapper.get('[data-test="group"]').text()).toContain('Claude')
-    expect(wrapper.get('[data-test="composite-group-summary"]').classes()).toContain(
-      'max-w-[22rem]',
-    )
-    await wrapper.get('[data-test="group"] button').trigger('click')
-    await nextTick()
-
-    expect(wrapper.get('[data-test="composite-group-editor"]').findAll('input')).toHaveLength(2)
-  })
-
-  // Two composite mappings use prefixes that differ only in letter case. The test protects
-  // immediate duplicate-prefix feedback and blocks the create request for that ambiguous
-  // routing draft.
-  it('blocks case-insensitive duplicate composite prefixes', async () => {
-    getAvailableGroups.mockResolvedValueOnce([
-      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1 },
-      { id: 43, name: 'Claude', platform: 'anthropic', rate_multiplier: 1 },
+  // Automatic routing exposes administrator priorities as an ordered read-only list.
+  // Users can switch to one fixed group, but no channel editor or reorder controls exist.
+  it('shows administrator route order and allows single-group mode', async () => {
+    getAvailableGroups.mockResolvedValue([
+      { id: 42, name: 'OpenAI A' },
+      { id: 43, name: 'OpenAI B' },
     ])
+    getRoutingOptions.mockResolvedValue({ group_ids: [43, 42] })
     const wrapper = await mountView()
-
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
-    await wrapper.get('[data-test="composite-key-toggle"]').trigger('click')
-    let editor = wrapper.get('[data-test="composite-group-editor"]')
-    await editor.findAllComponents({ name: 'Select' })[0]!.vm.$emit('update:modelValue', 42)
-    await editor.findAll('input')[0]!.setValue('GPT')
-    await getButtonByText(wrapper, 'Add group mapping').trigger('click')
-    await nextTick()
-
-    editor = wrapper.get('[data-test="composite-group-editor"]')
-    await editor.findAllComponents({ name: 'Select' })[1]!.vm.$emit('update:modelValue', 43)
-    await editor.findAll('input')[1]!.setValue('gpt')
-    await wrapper.get('form#key-form').trigger('submit')
-    await nextTick()
-
-    expect(showError).toHaveBeenCalledWith('Duplicate prefix')
-    expect(createKey).not.toHaveBeenCalled()
-  })
-
-  // Two composite mappings select the same routing group with different prefixes. The test
-  // protects duplicate-group feedback and prevents creation of the rejected mapping set.
-  it('blocks duplicate groups in composite mappings', async () => {
-    getAvailableGroups.mockResolvedValueOnce([
-      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1 },
-    ])
-    const wrapper = await mountView()
-
-    await getButtonByText(wrapper, 'Create API Key').trigger('click')
-    await wrapper.get('[data-test="composite-key-toggle"]').trigger('click')
-    let editor = wrapper.get('[data-test="composite-group-editor"]')
-    await editor.findAllComponents({ name: 'Select' })[0]!.vm.$emit('update:modelValue', 42)
-    await editor.findAll('input')[0]!.setValue('GPT')
-    await getButtonByText(wrapper, 'Add group mapping').trigger('click')
-    await nextTick()
-
-    editor = wrapper.get('[data-test="composite-group-editor"]')
-    await editor.findAllComponents({ name: 'Select' })[1]!.vm.$emit('update:modelValue', 42)
-    await editor.findAll('input')[1]!.setValue('Backup')
-    await wrapper.get('form#key-form').trigger('submit')
-    await nextTick()
-
-    expect(showError).toHaveBeenCalledWith('Duplicate group')
-    expect(createKey).not.toHaveBeenCalled()
-  })
-
-  // An existing composite key is converted to ordinary mode. The test protects required
-  // explicit group selection before sending a noncomposite update with the chosen binding.
-  it('requires an explicit target group when converting composite to ordinary', async () => {
-    getAvailableGroups.mockResolvedValueOnce([
-      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1 },
-    ])
-    listKeys.mockResolvedValueOnce({
-      items: [
-        {
-          ...createApiKey(),
-          group_id: null,
-          is_composite: true,
-          composite_groups: [
-            { group_id: 42, prefix: 'GPT', group: { id: 42, name: 'OpenAI', platform: 'openai' } },
-          ],
-        },
-      ],
-      total: 1,
-      page: 1,
-      page_size: 20,
-      pages: 1,
-    })
-    const wrapper = await mountView()
-
-    await getButtonByText(wrapper, 'Edit').trigger('click')
-    await wrapper.get('[data-test="composite-key-toggle"]').trigger('click')
-    await wrapper.get('form#key-form').trigger('submit')
-    await nextTick()
-    expect(showError).toHaveBeenCalledWith('Group required')
-    expect(updateKey).not.toHaveBeenCalled()
-
-    const groupSelect = wrapper
+    await flushPromises()
+    expect(wrapper.find('ol').text()).toMatch(/1\..*OpenAI B.*2\..*OpenAI A/s)
+    expect(wrapper.find('[data-test="channel-editor"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="edit-channels"]').exists()).toBe(false)
+    await customizeChannels(wrapper)
+    const group = wrapper
       .findAllComponents({ name: 'Select' })
-      .find((select) => select.attributes('data-tour') === 'key-form-group')
-    expect(groupSelect).toBeDefined()
-    await groupSelect!.vm.$emit('update:modelValue', 42)
+      .find((select) => select.attributes('data-test') === 'single-group-select')!
+    group.vm.$emit('update:modelValue', 42)
     await wrapper.get('form#key-form').trigger('submit')
     await flushPromises()
+    expect(createKey).toHaveBeenCalledWith(
+      expect.objectContaining({ routing_mode: 'single', group_id: 42, use_default_groups: false }),
+    )
+  })
 
+  // An edited fixed-group Key can return to administrator-managed automatic routing.
+  // Advanced request restrictions remain in its submitted draft after switching mode.
+  it('restores automatic routing while retaining advanced restrictions', async () => {
+    listKeys.mockResolvedValueOnce({
+      items: [
+        {
+          ...createApiKey(),
+          routing_mode: 'single',
+          group_id: 42,
+          use_default_groups: false,
+          rpm_limit: 60,
+        },
+      ],
+      total: 1,
+    })
+    const wrapper = await mountView()
+    await getButtonByText(wrapper, 'Edit').trigger('click')
+    await flushPromises()
+    const mode = wrapper
+      .findAllComponents({ name: 'Select' })
+      .find((select) => select.attributes('data-test') === 'routing-mode-select')!
+    mode.vm.$emit('update:modelValue', 'auto')
+    await wrapper.get('form#key-form').trigger('submit')
+    await flushPromises()
     expect(updateKey).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({
-        group_id: 42,
-        is_composite: false,
-        composite_groups: undefined,
-      }),
+      expect.objectContaining({ routing_mode: 'auto', use_default_groups: true, rpm_limit: 60 }),
     )
   })
 
@@ -1405,10 +1331,11 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await wrapper.get('[data-tour="key-form-name"]').setValue('redirect-key')
     const groupSelect = wrapper
       .findAllComponents({ name: 'Select' })
-      .find((select) => select.attributes('data-tour') === 'key-form-group')
+      .find((select) => select.attributes('data-test') === 'single-group-select')
     await groupSelect!.vm.$emit('update:modelValue', 42)
     await wrapper.get('[data-testid="model-mapping-add"]').trigger('click')
     await wrapper.get('[data-testid="model-mapping-source-0"]').setValue(' codex-auto-review ')
@@ -1442,6 +1369,7 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Edit').trigger('click')
+    await customizeChannels(wrapper)
     expect(
       (wrapper.get('[data-testid="model-mapping-source-0"]').element as HTMLInputElement).value,
     ).toBe('codex-auto-review')
@@ -1456,7 +1384,9 @@ describe('user KeysView column settings', () => {
   // test protects loading those values and submitting zero to remove both caps.
   it('loads request limits and submits zero to remove them', async () => {
     listKeys.mockResolvedValueOnce({
-      items: [{ ...createApiKey(), group_id: 42, concurrency_limit: 3, rpm_limit: 60 }],
+      items: [
+        { ...createApiKey(), groups: [{ group_id: 42 }], concurrency_limit: 3, rpm_limit: 60 },
+      ],
       total: 1,
       page: 1,
       page_size: 20,
@@ -1464,6 +1394,7 @@ describe('user KeysView column settings', () => {
     })
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'Edit').trigger('click')
+    await customizeChannels(wrapper)
     expect((wrapper.get('#key-concurrency-limit').element as HTMLInputElement).value).toBe('3')
     expect((wrapper.get('#key-rpm-limit').element as HTMLInputElement).value).toBe('60')
     await wrapper.get('#key-concurrency-limit').setValue('0')
@@ -1482,6 +1413,7 @@ describe('user KeysView column settings', () => {
   it.each(['-1', '1.5', '2147483648'])('rejects invalid request limit %s', async (value) => {
     const wrapper = await mountView()
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await wrapper.get('#key-rpm-limit').setValue(value)
     await wrapper.get('form#key-form').trigger('submit')
     expect(createKey).not.toHaveBeenCalled()
@@ -1495,6 +1427,7 @@ describe('user KeysView column settings', () => {
     const wrapper = await mountView()
 
     await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await customizeChannels(wrapper)
     await wrapper.get('[data-testid="model-mapping-add"]').trigger('click')
     await wrapper.get('[data-testid="model-mapping-source-0"]').setValue('bad*source')
     await wrapper.get('[data-testid="model-mapping-target-0"]').setValue('target')

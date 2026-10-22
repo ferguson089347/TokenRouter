@@ -204,11 +204,13 @@ Ollama Cloud 的设置、状态、会话、自动刷新和主动刷新路由绑�
 
 ## API Key 结算策略接口
 
-普通 Key 需要绑定一个可用的分组。历史上没有绑定分组的 Key，字符串仍然保留，调用前需要先绑定；系统没有不经过分组的调度入口。`fallback_when_group_unavailable` 只能回退到管理员配置的回退分组，目标分组要重新检查权限、模型、协议、团队和订阅范围。
+自动 Key 继承管理员默认渠道，请求通过完整模型名和协议选择合格分组，上游故障时按管理员顺序切换。单分组模式绑定 `group_id`，其 `fallback_when_group_unavailable` 使用管理员配置的回退分组，目标分组重新检查权限、模型、协议、团队和订阅范围。
 
 `POST /api/v1/keys` 和 `PUT /api/v1/keys/{id}` 接受 `billing_mode`（`auto`、`subscription`、`balance`）和可空的 `preferred_subscription_id`。省略模式或使用 `auto` 时，先用订阅，不足的部分由余额补足；`balance` 会清除指定的订阅；`subscription` 需要指定当前付款主体的一份有效订阅。个人 Key 的付款主体是本人，团队 Key 的付款主体是 Team Owner。
 
 创建和更新 API Key 时，`quota`、`rate_limit_5h`、`rate_limit_1d`、`rate_limit_7d` 要求是有限的、非负的、小于 `1e12` 的 USD 数值，以适配数据库的 `DECIMAL(20,8)`；`0` 表示不限额。创建时省略 `expires_in_days` 表示永不过期，提供时要大于 0；更新时用空的 `expires_at` 清除到期时间，用合法的 RFC3339 时间设置到期点。handler 的早期校验和 service 的最终校验使用同一套规则，内部调用同样要经过校验。
+
+`GET /api/v1/keys/routing-options` 返回当前作用域有权限的默认 `group_ids`。管理员通过 `GET`、`PUT /api/v1/admin/api-keys/defaults` 读取及整体替换默认顺序。Key 创建、更新接受 `routing_mode=auto|single`；自动模式继承管理员有序 `groups`，单分组模式接受 `group_id`。用户不能提交自定义顺序。详见[通用 API Key](../domains/composite_api_keys.md)。
 
 `GET /api/v1/keys/billing-options?scope=personal|team` 返回当前作用域下可以指定的有效订阅摘要，包括 `id`、`plan_id`、`plan_name`、`expires_at`、`groups_restricted` 和 `applicable_groups`。`GET /api/v1/groups/available?scope=personal|team&subscription_id={id}` 带 `subscription_id` 时，返回付款主体已有的分组权限和这个订阅套餐分组的交集；不带时返回普通的可用分组列表。两个接口在团队作用域下都不会返回成员自己的订阅。可见分组的 `models` 和 `model_protocols` 来自有限模型目录，供客户端配置时选择型号，权限由请求时的分组策略校验。`include_models` 默认为 `true`；传 `false` 时保留作用域、套餐和分组权限过滤，跳过模型、协议和模型属性计算。使用记录及仪表盘的筛选项使用轻量查询，Key 配置导出使用完整查询。非法的 `include_models` 值返回 400。
 
@@ -402,4 +404,4 @@ Grok 请求缓存开关使用 `X-TokenRouter-Grok-Client-Tool-Cache`，没有新
 
 ## 降智检测接口
 
-`/api/v1/admin/intelligence-tests` 提供配置、手动执行和历史查询；`/api/v1/intelligence-tests` 为登录用户提供站点检测和共享用户测试结果。POST `/api/v1/intelligence-tests/run` 使用当前用户自己的个人普通 Key ID 创建画图自测，请求仅含 `api_key_id`，执行参数与 API 地址取自所属渠道的第一个启用系统画图配置；成功返回 202。`/api/v1/intelligence-tests/preview-content/:ticket` 使用短期作品票据，并重新校验当前权限。用户和管理员的 `/runs/:id/thumbnail` 返回 PNG，每次校验当前权限；无截图且仍有 HTML 时补生成并保存。操作列表与隔离规则见[降智检测](../domains/intelligence_tests.md)。
+`/api/v1/admin/intelligence-tests` 提供配置、手动执行和历史查询；`/api/v1/intelligence-tests` 为登录用户提供站点检测和共享用户测试结果。POST `/api/v1/intelligence-tests/run` 使用当前用户自己的个人 Key ID 创建画图自测，请求仅含 `api_key_id`，执行参数与 API 地址取自所属渠道的第一个启用系统画图配置；成功返回 202。`/api/v1/intelligence-tests/preview-content/:ticket` 使用短期作品票据，并重新校验当前权限。用户和管理员的 `/runs/:id/thumbnail` 返回 PNG，每次校验当前权限；无截图且仍有 HTML 时补生成并保存。操作列表与隔离规则见[降智检测](../domains/intelligence_tests.md)。

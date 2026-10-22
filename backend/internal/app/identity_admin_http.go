@@ -79,7 +79,8 @@ func provideKeyAdmin(client *dbent.Client, keys *keypostgres.KeyStore, users *id
 // provideIdentityAdminHTTP supplies Key DTO reads, concurrency loads, and
 // step-up enforcement to user HTTP. The load callback returns available counts
 // alongside the scheduler error, omitting nil load entries from its result map.
-func provideIdentityAdminHTTP(admin *identity.UserAdmin, keys *apikey.Admin, concurrency *scheduler.ConcurrencyService, totp *identity.TotpService, users *identity.UserService, settings *identity.RuntimeSettings) *identityhttp.AdminUserHandler[keydto.APIKey[routingdto.Group]] {
+// Key presentation refreshes inherited channel permissions before DTO conversion.
+func provideIdentityAdminHTTP(admin *identity.UserAdmin, keys *apikey.Admin, available *apikey.APIKeyService, concurrency *scheduler.ConcurrencyService, totp *identity.TotpService, users *identity.UserService, settings *identity.RuntimeSettings) *identityhttp.AdminUserHandler[keydto.APIKey[routingdto.Group]] {
 	listKeys := func(ctx context.Context, id int64, page, size int, sortBy, order string) ([]keydto.APIKey[routingdto.Group], int64, error) {
 		rows, total, err := keys.GetUserAPIKeys(ctx, id, page, size, sortBy, order)
 		if err != nil {
@@ -87,6 +88,9 @@ func provideIdentityAdminHTTP(admin *identity.UserAdmin, keys *apikey.Admin, con
 		}
 		result := make([]keydto.APIKey[routingdto.Group], 0, len(rows))
 		for i := range rows {
+			if err := available.ApplyRoutingDefaults(ctx, &rows[i]); err != nil {
+				return nil, 0, err
+			}
 			result = append(result, *keydto.APIKeyFromKey(&rows[i], func(group *routing.Group) *routingdto.Group {
 				return routingdto.GroupFromRouting(apikey.RoutingGroup(group))
 			}))

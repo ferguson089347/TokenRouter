@@ -5,7 +5,7 @@ import (
 )
 
 // routes_admin.go registers the administrative Key-update route for binding
-// changes and optional spending-window resets. Route registration uses the
+// changes, administrator channel defaults and optional spending-window resets. Route registration uses the
 // caller's already configured admin group so its authentication, rate controls
 // and auditing apply before the supplied handler runs.
 
@@ -16,6 +16,8 @@ import (
 func RegisterAdminAPIKeyRoutes[G any](admin *gin.RouterGroup, endpoint *AdminAPIKeyHandler[G]) {
 	apiKeys := admin.Group("/api-keys")
 	{
+		apiKeys.GET("/defaults", endpoint.RoutingDefaults)
+		apiKeys.PUT("/defaults", endpoint.SaveRoutingDefaults)
 		apiKeys.PUT("/:id", endpoint.UpdateGroup)
 	}
 }

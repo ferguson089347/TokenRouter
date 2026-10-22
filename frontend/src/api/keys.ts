@@ -105,6 +105,7 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
  * module's named or default API object.
  */
 export const keysAPI = {
+  getRoutingOptions,
   list,
   getBillingOptions,
   createWithPayload,
@@ -115,3 +116,17 @@ export const keysAPI = {
 }
 
 export default keysAPI
+
+/**
+ * getRoutingOptions reads administrator channels authorized for the selected payer.
+ * Scope defaults to personal; team scope uses its owner. Failures propagate to
+ * the editor, and subscription filtering occurs during configuration and admission.
+ */
+export async function getRoutingOptions(scope: 'personal' | 'team' = 'personal'): Promise<{
+  group_ids: number[] // Authorized channel priority order.
+}> {
+  const { data } = await apiClient.get<{ group_ids: number[] }>('/keys/routing-options', {
+    params: { scope },
+  })
+  return data
+}

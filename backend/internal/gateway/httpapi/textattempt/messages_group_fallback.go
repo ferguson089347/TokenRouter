@@ -45,6 +45,9 @@ import (
 // caller/platform/cache policy stays in context while original client input
 // remains available for rebuilding.
 func (b *messageAttemptBridge) Fallback(cause error, fallbackUsed bool) bool {
+	if requeststate.ChannelAttemptFromContext(b.Context()) != nil {
+		return false
+	}
 	var tooLong *antigravity.PromptTooLongError
 	if !errors.As(cause, &tooLong) {
 		return false

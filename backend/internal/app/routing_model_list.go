@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"log/slog"
+	"slices"
 
 	gatewayprovider "github.com/TokenFlux/TokenRouter/internal/gateway/provider"
+	"github.com/TokenFlux/TokenRouter/internal/gateway/requeststate"
 	"github.com/TokenFlux/TokenRouter/internal/provider"
 	providerpostgres "github.com/TokenFlux/TokenRouter/internal/provider/postgres"
 	"github.com/TokenFlux/TokenRouter/internal/routing"
@@ -32,6 +34,12 @@ func catalogueReader(store *providerpostgres.ProviderStore) func(context.Context
 		if err != nil {
 			return nil, err
 		}
+		ids := make([]int64, 0, len(values))
+		for _, value := range values {
+			ids = append(ids, value.ID)
+		}
+		excluded := requeststate.ChannelProviderExclusions(ctx, ids, nil)
+		values = slices.DeleteFunc(values, func(value provider.Record) bool { _, blocked := excluded[value.ID]; return blocked })
 		return gatewayprovider.CatalogueProviders(values), nil
 	}
 }

@@ -479,7 +479,7 @@ import { provideIntelligenceResults } from '@/components/intelligence/useIntelli
 
 // IntelligenceTestsView.vue manages model quality configurations and explicit
 // paid test submissions with configurable drawing prompts. The form selects
-// personal ordinary Keys belonging to the selected group, displays credential-free
+// personal Keys containing the selected channel, displays credential-free
 // option labels, and clears transient secrets when group or dialog state changes. Existing configuration
 // identity remains fixed while execution settings can change during idle
 // periods.
@@ -688,21 +688,18 @@ async function loadModels() {
 function useCurrentSite() {
   form.base_url = `${window.location.origin}/v1`
 }
-// canUseKey checks whether a personal ordinary Key can test the selected
-// group. It requires active, unexpired, available quota and excludes team or
-// composite credentials; unavailable-group routing preferences remain
-// eligible.
+// canUseKey checks a personal credential's current eligibility for this channel.
+// Active state, remaining quota, expiry and the ordered channel list determine
+// display eligibility; the backend repeats ownership and permission checks on save.
 function canUseKey(key: ApiKey, groupID: number) {
-  // The gateway applies the Key's unavailable-group preference after submission,
-  // so an ordinary Key stays eligible with either saved preference.
   return (
-    key.group_id === groupID &&
+    (key.routing_mode === 'single'
+      ? key.group_id === groupID
+      : (key.groups ?? []).some((binding) => binding.group_id === groupID)) &&
     key.status === 'active' &&
     !!key.key &&
     !key.team_id &&
     key.scope !== 'team' &&
-    !key.is_composite &&
-    !key.composite_groups?.length &&
     (!key.expires_at || Date.parse(key.expires_at) > Date.now()) &&
     (key.quota <= 0 || key.quota_used < key.quota)
   )

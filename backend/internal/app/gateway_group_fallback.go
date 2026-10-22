@@ -33,10 +33,23 @@ import (
 // resolved subscription.
 type runtimeGroupFallbackResolver func(context.Context, *apikey.APIKey, int64, protocol.ProtocolID) (*apikey.APIKey, *billing.UserSubscription, error)
 
+// automaticRoutingRPMCache reuses one request's successful counters across route attempts.
+type automaticRoutingRPMCache struct{ scheduler.UserRPMCache }
+
+// IncrementUserRPM counts the original client request once across automatic channels.
+func (c automaticRoutingRPMCache) IncrementUserRPM(ctx context.Context, id int64) (int, error) {
+	return requeststate.ChannelRPMCount(ctx, id, 0, func() (int, error) { return c.UserRPMCache.IncrementUserRPM(ctx, id) })
+}
+
+// IncrementUserGroupRPM independently counts each visited payer/channel pair once.
+func (c automaticRoutingRPMCache) IncrementUserGroupRPM(ctx context.Context, userID, groupID int64) (int, error) {
+	return requeststate.ChannelRPMCount(ctx, userID, groupID, func() (int, error) { return c.UserRPMCache.IncrementUserGroupRPM(ctx, userID, groupID) })
+}
+
 // provideFundingAdmission combines billing eligibility and scheduler-owned user
 // RPM admission.
 func provideFundingAdmission(funds *billing.Eligibility, rpm scheduler.UserRPMCache, rates billing.UserGroupRateRepository) *admission.FundingAdmission {
-	limiter := scheduler.NewRPMAdmission(rpm, rates, scheduler.Diagnostics{Logf: logging.LegacyPrintf})
+	limiter := scheduler.NewRPMAdmission(automaticRoutingRPMCache{rpm}, rates, scheduler.Diagnostics{Logf: logging.LegacyPrintf})
 	return admission.NewFundingAdmission(funds, limiter)
 }
 
@@ -126,6 +139,9 @@ func provideClientGroupFallbackResolver(keys *apikey.APIKeyService, funding *adm
 			visited[current.Group.ID] = struct{}{}
 			if !current.Group.ClaudeCodeOnly || (source == protocol.ProtocolAnthropicMessages && requeststate.IsClaudeCodeClient(ctx)) {
 				return current, subscription, nil
+			}
+			if current.IsComposite {
+				return nil, nil, routing.ErrClaudeCodeOnly
 			}
 			target := current.Group.FallbackGroupID
 			if target == nil || *target <= 0 {

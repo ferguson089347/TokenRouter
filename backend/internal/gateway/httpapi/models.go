@@ -23,7 +23,7 @@ import (
 // Keys, a forced platform selects the response family and constrains resolution.
 //
 // Composite Keys aggregate authorized groups in binding order and attach each
-// configured prefix to model names after alias expansion. Subscription-only
+// complete original identifiers to the merged list after alias expansion. Subscription-only
 // Keys also require the selected subscription to cover each group. This
 // ordering keeps a displayed alias tied to one permitted target and group,
 // while deduplication retains the first occurrence. Metadata lookup supplies
@@ -288,16 +288,16 @@ func (h *ModelsHandler) AntigravityModels(c *gin.Context) {
 	h.WriteClaudeCompatiblePlatformModelsList(c, capability.PlatformAntigravity, nil)
 }
 
-// CompositeRequestableModels aggregates prefixed model IDs from authorized
+// CompositeRequestableModels aggregates original model IDs from authorized
 // composite bindings in their saved order. Missing handler, catalogue,
 // request or Key returns nil, as does a missing required subscription. Each
 // group first passes user, activity and subscription checks.
 //
 // Configured candidates are resolved under the optional platform restriction,
 // intersected with custom lists, and expanded with concrete Key aliases. The
-// binding prefix is added after these checks so one public name identifies
-// its group and eligible model. Duplicate prefixed IDs retain their first
-// occurrence in the aggregate.
+// original model name identifies its first eligible channel. Duplicate IDs
+// retain their first occurrence in the aggregate, so listing order agrees with
+// the routing priority used when the same model exists in several groups.
 func (h *ModelsHandler) CompositeRequestableModels(c *gin.Context, apiKey *apikey.APIKey, requiredPlatform string) []string {
 	if h == nil || !h.backend.Available() || c == nil || c.Request == nil || apiKey == nil {
 		return nil
@@ -325,16 +325,15 @@ func (h *ModelsHandler) CompositeRequestableModels(c *gin.Context, apiKey *apike
 		if customListEnabled(group) {
 			available = FilterModelsByCustomList(available, nil, group.ModelsListConfig.Models)
 		}
-		// Expand aliases within each eligible group before adding its prefix. This
+		// Expand aliases within each eligible group before merging channel results. This
 		// prevents an alias from borrowing target availability from a different binding.
 		available = apikey.AppendAPIKeyModelAliases(available, apiKey.ModelMapping)
 		for _, model := range available {
-			prefixed := binding.Prefix + "/" + model
-			if _, exists := seen[prefixed]; exists {
+			if _, exists := seen[model]; exists {
 				continue
 			}
-			seen[prefixed] = struct{}{}
-			models = append(models, prefixed)
+			seen[model] = struct{}{}
+			models = append(models, model)
 		}
 	}
 	return models
@@ -355,7 +354,7 @@ func (h *ModelsHandler) CompositePreferredSubscription(c *gin.Context, apiKey *a
 	return subscription, true
 }
 
-// WriteCompositeModelsList writes already-prefixed IDs in the OpenAI list
+// WriteCompositeModelsList writes aggregated model IDs in the OpenAI list
 // envelope. It uses the public ID as display name, TokenRouter ownership, and
 // empty or zero timestamps because group aggregation supplies no merged
 // vendor metadata.

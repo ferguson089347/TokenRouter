@@ -80,6 +80,31 @@ export default {
   },
   // API Keys
   keys: {
+    routing: {
+      cooldown: 'Failed provider cooldown (seconds)',
+      cooldownHint:
+        'Temporarily skip failed providers for the same Key, model and endpoint. Set 0 to disable cooldown.',
+
+      adminOrder: 'The administrator manages routing groups and their priority.',
+      mode: 'Routing mode',
+      auto: 'Automatic routing',
+      single: 'Single group',
+
+      nameOptional: 'Name (optional)',
+      channels: 'Available channels',
+      inherited: 'Following administrator defaults',
+      custom: 'Custom channel settings',
+      followDefaults: 'Follow administrator defaults',
+      addChannel: 'Add channel',
+      priorityHint:
+        'The first eligible channel handles each model. Call models by their original ID.',
+      advanced: 'Advanced options',
+      defaultsTitle: 'Default API key channels',
+      saveDefaults: 'Save defaults',
+      saved: 'Default channels saved',
+      defaultsHint:
+        'Keys following defaults use this order within their existing group permissions. An empty list disables inherited routing.',
+    },
     title: 'API Keys',
     description: 'Manage your API keys and access tokens',
     searchPlaceholder: 'Search name or key...',
@@ -129,7 +154,7 @@ export default {
     selectGroup: 'Select a group',
     composite: {
       label: 'Composite key',
-      hint: 'Choose a group with a prefix/model ID.',
+      hint: 'Use channel priority to select a group supporting the requested model.',
       addMapping: 'Add group mapping',
       editMappings: 'Edit composite key mappings',
       moreMappings: '+{count}',
@@ -139,7 +164,7 @@ export default {
       prefixInvalid: 'Use 1-32 letters, numbers, underscores, or hyphens',
       prefixDuplicate: 'Prefixes must be unique, ignoring case',
       groupDuplicate: 'Each group can only be added once',
-      mappingRequired: 'A composite key needs at least one group mapping',
+      mappingRequired: 'Select at least one channel',
       tooManyMappings: 'A composite key supports up to 20 group mappings',
       moveUp: 'Move up',
       moveDown: 'Move down',
@@ -235,7 +260,8 @@ export default {
       websocketDescription:
         'Connects to the Responses API over WebSocket. Requires a Codex client with WebSocket v2 support; leave it off if unsure.',
       title: 'Use API Key',
-      compositeDescription: 'Prefix each model ID with the group prefix when making requests.',
+      compositeDescription:
+        'Use one Key across configured channels and call the original model names below.',
       description:
         'Add the following environment variables to your terminal profile or run directly in terminal to configure API access.',
       copy: 'Copy',

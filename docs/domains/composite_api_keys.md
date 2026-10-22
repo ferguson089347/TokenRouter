@@ -1,88 +1,63 @@
-# 复合 API Key
+# 通用 API Key
 
-复合 API Key 允许一个密钥绑定多个分组。每个映射由分组和前缀组成，请求通过 `前缀/模型 ID` 选择分组。
-
-本文覆盖复合 Key 的配置、单请求选组、支持入口、错误和实时连接限制，不覆盖选组后的渠道/提供商调度或单 Key 模型重定向规则。
+用户创建 Key 时默认使用自动路由。管理员统一设置候选分组及顺序，用户可以查看，或切换为单个分组模式自行选组。客户端直接提交原模型 ID，例如 `gpt-5` 或 `vendor/model`。
 
 ## 章节导航
 
-- [创建与更新](#创建与更新)：修改持久映射和校验时读取。
-- [请求选组](#请求选组)：修改前缀解析和请求改写时读取。
+- [创建与更新](#创建与更新)：修改默认继承、模式切换或管理接口时读取。
+- [请求选组](#请求选组)：修改模型资格与渠道优先级时读取。
 - [支持入口](#支持入口)：新增协议入口时核对。
 - [错误](#错误)：保持协议错误形状时读取。
 - [实时接口限制](#实时接口限制)：修改长连接能力时读取。
 
 ## 创建与更新
 
-创建复合 Key 时提交 `is_composite: true` 和完整的 `composite_groups`：
+管理员在系统设置的用户默认配置中保存渠道及顺序。`GET`、`PUT /api/v1/admin/api-keys/defaults` 读取、整体替换 `group_ids`；数据库设置键为 `api_key_default_groups`，内容是有序整数数组。最多配置 20 个互不重复的活动分组，空数组暂停默认路由。
+
+`POST /api/v1/keys` 接受可选名称，空名称保存为 `API Key`。`routing_mode` 省略或为 `auto` 时，继承管理员配置。选择单个分组时提交：
 
 ```json
-{
-  "name": "多平台开发",
-  "is_composite": true,
-  "composite_groups": [
-    { "group_id": 10, "prefix": "GPT" },
-    { "group_id": 20, "prefix": "Claude" }
-  ]
-}
+{"name":"固定分组","routing_mode":"single","group_id":10}
 ```
 
-更新接口对 `composite_groups` 整体替换。复合 Key 的更新请求如果同时带 `group_id`，会被拒绝。从复合 Key 转回普通 Key 时必须提交 `is_composite: false` 和目标 `group_id`。
+更新可在两个模式间切换，切换 `single` 时提供 `group_id`；切换 `auto` 时重新读取当前默认分组。用户接口拒绝 `group_ids` 自定义顺序和关闭自动继承，旧的 `is_composite`、`composite_groups` 参数也被拒绝。
 
-每个复合 Key 可配置 1 至 20 个映射。同一 Key 内分组不能重复，前缀按小写判重。前缀去除首尾空格后长度必须为 1 至 32，只能包含字母、数字、下划线和连字符。
+响应通过 `routing_mode`、`use_default_groups` 和 `groups` 返回模式、继承状态与当前有序分组，单分组模式通过 `group_id` 与 `group` 返回目标。用户创建弹窗直接显示自动路由分组及编号顺序，切到单分组时显示选组框。高级选项继续默认折叠，包含资金来源、模型重定向、IP、额度、并发、RPM 和有效期。
+
+`GET /api/v1/keys/routing-options?scope=personal|team` 返回当前付款主体有权限的管理员路由。自动配置每次读取都按当前活动状态和权限过滤，团队 Key 使用当前 owner 的权限与订阅。隐藏的服务器执行 Key 固定在任务选中的分组。
+
+管理员通过同一个默认配置接口设置 `cooldown_seconds`，范围 0 至 3600，默认 60。分组顺序和冷却在同一次设置事务中保存。0 关闭跨请求冷却，本请求仍会排除实际失败的提供商。
 
 <a id="group_selection"></a>
 ## 请求选组
 
-以下示例选择前缀为 `GPT` 的分组，内部实际模型为 `gpt-5`：
+请求按渠道顺序检查活动状态、付款主体权限、指定订阅范围、客户端协议及可请求模型目录。Key 级别名先按一跳目标检查资格，选组后由既有模型改写阶段应用到报文。第一个满足条件的渠道成为本次请求的计费和调度分组。
 
-```json
-{
-  "model": "GPT/gpt-5",
-  "messages": [{ "role": "user", "content": "Hello" }]
-}
-```
+同名模型优先使用排在前面的合格分组。组内重试结束后，确认来自上游的限流、HTTP 失败或网络故障，且尚未输出业务内容、没有提交用量、请求未取消时，按顺序尝试下一分组。每组每请求最多尝试一次；全部失败返回最后实际尝试组的错误。每轮重新鉴权、检查付款权限、订阅与模型协议，余额、Key 配额或本地策略拒绝直接结束。
 
-前缀匹配不区分大小写。服务只按第一个 `/` 拆分，因此 `GPT/vendor/model` 的实际模型 ID 是 `vendor/model`。
+故障提供商按 Key、提供商、模型、接口进入有界冷却，同一提供商即使出现在其他分组也会排除。Redis 读写使用短预算，本地仅保留已知失败，缓存故障不会伪造全部不可用。全局用户 RPM 和 Key 请求额度按一个客户端请求计数，每个新分组的用户 RPM 仍单独校验。
 
-Gemini 原生入口将前缀放在模型 URL 中：
+Responses 的远端续接句柄、不透明压缩历史、后台任务、生图和服务器工具请求不跨分组重放。已提交业务输出或排入用量结算的请求也停止切换。SSE 前导和失败帧最多缓冲 256 KiB，首个业务输出提交后保持当前流；达到上限时同样关闭重放。新建会话归属使用独立 token，换组前只释放本轮仍持有的临时归属。单个分组模式沿用该组内部的提供商调度和重试。
 
-```text
-POST /v1beta/models/Gemini/gemini-2.5-pro:generateContent
-```
-
-服务在鉴权后移除前缀，再执行分组权限、回退、订阅、倍率、限流、提供商选择和计费。使用记录明细的客户端模型名保留带前缀名称，内部模型和上游模型记录为去前缀名称；模型分布按内部请求模型聚合，因此普通 Key 与不同复合前缀请求同一模型时只形成一个统计项。
-
-复合 Key 选择 `subscription` 结算模式时，所有前缀映射都必须位于该指定订阅套餐的分组范围内；配置页只展示用户权限与套餐范围的交集。每次请求在前缀选组、默认组或不可用分组回退完成后都会重验最终分组。套餐变更、旧 Key 配置或直接调用接口都不能借由另一条映射、默认组或回退组使用套餐外分组；指定订阅额度不足时也不得回退余额。
+模型 ID 中的斜杠属于模型本身。例如 `vendor/model` 在查询目录、选择渠道和转发时保持完整。Gemini 使用 `/v1beta/models/<模型>:<动作>`。模型列表按渠道顺序聚合原 ID，并对同名模型去重；精确 Key 别名按目标的可用性展示。
 
 ## 支持入口
 
-- OpenAI、Anthropic 及兼容入口的 JSON 请求。
+- OpenAI、Anthropic 及兼容入口的 JSON 和流式请求。
 - SystemOne `/v1/systemone` 的 JSON 决策请求。
 - 图片生成与编辑的 JSON 或 multipart 请求。
 - 单模型批量图片提交。
-- Gemini `/v1beta/models/<前缀>/<模型>:<动作>` 入口。
-- 无模型的用量、视频任务查询和批任务管理接口；这些入口仍校验身份、用户与团队状态、IP 和资源归属，不重新选组消费。
-
-`/v1/models`、裸 `/models`、Gemini 模型列表和批量图片模型列表会按映射顺序聚合可用模型，并在每个模型 ID 前添加对应前缀。
+- Gemini 模型 URL 与生成入口。
+- 无模型的用量、视频任务查询和批任务管理接口。这些入口检查身份、用户与团队状态、IP 和资源归属。
 
 ## 错误
 
-缺少前缀、未知前缀或非法前缀均返回 HTTP 400，并使用对应入口的 OpenAI、Anthropic 或 Google 错误结构。
+缺少模型返回 `MODEL_REQUIRED`，没有渠道支持请求的模型及协议时返回 `MODEL_NOT_AVAILABLE`。模型目录不可用返回 503，避免将读取故障当成模型不存在。错误使用对应入口的 OpenAI、Anthropic、SystemOne 或 Google 结构。
 
-SystemOne 单独识别入口，使用包含 `error.type`、`error.message`、`error.code` 和 `error.param` 的 JSON 返回复合前缀错误。主要错误码如下：
-
-- `COMPOSITE_KEY_MODEL_PREFIX_REQUIRED`
-- `COMPOSITE_KEY_PREFIX_NOT_FOUND`
-- `COMPOSITE_KEY_PREFIX_INVALID`
-- `COMPOSITE_KEY_PREFIX_DUPLICATE`
-- `COMPOSITE_KEY_GROUP_DUPLICATE`
-- `COMPOSITE_KEY_GROUPS_REQUIRED`
-- `COMPOSITE_KEY_TOO_MANY_GROUPS`
-- `COMPOSITE_KEY_ENDPOINT_UNSUPPORTED`
+用户 Key 的创建与更新通过 `routing_mode` 区分自动与单分组；自动模式拒绝 `group_id` 和自定义顺序。请求前缀不参与选组，客户端应使用模型列表返回的完整 ID。
 
 ## 实时接口限制
 
-复合 Key 不支持 `/v1/live`、Codex Realtime、Responses WebSocket 和 Live sideband。这些入口可能在同一个连接里切换模型，服务返回 `COMPOSITE_KEY_ENDPOINT_UNSUPPORTED`，请求在选组之前结束。
+通用 Key 当前支持 HTTP 和 SSE。`/v1/live`、Codex Realtime、Responses WebSocket 和 Live sideband 返回 `COMPOSITE_KEY_ENDPOINT_UNSUPPORTED`。这些入口的连接内模型与渠道切换需要独立的授权和结算处理。
 
 相关文档：[API Key 模型重定向](api_key_model_redirects.md)、[路由与结算](routing_and_billing.md)、[网关请求生命周期](../architecture/gateway_request_lifecycle.md)。

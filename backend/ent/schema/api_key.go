@@ -75,6 +75,9 @@ func (APIKey) Fields() []ent.Field {
 		field.Bool("is_composite").
 			Default(false).
 			Comment("Routes across groups using model prefixes"),
+		// Following defaults reloads the administrator channel order for each request;
+		// custom keys use their persisted bindings and independent ordering.
+		field.Bool("use_default_groups").Default(true),
 		// Stored activation state.
 		field.String("status").
 			MaxLen(20).

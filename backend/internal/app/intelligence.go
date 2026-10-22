@@ -25,14 +25,14 @@ import (
 // provideIntelligence constructs quality-check endpoints and registers the owned workers.
 // The global switch requires the stored string true; read failures disable new
 // work. Lifecycle cancellation drains workers before database resources close.
-func provideIntelligence(db *sql.DB, keys apikey.APIKeyRepository, groups routing.GroupRepository, available *apikey.APIKeyService, users *identitypostgres.UserStore, store *settings.Store, cfg *config.Config, manager *lifecycle.Manager) *intelligencehttp.IntelligenceHandler {
+func provideIntelligence(db *sql.DB, groups routing.GroupRepository, available *apikey.APIKeyService, users *identitypostgres.UserStore, store *settings.Store, cfg *config.Config, manager *lifecycle.Manager) *intelligencehttp.IntelligenceHandler {
 	enabled := func(ctx context.Context) bool {
 		value, err := store.GetValue(ctx, intelligence.SettingKeyEnabled)
 		return err == nil && value == "true"
 	}
 	service := intelligence.NewIntelligenceService(
 		postgres.NewIntelligenceRepository(db),
-		keys,
+		available,
 		groups,
 		available,
 		provider.NewClient(nil),

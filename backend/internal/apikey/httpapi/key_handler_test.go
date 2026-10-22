@@ -186,11 +186,41 @@ func TestKeyWritesRejectRetiredDefaultGroupFallback(t *testing.T) {
 			method, path string // request HTTP method; submitted endpoint path
 		}{{http.MethodPost, "/keys"}, {http.MethodPut, "/keys/1"}} {
 			recorder := httptest.NewRecorder()
-			req := httptest.NewRequest(endpoint.method, endpoint.path, strings.NewReader(`{"name":"key","group_id":1,"fallback_to_default_group_when_unavailable":`+value+`}`))
+			req := httptest.NewRequest(endpoint.method, endpoint.path, strings.NewReader(`{"name":"key","fallback_to_default_group_when_unavailable":`+value+`}`))
 			req.Header.Set("Content-Type", "application/json")
 			router.ServeHTTP(recorder, req)
 			require.Equal(t, http.StatusBadRequest, recorder.Code)
 			require.Contains(t, recorder.Body.String(), "fallback_to_default_group_when_unavailable")
+		}
+	}
+}
+
+// TestKeyWritesRejectRetiredRoutingFields submits the removed mode, prefix-list
+// and single-group fields to both user write routes. Strict decoding rejects
+// each request before any credential service operation can run.
+func TestKeyWritesRejectRetiredRoutingFields(t *testing.T) {
+	handler := NewAPIKeyHandler[struct{}](nil, nil)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(authctx.ContextKeyUser, authctx.AuthSubject{UserID: 1})
+		c.Next()
+	})
+	router.POST("/keys", handler.Create)
+	router.PUT("/keys/:id", handler.Update)
+	for _, field := range []struct {
+		name  string // Retired transport field.
+		value string // JSON fixture value.
+	}{{"group_id", "1"}, {"is_composite", "true"}, {"composite_groups", "[]"}} {
+		for _, endpoint := range []struct {
+			method string // HTTP mutation method.
+			path   string // User credential endpoint.
+		}{{http.MethodPost, "/keys"}, {http.MethodPut, "/keys/1"}} {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(endpoint.method, endpoint.path, strings.NewReader(`{"name":"key","`+field.name+`":`+field.value+`}`))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(recorder, request)
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+			require.Contains(t, recorder.Body.String(), field.name)
 		}
 	}
 }
@@ -336,5 +366,25 @@ func TestAvailableGroupsOptionalModels(t *testing.T) {
 				require.Equal(t, []string{"known"}, result.Data[0].Models)
 			}
 		})
+	}
+}
+
+// TestUserCannotWriteAutomaticChannelOrder submits custom routing from both endpoints.
+// The server rejects ordered identifiers and disabled inheritance before a Key
+// service call, so hiding the editor cannot be bypassed by direct HTTP requests.
+func TestUserCannotWriteAutomaticChannelOrder(t *testing.T) {
+	handler := NewAPIKeyHandler[struct{}](nil, nil)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set(authctx.ContextKeyUser, authctx.AuthSubject{UserID: 1}); c.Next() })
+	router.POST("/keys", handler.Create)
+	router.PUT("/keys/:id", handler.Update)
+	for _, body := range []string{`{"group_ids":[2,1]}`, `{"routing_mode":"auto","use_default_groups":false}`} {
+		for _, endpoint := range []struct{ method, path string }{{http.MethodPost, "/keys"}, {http.MethodPut, "/keys/1"}} {
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(endpoint.method, endpoint.path, strings.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(recorder, request)
+			require.Equal(t, http.StatusBadRequest, recorder.Code, recorder.Body.String())
+		}
 	}
 }

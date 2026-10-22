@@ -73,6 +73,7 @@ func (s *Generic) SelectProviderForModel(ctx context.Context, groupID *int64, se
 // hydration, while the scheduler's SelectOnly mode leaves generation slots
 // unoccupied.
 func (s *Generic) SelectProviderForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*gatewayprovider.ExecutionProvider, error) {
+	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	ctx = withSelectionRequest(ctx, groupID, requestedModel)
 	ctx, capabilities := withCapabilitySelection(ctx)
 	core, scope := s.genericSelector()
@@ -91,6 +92,7 @@ func (s *Generic) SelectProviderForModelWithExclusions(ctx context.Context, grou
 // metadataUserID and tokenRouterUserID are unused compatibility inputs.
 // @project-doc docs/architecture/gateway_request_lifecycle.md#account_selection_and_failover
 func (s *Generic) SelectProviderWithLoadAwareness(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, metadataUserID string, tokenRouterUserID int64) (*gatewayprovider.SelectionResult, error) {
+	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	ctx = withSelectionRequest(ctx, groupID, requestedModel)
 	ctx, capabilities := withCapabilitySelection(ctx)
 	core, scope := s.genericSelector()
@@ -357,6 +359,7 @@ func (s *Generic) shouldClearStickySessionForProviderLayer(ctx context.Context, 
 // afterward, letting diagnosis distinguish an otherwise eligible pool that
 // lacks the model from a pool already excluded for another eligibility reason.
 func (s *Generic) isProviderEligibleExceptModelSupport(ctx context.Context, provider *gatewayprovider.ExecutionProvider, requestedModel string, platform string, excludedIDs map[int64]struct{}, useMixed bool, groupID *int64, schedGroup *routing.Group) bool {
+	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	if !gatewayprovider.ExecutionModelPolicy(provider).AllowsProtocol(ctx) {
 		return false
 	}
@@ -395,6 +398,7 @@ func (s *Generic) isProviderEligibleExceptModelSupport(ctx context.Context, prov
 // or runtime unavailability instead of claiming that the group's configured
 // model is absent.
 func (s *Generic) shouldUseGroupModelUnsupportedError(ctx context.Context, providers []gatewayprovider.ExecutionProvider, requestedModel string, platform string, excludedIDs map[int64]struct{}, useMixed bool, groupID *int64, schedGroup *routing.Group) bool {
+	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	requestedModel = strings.TrimSpace(requestedModel)
 	if requestedModel == "" || len(providers) == 0 {
 		return false
@@ -417,6 +421,7 @@ func (s *Generic) shouldUseGroupModelUnsupportedError(ctx context.Context, provi
 // the relevant pool lacks the requested model. Otherwise it returns nil,
 // leaving the caller to produce its ordinary no-provider or capacity error.
 func (s *Generic) groupModelUnsupportedErrorIfApplicable(ctx context.Context, providers []gatewayprovider.ExecutionProvider, requestedModel string, platform string, excludedIDs map[int64]struct{}, useMixed bool, groupID *int64, schedGroup *routing.Group) error {
+	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	if s.shouldUseGroupModelUnsupportedError(ctx, providers, requestedModel, platform, excludedIDs, useMixed, groupID, schedGroup) {
 		if err := routing.NewGroupModelRejection(platform, requestedModel, modelRejectionSources(providers)); err != nil {
 			return err

@@ -1,8 +1,9 @@
 import type { Group } from '@/api/groups.types'
 
 // keys.types.ts describes API credentials and the requests used to create or edit them.
-// Keys carry routing, funding, and spending controls, while composite keys associate
-// individual prefixes with destination groups and may belong to a personal or team scope.
+// Keys carry routing, funding, and spending controls for a personal or team scope.
+// Automatic channels inherit administrator priority. Single mode binds one group,
+// and model requests keep the complete identifiers advertised by that selection.
 
 // ApiKeyFastModePolicy selects key-level Fast handling; system policy takes precedence
 // over this preference.
@@ -23,15 +24,18 @@ export interface ApiKeyBillingSubscriptionOption {
   applicable_groups: number[] // Eligible routing groups.
 }
 
-// ApiKeyCompositeGroup maps a composite key prefix to its destination group.
+// ApiKeyCompositeGroup describes one channel in a credential's ordered routing list.
 export interface ApiKeyCompositeGroup {
   group_id: number // Routing group identifier.
-  prefix: string // Composite routing prefix.
   group?: Group // Expanded routing group.
 }
 
 // ApiKey describes a personal or team credential and its routing and spending limits.
 export interface ApiKey {
+  routing_mode: 'auto' | 'single' // Automatic channel order or fixed group.
+  // Automatic Keys resolve administrator channels on each read. Single mode
+  // carries its fixed selection in group_id and its expanded group record.
+  use_default_groups: boolean // Follow current administrator channel defaults.
   id: number // Record numeric identifier.
   user_id: number // Owning account identifier.
   team_id?: number | null // Owning team identifier.
@@ -42,8 +46,7 @@ export interface ApiKey {
   key: string // API access credential.
   name: string // Record display name.
   group_id: number | null // Routing group identifier.
-  is_composite?: boolean // Composite routing enabled.
-  composite_groups?: ApiKeyCompositeGroup[] // Prefix-to-group routing entries.
+  groups: ApiKeyCompositeGroup[] // Ordered eligible routing channels.
   status: 'active' | 'inactive' | 'disabled' | 'quota_exhausted' | 'expired' // Current lifecycle state.
   fast_mode_policy: ApiKeyFastModePolicy // Key acceleration preference.
   billing_mode?: ApiKeyBillingMode // Request funding mode.
@@ -84,14 +87,11 @@ export interface ApiKey {
 // CreateApiKeyRequest supplies credential ownership, routing, and spending settings for
 // creation.
 export interface CreateApiKeyRequest {
+  routing_mode?: 'auto' | 'single' // Omitted selects automatic routing.
+  group_id?: number | null // Single-mode target group identifier.
+  use_default_groups?: boolean // Inherit current administrator channels.
   name: string // Record display name.
   scope?: 'personal' | 'team' // Credential ownership scope.
-  group_id?: number | null // Routing group identifier.
-  is_composite?: boolean // Composite routing enabled.
-  composite_groups?: Array<{
-    group_id: number // Routing group identifier.
-    prefix: string // Composite routing prefix.
-  }> // Prefix-to-group routing entries.
   fast_mode_policy?: ApiKeyFastModePolicy // Key acceleration preference.
   billing_mode?: ApiKeyBillingMode // Request funding mode.
   preferred_subscription_id?: number | null // Preferred funding subscription identifier.
@@ -116,13 +116,10 @@ export interface CreateApiKeyRequest {
 // UpdateApiKeyRequest supplies optional credential settings and requested usage counter
 // resets.
 export interface UpdateApiKeyRequest {
+  routing_mode?: 'auto' | 'single' // Optional routing mode replacement.
+  group_id?: number | null // Single-mode target group identifier.
+  use_default_groups?: boolean // Requested administrator-default inheritance.
   name?: string // Record display name.
-  group_id?: number | null // Routing group identifier.
-  is_composite?: boolean // Composite routing enabled.
-  composite_groups?: Array<{
-    group_id: number // Routing group identifier.
-    prefix: string // Composite routing prefix.
-  }> // Prefix-to-group routing entries.
   status?: 'active' | 'inactive' // Current lifecycle state.
   fast_mode_policy?: ApiKeyFastModePolicy // Key acceleration preference.
   billing_mode?: ApiKeyBillingMode // Request funding mode.

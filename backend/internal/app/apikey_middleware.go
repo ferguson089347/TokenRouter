@@ -11,6 +11,7 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/config"
 	gatewayhttp "github.com/TokenFlux/TokenRouter/internal/gateway/httpapi"
 	"github.com/TokenFlux/TokenRouter/internal/gateway/requeststate"
+	"github.com/TokenFlux/TokenRouter/internal/gateway/session"
 	"github.com/TokenFlux/TokenRouter/internal/routing"
 	"github.com/TokenFlux/TokenRouter/internal/server/clientip"
 	"github.com/TokenFlux/TokenRouter/internal/server/middleware"
@@ -37,7 +38,7 @@ import (
 //
 // CopyAPIKey copies user and actor views, group views, and the composite-group
 // slice. Other key reference fields remain shared with the callback's input.
-func newGatewayAuthorization(keys *apikey.APIKeyService, subscriptions *billing.SubscriptionService, cfg *config.Config, google bool) gin.HandlerFunc {
+func newGatewayAuthorization(keys *apikey.APIKeyService, subscriptions *billing.SubscriptionService, cfg *config.Config, google bool, cache session.GatewayCache, responses session.OpenAIWSStateStore) gin.HandlerFunc {
 	options := gatewayhttp.APIKeyAuthorizationOptions{
 		Authentication: keyhttp.AuthenticationOptions{
 			Google: google, Context: func(c *gin.Context) context.Context { return c.Request.Context() },
@@ -72,18 +73,22 @@ func newGatewayAuthorization(keys *apikey.APIKeyService, subscriptions *billing.
 		reader = subscriptions
 	}
 	nativeKeys := keys
+	var authenticate gin.HandlerFunc
 	if google {
-		return gatewayhttp.NewGoogleAPIKeyAuthorization(nativeKeys, reader, options)
+		authenticate = gatewayhttp.NewGoogleAPIKeyAuthorization(nativeKeys, reader, options)
+	} else {
+		authenticate = gatewayhttp.NewAPIKeyAuthorization(nativeKeys, reader, options)
 	}
-	return gatewayhttp.NewAPIKeyAuthorization(nativeKeys, reader, options)
+	cooldown, _ := cache.(gatewayhttp.ChannelCooldownCache)
+	return gatewayhttp.WithAutomaticChannelRouting(authenticate, cooldown, responses)
 }
 
 // provideAPIKeyAuth constructs standard API key middleware with application
 // observation and context-binding callbacks. It uses newGatewayAuthorization's
 // configured IP trust policy; nil subscriptions leave the optional subscription
 // reader unset.
-func provideAPIKeyAuth(keys *apikey.APIKeyService, subscriptions *billing.SubscriptionService, cfg *config.Config) keyhttp.APIKeyAuthMiddleware {
-	return keyhttp.APIKeyAuthMiddleware(newGatewayAuthorization(keys, subscriptions, cfg, false))
+func provideAPIKeyAuth(keys *apikey.APIKeyService, subscriptions *billing.SubscriptionService, cfg *config.Config, cache session.GatewayCache, responses session.OpenAIWSStateStore) keyhttp.APIKeyAuthMiddleware {
+	return keyhttp.APIKeyAuthMiddleware(newGatewayAuthorization(keys, subscriptions, cfg, false, cache, responses))
 }
 
 // bindLegacyAuthorizationGroup makes a hydrated authorization group available

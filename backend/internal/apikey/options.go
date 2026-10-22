@@ -81,6 +81,11 @@ type InvalidAuthAbuseConfig struct {
 // Options supplies authentication startup values and retained callbacks for Key
 // operations.
 type Options struct {
+	// RoutingSettings supplies current administrator channels. ResolveGroupModel
+	// supplies model and protocol eligibility; assembly installs both dependencies
+	// before concurrent requests access this retained Options pointer.
+	RoutingSettings   KeyRoutingSettings                                                 // shared persistent default channel settings
+	ResolveGroupModel func(context.Context, int64, string, string, string) (bool, error) // current model and protocol eligibility
 	// Now is read at each expiry or outbox scheduling decision when supplied.
 	// Install a concurrency-safe callback before concurrent use of the retained Options.
 	Now func() time.Time

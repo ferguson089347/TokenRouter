@@ -42,6 +42,7 @@ const geminiStickySessionTTL = time.Hour
 // for hydration, and the final admitted group's scheduler mode controls
 // candidate ordering.
 func (s *Gemini) SelectProviderForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*gatewayprovider.ExecutionProvider, error) {
+	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	ctx = withSelectionRequest(ctx, groupID, requestedModel)
 	core, scope := s.geminiSelector()
 	selected, err := core.SelectOnly(ctx, schedulercore.SelectionInput{
@@ -351,6 +352,7 @@ func (s *Gemini) selectAdvancedGeminiProvider(
 // every relevant record rejects the model, routing builds the advertised model
 // list from the supplied candidates.
 func (s *Gemini) groupModelUnsupportedErrorIfApplicable(ctx context.Context, providers []gatewayprovider.ExecutionProvider, requestedModel string, platform string, excludedIDs map[int64]struct{}, useMixedScheduling bool) error {
+	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	requestedModel = strings.TrimSpace(requestedModel)
 	if requestedModel == "" || len(providers) == 0 {
 		return nil

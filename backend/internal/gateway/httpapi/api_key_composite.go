@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -23,19 +24,18 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/server/httpx"
 )
 
-// api_key_composite.go selects a composite key's group and rewrites prefixed
-// model names across HTTP representations. A composite credential selects its
-// request group from a client model prefix, while upstream requests use the
-// remaining model ID. JSON, multipart, and Gemini URL parameters carry that
-// identity differently, so extraction and rewriting follow the endpoint's
-// representation. Model-less reads retain the composite credential and mark
-// group assignment as unnecessary; connection endpoints that can change models
-// are rejected before group selection.
+// api_key_composite.go selects a request channel from its complete model name
+// and adapts model fields shared with Key redirects. JSON, multipart, and Gemini
+// URL parameters carry the same identity in different representations. Extraction
+// restores consumed bodies so the existing protocol handler can parse them after
+// authorization, and model-less reads mark group assignment as unnecessary.
 //
-// The original prefixed name remains in request context and response output.
-// Additional tool models can select the same binding, while a known prefix for
-// another group rejects the request. Body reconstruction updates its length and,
-// for multipart output, its boundary so downstream parsers read the rewritten data.
+// The Key service combines channel order, model support, protocol permission,
+// payer access and subscription coverage before funding admission. Selection
+// leaves the client payload intact. Redirect helpers reconstruct changed JSON
+// or multipart bodies with correct length and boundaries, while response model
+// restoration changes protocol metadata independently of generated text. Connection
+// endpoints requiring later model selection reject before this HTTP routing step.
 
 // CompositeKeyNoGroupContextKey marks model-less composite requests so group
 // assignment middleware accepts their unselected credential while other admission checks continue.
@@ -45,25 +45,26 @@ const CompositeKeyNoGroupContextKey = "composite_key_no_group"
 type CompositeModelResponseWriter struct {
 	gin.ResponseWriter // downstream protocol output
 	// clientModel and actualModel belong to the same selected request. Write
-	// restores actualModel-shaped metadata to clientModel, which includes the client's group prefix.
-	clientModel string // prefixed client model
-	actualModel string // unprefixed request model
+	// restores actualModel-shaped metadata to clientModel, which identifies the client-facing model name.
+	clientModel string // client-facing model identifier
+	actualModel string // resolved request model identifier
 }
 
-// ResolveCompositeAPIKeyRequest selects the group from the model prefix and strips that prefix for forwarding.
-// Ordinary or nil keys pass through. Composite model-less reads retain the key
-// and mark the request for group-assignment middleware, while unsupported
-// connection endpoints return a local composite-key error.
+// ResolveCompositeAPIKeyRequest binds the first eligible channel for a model call.
+// Fixed managed views pass through, while model-less reads mark group assignment
+// as unnecessary. Unsupported connection endpoints reject before payload lookup.
 //
-// Model-bearing requests are rewritten before the service creates and authorizes
-// a group-specific key view. Successful selection installs response restoration
-// and client-model telemetry together, preserving the association between the
-// chosen group, its internal model, and the client's prefixed name. Callers stop
-// admission on error because parameter or body rewriting may already have occurred.
+// The full client model, including any vendor path, reaches the Key service
+// together with the route protocol and forced platform. Selection changes the
+// returned request-owned Key view; later alias processing owns payload changes.
+// Callers stop admission on selection failure before checking funds or forwarding.
 // @project-doc docs/domains/composite_api_keys.md#group_selection
 func ResolveCompositeAPIKeyRequest(c *gin.Context, apiKeyService *apikey.APIKeyService, apiKey *apikey.APIKey) (*apikey.APIKey, error) {
 	if apiKey == nil || !apiKey.IsComposite {
 		return apiKey, nil
+	}
+	if err := prepareChannelRouting(c, apiKey, apiKeyService); err != nil {
+		return nil, err
 	}
 	if IsCompositeKeyUnsupportedEndpoint(c.Request.Method, c.Request.URL.Path, c.FullPath()) {
 		return nil, apikey.ErrCompositeKeyUnsupported
@@ -74,50 +75,83 @@ func ResolveCompositeAPIKeyRequest(c *gin.Context, apiKeyService *apikey.APIKeyS
 	}
 
 	var originalModel string
-	var actualModel string
-	var binding *apikey.APIKeyCompositeGroup
 	var err error
 	if IsGeminiNativeModelEndpoint(c.Request.URL.Path) {
-		// Gemini actions encode the group prefix in route parameters, so replace
-		// their model portion while retaining the action used by native dispatch.
 		originalModel, err = CompositeGeminiModelFromParams(c)
-		if err == nil {
-			binding, actualModel, err = apiKey.ResolveCompositeModel(originalModel)
-		}
-		if err == nil {
-			RewriteCompositeGeminiParams(c, actualModel)
-		}
 	} else {
-		// Resolve tool models against the chosen binding before replacing the main
-		// model; one HTTP request cannot carry separately authorized composite groups.
 		originalModel, err = CompositeModelFromRequest(c.Request)
-		if err == nil {
-			binding, actualModel, err = apiKey.ResolveCompositeModel(originalModel)
-		}
-		if err == nil {
-			err = RewriteCompositeAdditionalModels(c.Request, apiKey, binding)
-		}
-		if err == nil {
-			err = RewriteCompositeRequestModel(c.Request, actualModel)
-		}
 	}
 	if err != nil {
 		return nil, err
 	}
-
-	selected, err := apiKeyService.SelectCompositeGroupForRequest(c.Request.Context(), apiKey, binding)
+	if value, ok := c.Get(channelRoutingContextKey); ok {
+		if execution, ok := value.(*channelRoutingExecution); ok && execution.active {
+			execution.model = originalModel
+		}
+	}
+	clientProtocol := string(compositeRequestProtocol(c.Request.Method, c.Request.URL.Path))
+	forced, _ := keyhttp.GetForcePlatformFromContext(c)
+	selected, err := apiKeyService.SelectModelGroup(c.Request.Context(), apiKey, originalModel, clientProtocol, forced)
 	if err != nil {
+		if value, ok := c.Get(channelRoutingContextKey); ok {
+			if execution, ok := value.(*channelRoutingExecution); ok && execution.active {
+				execution.exhausted = infraerrors.Reason(err) == "MODEL_NOT_AVAILABLE"
+				if execution.exhausted {
+					if ttl := execution.retryAfter(); ttl > 0 {
+						c.Header("Retry-After", fmt.Sprint(max(1, int(math.Ceil(ttl.Seconds())))))
+						err = infraerrors.ServiceUnavailable("ROUTING_CHANNELS_COOLING", "Matching routing providers are cooling down")
+					}
+				}
+			}
+		}
 		return nil, err
 	}
-	SetCompositeModelContext(c, originalModel, actualModel)
+	if value, ok := c.Get(channelRoutingContextKey); ok {
+		if execution, ok := value.(*channelRoutingExecution); ok && execution.active {
+			execution.groupID = selected.Group.ID
+		}
+	}
 	return selected, nil
+}
+
+// compositeRequestProtocol identifies model admission for text and extended routes.
+// Text and Gemini endpoints use dedicated protocol guards, so their display-only
+// catalogue entries have no extended route metadata. Normalize their registered
+// aliases here before channel selection; the later guards recheck the selected
+// group using the same protocol, including token-count and compact subpaths.
+func compositeRequestProtocol(method, path string) ProtocolID {
+	if strings.HasPrefix(path, "/antigravity/") {
+		path = strings.TrimPrefix(path, "/antigravity")
+	}
+	if method == http.MethodPost && strings.HasPrefix(path, EndpointGeminiModels+"/") {
+		return ProtocolGeminiGenerateContent
+	}
+	for _, prefix := range []string{"/backend-api/codex", "/v1"} {
+		if strings.HasPrefix(path, prefix+"/") {
+			path = strings.TrimPrefix(path, prefix)
+		}
+	}
+	if method == http.MethodPost {
+		switch {
+		case path == "/messages" || path == "/messages/count_tokens":
+			return ProtocolAnthropicMessages
+		case path == "/chat/completions":
+			return ProtocolOpenAIChatCompletions
+		case path == "/responses/compact" || strings.HasPrefix(path, "/responses/compact/"):
+			return ProtocolResponsesCompact
+		case path == "/responses" || strings.HasPrefix(path, "/responses/"):
+			return ProtocolOpenAIResponses
+		}
+	}
+	result, _ := ProtocolForRoute(method, path)
+	return result
 }
 
 // SetCompositeModelContext records client and internal model names for logging
 // and response restoration. A nil context is ignored; otherwise the current
-// writer is wrapped and any request receives the prefixed client model in telemetry.
+// writer is wrapped and any request receives the client-facing model identifier in telemetry.
 //
-// The two names describe one request after prefix selection. Keeping them beside
+// The two names describe one request after model rewriting. Keeping them beside
 // the writer lets subsequent output restore model metadata even after upstream
 // preparation changes the payload, while GetCompositeModelFromContext supplies
 // the same names to later key redirects and observation code. Repeated calls add
@@ -143,7 +177,7 @@ func SetCompositeModelContext(c *gin.Context, clientModel, actualModel string) {
 // It removes Content-Length because rewriting can change output size and returns
 // the input byte count together with the downstream error, even when writing fails.
 func (w *CompositeModelResponseWriter) Write(data []byte) (int, error) {
-	// The client's prefixed model can be longer than the internal model, so a
+	// The client's original model can be longer than the internal model, so a
 	// length computed before metadata restoration cannot describe the emitted response.
 	w.Header().Del("Content-Length")
 	rewritten := ReplaceCompositeResponseModel(data, w.actualModel, w.clientModel)
@@ -187,7 +221,7 @@ func IsCompositeKeyNoModelEndpoint(method, path string) bool {
 
 // IsCompositeKeyModelListEndpoint identifies model lists that aggregate composite key mappings.
 // It accepts GET requests and removes one trailing slash before comparing the
-// supported paths; a model list is independent of a single prefixed request model.
+// supported paths; a model list is independent of a single selected request model.
 func IsCompositeKeyModelListEndpoint(method, path string) bool {
 	if method != http.MethodGet {
 		return false
@@ -245,36 +279,34 @@ func IsGeminiNativeModelEndpoint(path string) bool {
 	return strings.Contains(path, "/v1beta/models/")
 }
 
-// CompositeGeminiModelFromParams extracts the prefixed model from Gemini URL parameters.
-// GET uses model; prefixed POST routes join prefix and model, while wildcard
+// CompositeGeminiModelFromParams extracts the complete model from Gemini URL parameters.
+// GET uses model; split POST routes join model path segments, while wildcard
 // routes split modelAction at its last colon. Missing model information returns
-// the composite-prefix-required error before a binding can be selected.
+// the missing-model error before a binding can be selected.
 //
-// The result still carries the group prefix for APIKey.ResolveCompositeModel to
-// validate and split. Nested model-path segments remain in that string, while
-// the wildcard action suffix is excluded from group resolution. Callers update
-// Gin parameters separately after selecting the internal model.
+// The result retains all vendor path segments for channel selection. Its
+// complete identifier reaches the shared requestable catalogue after extraction.
 func CompositeGeminiModelFromParams(c *gin.Context) (string, error) {
 	// Route templates supply model, prefix/model, or modelAction parameters.
 	// Reduce them to one client model for binding resolution; the action suffix belongs to dispatch.
 	if c.Request.Method == http.MethodGet {
 		model := strings.TrimPrefix(strings.TrimSpace(c.Param("model")), "/")
 		if model == "" {
-			return "", apikey.ErrCompositeKeyPrefixRequired
+			return "", apikey.ErrModelRequired
 		}
 		return model, nil
 	}
 	if prefix := strings.TrimSpace(c.Param("prefix")); prefix != "" {
 		model := strings.TrimPrefix(strings.TrimSpace(c.Param("model")), "/")
 		if model == "" {
-			return "", apikey.ErrCompositeKeyPrefixRequired
+			return "", apikey.ErrModelRequired
 		}
 		return prefix + "/" + model, nil
 	}
 	modelAction := strings.TrimPrefix(strings.TrimSpace(c.Param("modelAction")), "/")
 	separator := strings.LastIndex(modelAction, ":")
 	if separator <= 0 {
-		return "", apikey.ErrCompositeKeyPrefixRequired
+		return "", apikey.ErrModelRequired
 	}
 	return modelAction[:separator], nil
 }
@@ -306,7 +338,7 @@ func RewriteCompositeGeminiParams(c *gin.Context, actualModel string) {
 
 // CompositeModelFromRequest reads the top-level model from JSON or multipart input.
 // Successful body reading restores bytes for downstream handlers. Missing or empty
-// model values return the composite-prefix-required error; content decoding failures
+// model values return the missing-model error; content decoding failures
 // are returned to admission instead of selecting a group.
 func CompositeModelFromRequest(request *http.Request) (string, error) {
 	// Use the parsed media type for multipart dispatch; other results take JSON
@@ -319,17 +351,35 @@ func CompositeModelFromRequest(request *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	model := strings.TrimSpace(gjson.GetBytes(body, "model").String())
-	if model == "" {
-		return "", apikey.ErrCompositeKeyPrefixRequired
+	if !gjson.ValidBytes(body) || !gjson.ParseBytes(body).IsObject() {
+		return "", infraerrors.BadRequest("INVALID_MODEL_REQUEST", "Invalid JSON model request")
 	}
-	return model, nil
+	var model gjson.Result
+	count := 0
+	canonical := true
+	// Different decoders can accept duplicate keys differently. Reject every
+	// alternate spelling so selection and forwarding identify exactly one model.
+	gjson.ParseBytes(body).ForEach(func(key, value gjson.Result) bool {
+		if strings.EqualFold(key.String(), "model") {
+			count++
+			canonical = canonical && key.String() == "model"
+			model = value
+		}
+		return count <= 1
+	})
+	if count > 1 || !canonical {
+		return "", infraerrors.BadRequest("INVALID_MODEL_REQUEST", "Ambiguous model field")
+	}
+	if model.Type != gjson.String || strings.TrimSpace(model.String()) == "" {
+		return "", apikey.ErrModelRequired
+	}
+	return strings.TrimSpace(model.String()), nil
 }
 
 // RewriteCompositeRequestModel replaces the request's top-level internal model.
 // Multipart requests are rebuilt through RewriteMultipartModel; JSON rewriting
 // updates the readable body and length. Invalid JSON replacement returns the
-// composite-prefix-required error so admission stops before forwarding.
+// missing-model error so admission stops before forwarding.
 func RewriteCompositeRequestModel(request *http.Request, actualModel string) error {
 	// Use the parsed media type for multipart dispatch; otherwise sjson handles
 	// the body and supplies the replacement error returned to composite admission.
@@ -343,64 +393,16 @@ func RewriteCompositeRequestModel(request *http.Request, actualModel string) err
 	}
 	rewritten, err := sjson.SetBytes(body, "model", actualModel)
 	if err != nil {
-		// Present the patch failure as a composite-prefix error so admission stops
+		// Present the patch failure as a missing-model error so admission stops
 		// before installing an unsuccessful primary-model rewrite or selecting its provider.
-		return apikey.ErrCompositeKeyPrefixRequired
-	}
-	SetRequestBody(request, rewritten)
-	return nil
-}
-
-// RewriteCompositeAdditionalModels resolves additional models declared by Responses tools.
-// It strips same-group prefixes and rejects cross-group models because a request has one selected route.
-// Multipart input or missing selection data is ignored. Tool model strings that
-// fail composite resolution remain unchanged, including vendor IDs containing slashes.
-//
-// Recognized prefixes are checked against the main model's selected group before
-// any rewritten body is installed. A different group or failed JSON update
-// returns the unsupported-composite error; successful replacements are published
-// together so later handlers receive a single group-consistent request body.
-func RewriteCompositeAdditionalModels(request *http.Request, apiKey *apikey.APIKey, selected *apikey.APIKeyCompositeGroup) error {
-	// Multipart tool payloads are left for media handlers. Other parsed media
-	// types use the JSON tools array even when content-type parameters are malformed.
-	mediaType, _, _ := mime.ParseMediaType(request.Header.Get("Content-Type"))
-	if strings.HasPrefix(mediaType, "multipart/") || apiKey == nil || selected == nil {
-		return nil
-	}
-	body, err := ReadAndRestoreRequestBody(request)
-	if err != nil {
-		return err
-	}
-	rewritten := body
-	for index, tool := range gjson.GetBytes(body, "tools").Array() {
-		model := strings.TrimSpace(tool.Get("model").String())
-		if model == "" {
-			continue
-		}
-		binding, actualModel, resolveErr := apiKey.ResolveCompositeModel(model)
-		if resolveErr != nil {
-			// Vendor model IDs may contain slashes without naming a composite group.
-			// Keep unresolved tool model strings so ordinary tool-model routing can interpret them.
-			continue
-		}
-		if binding.GroupID != selected.GroupID {
-			// Reject a different group before publishing accumulated tool patches.
-			// The selected main route supplies this request's authorization and cannot cover that other group.
-			return apikey.ErrCompositeKeyUnsupported
-		}
-		rewritten, err = sjson.SetBytes(rewritten, fmt.Sprintf("tools.%d.model", index), actualModel)
-		if err != nil {
-			// Present an unusable tool-model rewrite as an unsupported composite request,
-			// preventing partial replacements from being installed for a selected group.
-			return apikey.ErrCompositeKeyUnsupported
-		}
+		return apikey.ErrModelRequired
 	}
 	SetRequestBody(request, rewritten)
 	return nil
 }
 
 // ReadAndRestoreRequestBody reads a request body and leaves bytes for later handlers.
-// Missing input returns the composite-prefix-required error. After a successful
+// Missing input returns the missing-model error. After a successful
 // raw read, the request is reset before content decoding is attempted.
 //
 // Encoded bodies are decoded using a cloned request so a decoding failure leaves
@@ -415,7 +417,7 @@ func RewriteCompositeAdditionalModels(request *http.Request, apiKey *apikey.APIK
 // and retain cleanup responsibility for the replaced original body.
 func ReadAndRestoreRequestBody(request *http.Request) ([]byte, error) {
 	if request == nil || request.Body == nil {
-		return nil, apikey.ErrCompositeKeyPrefixRequired
+		return nil, apikey.ErrModelRequired
 	}
 	rawBody, err := io.ReadAll(request.Body)
 	if err != nil {
@@ -455,7 +457,7 @@ func SetRequestBody(request *http.Request, body []byte) {
 
 // MultipartModel reads the first multipart field named model and trims its value.
 // It restores the request body before parsing. Missing fields, empty values, or
-// an invalid multipart content type return the composite-prefix-required error;
+// an invalid multipart content type return the missing-model error;
 // part-read failures are returned directly.
 func MultipartModel(request *http.Request) (string, error) {
 	body, err := ReadAndRestoreRequestBody(request)
@@ -464,37 +466,51 @@ func MultipartModel(request *http.Request) (string, error) {
 	}
 	mediaType, params, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
 	if err != nil || !strings.HasPrefix(mediaType, "multipart/") {
-		return "", apikey.ErrCompositeKeyPrefixRequired
+		return "", apikey.ErrModelRequired
 	}
 	reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	model := ""
+	found := false
 	for {
-		part, nextErr := reader.NextPart()
-		if errors.Is(nextErr, io.EOF) {
+		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
 			break
 		}
-		if nextErr != nil {
-			return "", nextErr
+		if err != nil {
+			return "", err
 		}
-		if part.FormName() == "model" {
-			value, readErr := io.ReadAll(part)
-			if readErr != nil {
-				return "", readErr
+		if !strings.EqualFold(strings.TrimSpace(part.FormName()), "model") {
+			if err := part.Close(); err != nil {
+				return "", err
 			}
-			model := strings.TrimSpace(string(value))
-			if model == "" {
-				return "", apikey.ErrCompositeKeyPrefixRequired
-			}
-			return model, nil
+			continue
 		}
+		if found || part.FormName() != "model" || part.FileName() != "" {
+			_ = part.Close()
+			return "", infraerrors.BadRequest("INVALID_MODEL_REQUEST", "Ambiguous model field")
+		}
+		value, err := io.ReadAll(part)
+		closeErr := part.Close()
+		if err != nil {
+			return "", err
+		}
+		if closeErr != nil {
+			return "", closeErr
+		}
+		model = strings.TrimSpace(string(value))
+		found = true
 	}
-	return "", apikey.ErrCompositeKeyPrefixRequired
+	if !found || model == "" {
+		return "", apikey.ErrModelRequired
+	}
+	return model, nil
 }
 
 // RewriteMultipartModel rebuilds multipart input with actualModel in every model field.
 // It copies headers and other contents exposed by multipart.Reader.NextPart in
 // input order. NextPart decodes quoted-printable contents and removes their
 // transfer-encoding header, so reconstruction uses that decoded representation.
-// Missing model fields or an invalid multipart content type return a composite-prefix error.
+// Missing model fields or an invalid multipart content type return a missing-model error.
 //
 // The replacement writer chooses a new multipart boundary, so its finalized
 // content type and bytes are installed together after all parts have been copied.
@@ -508,7 +524,7 @@ func RewriteMultipartModel(request *http.Request, actualModel string) error {
 	}
 	mediaType, params, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
 	if err != nil || !strings.HasPrefix(mediaType, "multipart/") {
-		return apikey.ErrCompositeKeyPrefixRequired
+		return apikey.ErrModelRequired
 	}
 	reader := multipart.NewReader(bytes.NewReader(body), params["boundary"])
 	var output bytes.Buffer
@@ -539,7 +555,7 @@ func RewriteMultipartModel(request *http.Request, actualModel string) error {
 		}
 	}
 	if !found {
-		return apikey.ErrCompositeKeyPrefixRequired
+		return apikey.ErrModelRequired
 	}
 	// Finalize the closing boundary before publishing its content type and body;
 	// downstream multipart parsers require those two representations to describe the same parts.

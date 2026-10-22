@@ -12,6 +12,7 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/gateway"
 	gatewayhttp "github.com/TokenFlux/TokenRouter/internal/gateway/httpapi"
 	"github.com/TokenFlux/TokenRouter/internal/gateway/requeststate"
+	"github.com/TokenFlux/TokenRouter/internal/gateway/session"
 	"github.com/TokenFlux/TokenRouter/internal/ops"
 	"github.com/TokenFlux/TokenRouter/internal/protocol"
 	"github.com/TokenFlux/TokenRouter/internal/routing"
@@ -40,6 +41,8 @@ func provideGatewayRouteMiddleware(
 	clients *messageHTTPBindings,
 	attributes *routing.ModelAttributeService,
 	settings *gateway.RuntimeSettings,
+	cache session.GatewayCache,
+	responses session.OpenAIWSStateStore,
 ) gatewayhttp.RouteMiddleware {
 	var clientFallback gatewayhttp.ClientGroupFallbackResolver
 	if clients != nil {
@@ -57,7 +60,7 @@ func provideGatewayRouteMiddleware(
 		},
 		ClientGroupFallback:   clientFallback,
 		APIKeyAuth:            gin.HandlerFunc(apiKeyAuth),
-		GoogleAPIKeyAuth:      newGatewayAuthorization(apiKeyService, subscriptionService, cfg, true),
+		GoogleAPIKeyAuth:      newGatewayAuthorization(apiKeyService, subscriptionService, cfg, true, cache, responses),
 		BodyLimit:             middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize),
 		TextBodyLimit:         middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize),
 		ClientRequestID:       middleware.ClientRequestID(),

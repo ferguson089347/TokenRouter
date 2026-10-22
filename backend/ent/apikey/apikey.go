@@ -35,6 +35,8 @@ const (
 	FieldGroupID = "group_id"
 	// FieldIsComposite holds the string denoting the is_composite field in the database.
 	FieldIsComposite = "is_composite"
+	// FieldUseDefaultGroups holds the string denoting the use_default_groups field in the database.
+	FieldUseDefaultGroups = "use_default_groups"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldFastModePolicy holds the string denoting the fast_mode_policy field in the database.
@@ -145,6 +147,7 @@ var Columns = []string{
 	FieldName,
 	FieldGroupID,
 	FieldIsComposite,
+	FieldUseDefaultGroups,
 	FieldStatus,
 	FieldFastModePolicy,
 	FieldBillingMode,
@@ -203,6 +206,8 @@ var (
 	NameValidator func(string) error
 	// DefaultIsComposite holds the default value on creation for the "is_composite" field.
 	DefaultIsComposite bool
+	// DefaultUseDefaultGroups holds the default value on creation for the "use_default_groups" field.
+	DefaultUseDefaultGroups bool
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -303,6 +308,11 @@ func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 // ByIsComposite orders the results by the is_composite field.
 func ByIsComposite(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsComposite, opts...).ToFunc()
+}
+
+// ByUseDefaultGroups orders the results by the use_default_groups field.
+func ByUseDefaultGroups(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUseDefaultGroups, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

@@ -11,7 +11,7 @@
 // before cache closure. request_limits.go and rediscache maintain admitted
 // request leases separately from cached configuration.
 //
-// composite.go, model_mapping.go and runtime_group.go resolve group prefixes,
+// routing.go, composite.go, model_mapping.go and runtime_group.go resolve ordered channels,
 // Key aliases and permitted fallback targets. access_context.go and
 // request_metadata.go carry request decisions; reauthenticate.go reloads current
 // identity for later connection turns. admin.go, credential_rotation.go and

@@ -17,6 +17,7 @@
 //   - openai_responses_execution.go executes a Responses attempt and dispatches the upstream protocol.
 //
 // File groups:
+//   - channel_routing.go and channel_writer.go: ordered automatic replay and bounded failure buffering.
 //   - authorization.go, api_key*.go, and routes*.go handle authentication, key model rewriting, and protocol admission.
 //   - messages*.go, compatible_text*.go, and gemini_native*.go prepare Messages, generic Responses/Chat, and Gemini entries.
 //   - openai_text*.go and openai_protocol_execution*.go handle OpenAI text entries and protocol execution.

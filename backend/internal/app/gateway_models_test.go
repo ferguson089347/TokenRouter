@@ -456,9 +456,9 @@ func TestAntigravityModelsExcludesAliasWhoseTargetIsUnavailableToBoundGroup(t *t
 }
 
 // TestGatewayModelsCompositeKeyAggregatesMappingsInOrder combines OpenAI and
-// Anthropic groups with ordered prefixes. It checks available exact aliases,
-// omission of unavailable/wildcard aliases, and all GPT-prefixed models
-// preceding Claude-prefixed models in the returned list.
+// Anthropic groups in saved channel order. It checks available exact aliases,
+// omission of unavailable and wildcard aliases, and original identifiers ordered
+// by the first eligible channel in the returned list.
 func TestGatewayModelsCompositeKeyAggregatesMappingsInOrder(t *testing.T) {
 	openAIGroupID := int64(50)
 	anthropicGroupID := int64(51)
@@ -499,23 +499,9 @@ func TestGatewayModelsCompositeKeyAggregatesMappingsInOrder(t *testing.T) {
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &got))
 	ids := modelIDsForTest(got.Data)
 	require.NotEmpty(t, ids)
-	require.Contains(t, ids, "GPT/review")
-	require.NotContains(t, ids, "GPT/missing-alias")
-	require.NotContains(t, ids, "GPT/wild-*")
-	firstClaude := -1
-	for index, id := range ids {
-		if len(id) >= len("Claude/") && id[:len("Claude/")] == "Claude/" {
-			firstClaude = index
-			break
-		}
-		require.Contains(t, id, "GPT/")
-	}
-	require.Greater(t, firstClaude, 0)
-	for _, id := range ids[firstClaude:] {
-		require.Contains(t, id, "Claude/")
-	}
-	require.Contains(t, ids, "GPT/gpt-5")
-	require.Contains(t, ids, "Claude/claude-sonnet-4-6")
+	require.Equal(t, []string{"gpt-5", "review", "claude-sonnet-4-6"}, ids)
+	require.NotContains(t, ids, "missing-alias")
+	require.NotContains(t, ids, "wild-*")
 }
 
 // TestGatewayModelsCompositeKeyFiltersPreferredSubscriptionMappings supplies a
@@ -564,7 +550,7 @@ func TestGatewayModelsCompositeKeyFiltersPreferredSubscriptionMappings(t *testin
 	var got gatewayModelsResponseForTest
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &got))
 	ids := modelIDsForTest(got.Data)
-	require.Contains(t, ids, "Allowed/allowed-model")
+	require.Contains(t, ids, "allowed-model")
 	require.NotContains(t, ids, "Blocked/blocked-model")
 }
 

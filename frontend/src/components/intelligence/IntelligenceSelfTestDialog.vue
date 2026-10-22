@@ -84,7 +84,13 @@ const availableKeys = computed(() => keys.value.filter(eligible))
 const keyOptions = computed(() =>
   availableKeys.value.map((key) => ({
     value: key.id,
-    label: `${key.name} · ${channels.value.get(key.group_id!)}`,
+    label: `${key.name} · ${(key.routing_mode === 'single'
+      ? [{ group_id: key.group_id ?? 0 }]
+      : (key.groups ?? [])
+    )
+      .map((binding) => channels.value.get(binding.group_id))
+      .filter(Boolean)
+      .join(', ')}`,
   })),
 )
 const selectedKey = computed(() =>
@@ -92,20 +98,19 @@ const selectedKey = computed(() =>
 )
 const valid = computed(() => !!selectedKey.value)
 
-// eligible reports whether a current personal ordinary Key can fund a drawing.
+// eligible reports whether a current personal Key can fund a drawing.
 // Group availability, lifecycle, expiry, and quota are checked for display;
 // the service validates ownership and these conditions again before queue admission.
 function eligible(key: ApiKey): boolean {
   return (
     key.status === 'active' &&
-    !!key.group_id &&
-    !key.is_composite &&
-    !key.composite_groups?.length &&
     !key.team_id &&
     key.scope !== 'team' &&
     (!key.expires_at || Date.parse(key.expires_at) > Date.now()) &&
     (key.quota <= 0 || key.quota_used < key.quota) &&
-    channels.value.has(key.group_id)
+    (key.routing_mode === 'single'
+      ? channels.value.has(key.group_id ?? 0)
+      : (key.groups ?? []).some((binding) => channels.value.has(binding.group_id)))
   )
 }
 

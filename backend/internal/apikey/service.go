@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -83,16 +84,15 @@ var (
 	ErrPreferredSubscriptionInvalid      = billing.ErrPreferredSubscriptionInvalid
 	ErrPreferredSubscriptionGroup        = billing.ErrPreferredSubscriptionGroup
 	ErrPreferredSubscriptionInsufficient = billing.ErrPreferredSubscriptionInsufficient
-	ErrCompositeKeyGroupsRequired        = infraerrors.BadRequest("COMPOSITE_KEY_GROUPS_REQUIRED", "composite api key requires at least one group")
-	ErrCompositeKeyTooManyGroups         = infraerrors.BadRequest("COMPOSITE_KEY_TOO_MANY_GROUPS", "composite api key supports at most 20 groups")
+	ErrCompositeKeyGroupsRequired        = infraerrors.BadRequest("COMPOSITE_KEY_GROUPS_REQUIRED", "API key requires at least one channel")
+	ErrCompositeKeyTooManyGroups         = infraerrors.BadRequest("COMPOSITE_KEY_TOO_MANY_GROUPS", "API key supports at most 20 channels")
 	ErrCompositeKeyPrefixInvalid         = infraerrors.BadRequest("COMPOSITE_KEY_PREFIX_INVALID", "composite api key prefix is invalid")
 	ErrCompositeKeyPrefixDuplicate       = infraerrors.BadRequest("COMPOSITE_KEY_PREFIX_DUPLICATE", "composite api key prefixes must be unique")
-	ErrCompositeKeyGroupDuplicate        = infraerrors.BadRequest("COMPOSITE_KEY_GROUP_DUPLICATE", "composite api key groups must be unique")
+	ErrCompositeKeyGroupDuplicate        = infraerrors.BadRequest("COMPOSITE_KEY_GROUP_DUPLICATE", "API key channels must be unique")
 	ErrCompositeKeyGroupConflict         = infraerrors.BadRequest("COMPOSITE_KEY_GROUP_CONFLICT", "composite api key cannot use group_id")
 	ErrCompositeKeyTargetRequired        = infraerrors.BadRequest("COMPOSITE_KEY_TARGET_GROUP_REQUIRED", "converting a composite api key requires a target group")
-	ErrCompositeKeyPrefixRequired        = infraerrors.BadRequest("COMPOSITE_KEY_MODEL_PREFIX_REQUIRED", "composite api key model must use prefix/model_id")
-	ErrCompositeKeyPrefixNotFound        = infraerrors.BadRequest("COMPOSITE_KEY_PREFIX_NOT_FOUND", "composite api key model prefix was not found")
-	ErrCompositeKeyUnsupported           = infraerrors.BadRequest("COMPOSITE_KEY_ENDPOINT_UNSUPPORTED", "composite api key is not supported for this endpoint")
+	ErrModelRequired                     = infraerrors.BadRequest("MODEL_REQUIRED", "model is required")
+	ErrCompositeKeyUnsupported           = infraerrors.BadRequest("COMPOSITE_KEY_ENDPOINT_UNSUPPORTED", "this key does not support this endpoint")
 	// ErrAPIKeyExpired reports current timestamp expiration to spending admission
 	// callers before total-quota evaluation selects its separate rejection
 	// identity.
@@ -358,7 +358,10 @@ type APIKeyAuthCacheInvalidator interface {
 // CreateAPIKeyRequest carries submitted configuration choices for a personal or
 // team credential.
 type CreateAPIKeyRequest struct {
-	Name string `json:"name"` // submitted credential display name
+	// UseDefaultGroups derives channel bindings from current administrator settings
+	// and payer permission; otherwise CompositeGroups supplies the complete custom order.
+	UseDefaultGroups bool   // follow administrator channel defaults
+	Name             string `json:"name"` // submitted credential display name
 	// Scope is trimmed and lowercased before validation. Empty selects personal;
 	// team creation saves the supplied creator ID while current owner identity
 	// supplies permissions and funding.
@@ -416,8 +419,11 @@ type APIKeyBillingSubscriptionOption struct {
 // UpdateAPIKeyRequest retains omitted configuration separately from
 // replacements and explicit usage resets.
 type UpdateAPIKeyRequest struct {
-	Name    *string `json:"name"`     // optional submitted display name
-	GroupID *int64  `json:"group_id"` // optional ordinary target identifier
+	// UseDefaultGroups retains inheritance when nil. Switching to custom routing
+	// requires CompositeGroups, and enabling inheritance resolves current administrator settings.
+	UseDefaultGroups *bool   // optional channel inheritance replacement
+	Name             *string `json:"name"`     // optional submitted display name
+	GroupID          *int64  `json:"group_id"` // optional ordinary target identifier
 	// IsComposite selects the final Key mode when present. Converting to composite
 	// requires complete CompositeGroups; converting back requires a positive
 	// GroupID, and composite input rejects a simultaneous ordinary target.
@@ -1127,6 +1133,12 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		if req.GroupID != nil {
 			return nil, ErrCompositeKeyGroupConflict
 		}
+		if req.UseDefaultGroups {
+			req.CompositeGroups, err = s.defaultGroupInputs(ctx, user, preferredSubscription)
+			if err != nil {
+				return nil, err
+			}
+		}
 		compositeGroups, err = s.KeyPrepareCompositeGroups(ctx, user, req.CompositeGroups)
 		if err != nil {
 			return nil, err
@@ -1200,9 +1212,10 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		UserID:                       userID,
 		TeamID:                       teamID,
 		Key:                          key,
-		Name:                         html.EscapeString(req.Name),
+		Name:                         html.EscapeString(strings.TrimSpace(req.Name)),
 		GroupID:                      req.GroupID,
 		IsComposite:                  req.IsComposite,
+		UseDefaultGroups:             req.UseDefaultGroups,
 		CompositeGroups:              compositeGroups,
 		Status:                       StatusActive,
 		FastModePolicy:               fastModePolicy,
@@ -1219,6 +1232,9 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		RateLimit1d:                  req.RateLimit1d,
 		RateLimit7d:                  req.RateLimit7d,
 		FallbackWhenGroupUnavailable: fallbackWhenGroupUnavailable,
+	}
+	if apiKey.Name == "" {
+		apiKey.Name = "API Key"
 	}
 	apiKey.ActorUser = actor
 	apiKey.User = user
@@ -1240,14 +1256,30 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	return apiKey, nil
 }
 
-// List loads the creator's filtered Key page, then adds optional live
-// concurrency observations. Repository failure rejects the page; failed or
-// absent live-count reads leave the returned records usable with their existing
-// observation fields.
+// List loads the creator's filtered Key page with current channel defaults.
+// A positive group filter first resolves administrator membership, allowing the
+// repository to count and paginate inheriting Keys against the current settings.
+// Returned inherited credentials then receive their payer-authorized channel view.
+//
+// Setting or repository errors reject the page. Optional live-concurrency reads
+// follow configuration hydration, and a failed observation leaves existing
+// counts available while the credential's routing configuration remains usable.
 func (s *APIKeyService) List(ctx context.Context, userID int64, params pagination.PaginationParams, filters APIKeyListFilters) ([]APIKey, *pagination.PaginationResult, error) {
+	if filters.GroupID != nil && *filters.GroupID > 0 {
+		defaults, err := s.RoutingDefaults(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		filters.MatchInheritedGroups = slices.Contains(defaults, *filters.GroupID)
+	}
 	keys, pagination, err := s.apiKeyRepo.ListByUserID(ctx, userID, params, filters)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list api keys: %w", err)
+	}
+	for i := range keys {
+		if err := s.ApplyRoutingDefaults(ctx, &keys[i]); err != nil {
+			return nil, nil, err
+		}
 	}
 	s.KeyFillCurrentConcurrency(ctx, keys)
 	return keys, pagination, nil
@@ -1324,6 +1356,9 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 		// enrichment, so their identifiers return the normal missing-Key response.
 		return nil, fmt.Errorf("get api key: %w", ErrAPIKeyNotFound)
 	}
+	if err := s.ApplyRoutingDefaults(ctx, apiKey); err != nil {
+		return nil, err
+	}
 	s.KeyCompileAPIKeyIPRules(apiKey)
 	if apiKey != nil {
 		apiKey.CurrentConcurrency = s.KeyCurrentConcurrencyForAPIKey(ctx, apiKey.ID)
@@ -1336,23 +1371,38 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 // access, and stopping authentication rejects operation admission.
 //
 // Accepted snapshots are reconstructed before ordinary unavailable-group
-// selection and public-group permission checks; composite prefix selection
+// selection and public-group permission checks; model-based channel selection
 // occurs later. Configured singleflight shares an in-progress credential load
 // using its first caller's context, and waiting followers receive that result
 // without their own cancellation branch. Cache or snapshot misses can reach a
 // direct storage reload. The operation count remains held through all lookup
 // and reconstruction paths so shutdown waits before closing caches.
-func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, error) {
-	if key == "" || len(key) > MaxAPIKeyCredentialBytes {
+func (s *APIKeyService) GetByKey(ctx context.Context, credential string) (*APIKey, error) {
+	if s == nil || credential == "" || len(credential) > MaxAPIKeyCredentialBytes {
 		return nil, ErrAPIKeyNotFound
-	}
-	if s == nil {
-		return nil, fmt.Errorf("get api key: %w", ErrAPIKeyNotFound)
 	}
 	if !s.operations.enter() {
 		return nil, ErrAuthenticationStopped
 	}
 	defer s.operations.leave()
+	key, err := s.getByKeyCached(ctx, credential)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.ApplyRoutingDefaults(ctx, key); err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+// getByKeyCached reconstructs a request-owned credential from cache or storage.
+// Its caller validates credential size and holds authentication operation admission
+// across this lookup and later default hydration. Accepted snapshots become a
+// request view before fixed-group permission checks, and a missing usable snapshot
+// falls through to the direct storage reader. Configured singleflight coalesces
+// same-credential cache loads using its first callback context; each successful
+// reconstruction remains owned by its caller for model-based channel selection.
+func (s *APIKeyService) getByKeyCached(ctx context.Context, key string) (*APIKey, error) {
 	cacheKey := s.KeyAuthCacheKey(key)
 
 	if entry, ok := s.KeyGetAuthCacheEntry(ctx, cacheKey); ok {
@@ -1434,7 +1484,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 
 // SelectCompositeGroupForRequest builds an effective view for the supplied
 // composite binding and rechecks any configured unavailable target. Missing
-// Key, composite mode, binding or group reports an unknown prefix.
+// Key, multi-channel mode, binding or group returns a group-permission error.
 //
 // The Key struct, binding slice and payer struct are copied, while nested
 // references, the selected group and override pointer remain shared with the
@@ -1444,7 +1494,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 // occur afterward.
 func (s *APIKeyService) SelectCompositeGroupForRequest(ctx context.Context, apiKey *APIKey, binding *APIKeyCompositeGroup) (*APIKey, error) {
 	if apiKey == nil || !apiKey.IsComposite || binding == nil || binding.Group == nil {
-		return nil, ErrCompositeKeyPrefixNotFound
+		return nil, ErrGroupNotAllowed
 	}
 	// Give the chosen binding and payer override their own top-level request view;
 	// nested data remains shared until another helper copies it.
@@ -1578,6 +1628,13 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	// Compare the final status with this value to select the status column when needed.
 	originalStatus := apiKey.Status
 	originalIsComposite := apiKey.IsComposite
+	if req.UseDefaultGroups != nil {
+		if !*req.UseDefaultGroups && apiKey.UseDefaultGroups && req.CompositeGroups == nil && (req.IsComposite == nil || *req.IsComposite) {
+			return nil, ErrCompositeKeyGroupsRequired
+		}
+		apiKey.UseDefaultGroups = *req.UseDefaultGroups
+		fields.CompositeConfiguration = true
+	}
 
 	// Combine supplied funding choices with saved values before binding checks, so
 	// a plan change and a group change are validated as one final configuration.
@@ -1652,6 +1709,23 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	// also selects ordinary GroupID so stale single-group state cannot survive a
 	// composite replacement.
 	if targetComposite {
+		if apiKey.UseDefaultGroups && (req.UseDefaultGroups != nil || billingConfigurationRequested) {
+			payer, err := s.KeyBillingUserForAPIKey(ctx, apiKey)
+			if err != nil {
+				return nil, err
+			}
+			if targetBillingMode == APIKeyBillingModeSubscription && preferredSubscription == nil {
+				_, _, preferredSubscription, err = s.KeyResolveAPIKeyBillingConfiguration(ctx, payer.ID, targetBillingMode, targetPreferredSubscriptionID)
+				if err != nil {
+					return nil, err
+				}
+			}
+			inputs, err := s.defaultGroupInputs(ctx, payer, preferredSubscription)
+			if err != nil {
+				return nil, err
+			}
+			req.CompositeGroups = &inputs
+		}
 		if req.GroupID != nil {
 			return nil, ErrCompositeKeyGroupConflict
 		}

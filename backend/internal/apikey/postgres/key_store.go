@@ -237,6 +237,7 @@ func KeyCreateAPIKeyRecord(ctx context.Context, client *dbent.Client, key *keyco
 		SetName(key.Name).
 		SetStatus(key.Status).
 		SetIsComposite(key.IsComposite).
+		SetUseDefaultGroups(key.UseDefaultGroups).
 		SetFastModePolicy(KeyApiKeyFastModePolicyForPersistence(key.FastModePolicy)).
 		SetBillingMode(KeyApiKeyBillingModeForPersistence(key.BillingMode)).
 		SetNillablePreferredSubscriptionID(key.PreferredSubscriptionID).
@@ -421,6 +422,7 @@ func (r *KeyStore) GetByKeyForAuth(ctx context.Context, key string) (*keycore.AP
 			apikey.FieldCreatedAt,
 			apikey.FieldGroupID,
 			apikey.FieldIsComposite,
+			apikey.FieldUseDefaultGroups,
 			apikey.FieldName,
 			apikey.FieldStatus,
 			apikey.FieldFastModePolicy,
@@ -565,6 +567,7 @@ func (r *KeyStore) Update(ctx context.Context, key *keycore.APIKey, fields keyco
 	}
 	if fields.CompositeConfiguration {
 		builder.SetIsComposite(key.IsComposite)
+		builder.SetUseDefaultGroups(key.UseDefaultGroups)
 	}
 	if fields.FastModePolicy {
 		builder.SetFastModePolicy(KeyApiKeyFastModePolicyForPersistence(key.FastModePolicy))
@@ -785,7 +788,8 @@ func (r *KeyStore) KeyDeleteWithTombstone(ctx context.Context, exec *dbent.Clien
 // KeyApiKeyListByUserIDQuery builds a creator-scoped nondeleted query excluding
 // managed credentials. Text matches name or secret without case, zero group
 // selects ordinary Keys without an undeleted group, and nonzero group selects
-// ordinary or composite bindings. Personal and team scope narrow membership;
+// saved custom bindings or current inherited membership supplied by the service.
+// Personal and team scope narrow membership;
 // other scope text leaves both eligible.
 //
 // @project-doc docs/domains/routing_and_billing.md#api_key_group_filter
@@ -812,10 +816,14 @@ func (r *KeyStore) KeyApiKeyListByUserIDQuery(userID int64, filters keycore.APIK
 				apikey.IsCompositeEQ(false),
 			)
 		} else {
-			q = q.Where(apikey.Or(
-				apikey.GroupIDEQ(*filters.GroupID),
-				apikey.HasCompositeGroupsWith(apikeycompositegroup.GroupIDEQ(*filters.GroupID)),
-			))
+			bound := apikey.And(
+				apikey.Or(apikey.IsCompositeEQ(false), apikey.UseDefaultGroupsEQ(false)),
+				apikey.Or(apikey.GroupIDEQ(*filters.GroupID), apikey.HasCompositeGroupsWith(apikeycompositegroup.GroupIDEQ(*filters.GroupID))),
+			)
+			if filters.MatchInheritedGroups {
+				bound = apikey.Or(bound, apikey.And(apikey.IsCompositeEQ(true), apikey.UseDefaultGroupsEQ(true)))
+			}
+			q = q.Where(bound)
 		}
 	}
 	// Personal and team are the supported scope filters; empty includes both.
@@ -1267,6 +1275,7 @@ func KeyApiKeyEntityToService(m *dbent.APIKey) *keycore.APIKey {
 		UpdatedAt:                    m.UpdatedAt,
 		GroupID:                      m.GroupID,
 		IsComposite:                  m.IsComposite,
+		UseDefaultGroups:             m.UseDefaultGroups,
 		Quota:                        m.Quota,
 		QuotaUsed:                    m.QuotaUsed,
 		ExpiresAt:                    m.ExpiresAt,

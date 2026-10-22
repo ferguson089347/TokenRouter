@@ -133,6 +133,7 @@ type APIKeyMutation struct {
 	key                             *string
 	name                            *string
 	is_composite                    *bool
+	use_default_groups              *bool
 	status                          *string
 	fast_mode_policy                *string
 	billing_mode                    *string
@@ -683,6 +684,42 @@ func (m *APIKeyMutation) OldIsComposite(ctx context.Context) (v bool, err error)
 // ResetIsComposite resets all changes to the "is_composite" field.
 func (m *APIKeyMutation) ResetIsComposite() {
 	m.is_composite = nil
+}
+
+// SetUseDefaultGroups sets the "use_default_groups" field.
+func (m *APIKeyMutation) SetUseDefaultGroups(b bool) {
+	m.use_default_groups = &b
+}
+
+// UseDefaultGroups returns the value of the "use_default_groups" field in the mutation.
+func (m *APIKeyMutation) UseDefaultGroups() (r bool, exists bool) {
+	v := m.use_default_groups
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUseDefaultGroups returns the old "use_default_groups" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldUseDefaultGroups(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUseDefaultGroups is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUseDefaultGroups requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUseDefaultGroups: %w", err)
+	}
+	return oldValue.UseDefaultGroups, nil
+}
+
+// ResetUseDefaultGroups resets all changes to the "use_default_groups" field.
+func (m *APIKeyMutation) ResetUseDefaultGroups() {
+	m.use_default_groups = nil
 }
 
 // SetStatus sets the "status" field.
@@ -2142,7 +2179,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 34)
+	fields := make([]string, 0, 35)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -2172,6 +2209,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.is_composite != nil {
 		fields = append(fields, apikey.FieldIsComposite)
+	}
+	if m.use_default_groups != nil {
+		fields = append(fields, apikey.FieldUseDefaultGroups)
 	}
 	if m.status != nil {
 		fields = append(fields, apikey.FieldStatus)
@@ -2273,6 +2313,8 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case apikey.FieldIsComposite:
 		return m.IsComposite()
+	case apikey.FieldUseDefaultGroups:
+		return m.UseDefaultGroups()
 	case apikey.FieldStatus:
 		return m.Status()
 	case apikey.FieldFastModePolicy:
@@ -2350,6 +2392,8 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldGroupID(ctx)
 	case apikey.FieldIsComposite:
 		return m.OldIsComposite(ctx)
+	case apikey.FieldUseDefaultGroups:
+		return m.OldUseDefaultGroups(ctx)
 	case apikey.FieldStatus:
 		return m.OldStatus(ctx)
 	case apikey.FieldFastModePolicy:
@@ -2476,6 +2520,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIsComposite(v)
+		return nil
+	case apikey.FieldUseDefaultGroups:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUseDefaultGroups(v)
 		return nil
 	case apikey.FieldStatus:
 		v, ok := value.(string)
@@ -2933,6 +2984,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldIsComposite:
 		m.ResetIsComposite()
+		return nil
+	case apikey.FieldUseDefaultGroups:
+		m.ResetUseDefaultGroups()
 		return nil
 	case apikey.FieldStatus:
 		m.ResetStatus()
