@@ -18,7 +18,6 @@
 // File groups:
 //   - body.go, openai_view.go, user_message.go: body views and user-message extraction.
 //   - routing.go, attempt_route.go, model_body.go: plans, candidate resolution, and model replacement.
-//   - channel_attempt.go: automatic-routing replay, ownership cleanup and provider exclusions.
 //   - reasoning_effort*.go, thinking.go: effort levels, request policies, and thinking state.
 //   - execution_hints.go, health.go, credential_budget.go: hints, health observations, and credential deadlines.
 //   - guardian_affinity.go, gemini_signature.go: parent-session affinity and provider-signature cleanup.

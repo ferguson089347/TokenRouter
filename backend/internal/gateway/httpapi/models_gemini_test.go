@@ -35,10 +35,10 @@ func TestAppendAPIKeyAliasesToGeminiModelsJSON(t *testing.T) {
 	require.Equal(t, "next", gjson.GetBytes(body, "nextPageToken").String())
 }
 
-// TestGeminiSingleModelSelectsOnlyBoundTarget queries a Key alias, a hidden
-// model and an unavailable vendor path. Finite candidate resolution examines
-// eligible channels in priority order while complete catalogue enumeration
-// remains unused for single-resource requests.
+// TestGeminiSingleModelSelectsOnlyBoundTarget queries a composite alias,
+// hidden custom-list model and missing prefix. Only the chosen binding's
+// requested name and exact target reach selected resolution; full catalogue
+// resolution stays unused.
 func TestGeminiSingleModelSelectsOnlyBoundTarget(t *testing.T) {
 	group := &routing.Group{ID: 7, Status: "active", AllowedProtocols: []protocol.ProtocolID{protocol.ProtocolGeminiGenerateContent}, ModelsListConfig: routing.GroupModelsListConfig{Enabled: true, Models: []string{"known"}}}
 	other := &routing.Group{ID: 8, Status: "active", AllowedProtocols: group.AllowedProtocols}
@@ -48,7 +48,7 @@ func TestGeminiSingleModelSelectsOnlyBoundTarget(t *testing.T) {
 	for _, tc := range []struct {
 		name   string // requested public resource name
 		status int    // expected HTTP response status
-	}{{"alias", http.StatusOK}, {"hidden", http.StatusNotFound}, {"missing/known", http.StatusNotFound}} {
+	}{{"chosen/alias", http.StatusOK}, {"chosen/hidden", http.StatusNotFound}, {"missing/known", http.StatusNotFound}} {
 		p.selectedModels = nil
 		p.resolvedPlatforms = nil
 		c, recorder := modelsContext()
@@ -56,13 +56,13 @@ func TestGeminiSingleModelSelectsOnlyBoundTarget(t *testing.T) {
 		NewModelsHandler(p, &modelsCatalogStub{}).GeminiV1BetaGetModel(c)
 		require.Equal(t, tc.status, recorder.Code)
 		require.Zero(t, p.resolveCalls)
-		if tc.name == "alias" {
+		if tc.name == "chosen/alias" {
 			require.Equal(t, []string{"alias", "known"}, p.selectedModels)
 			require.Len(t, p.resolvedPlatforms, 1)
-			require.Contains(t, recorder.Body.String(), "models/alias")
+			require.Contains(t, recorder.Body.String(), "models/chosen/alias")
 		}
 		if tc.name == "missing/known" {
-			require.Equal(t, []string{"missing/known", "missing/known"}, p.selectedModels)
+			require.Empty(t, p.selectedModels)
 		}
 	}
 }

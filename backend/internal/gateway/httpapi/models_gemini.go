@@ -21,10 +21,10 @@ import (
 // Gemini generation protocol. Group protocol permission and custom display
 // lists constrain these names before concrete Key aliases are added, so
 // catalogue metadata cannot independently make a model available. Composite
-// bindings contribute original model IDs in their configured channel order.
+// bindings attach their saved prefix to the public resource name.
 //
-// Single-resource lookup validates the complete URL model and examines channels
-// in priority order, checking only the requested name and
+// Single-resource lookup validates the URL segment and selects one exact
+// configured composite prefix before checking only the requested name and
 // possible exact alias target. List and resource output restore public names
 // while taking capability metadata from an eligible target. JSON alias
 // augmentation copies the target object's fields before replacing its name
@@ -56,15 +56,15 @@ func (h *ModelsHandler) GeminiV1BetaListModels(c *gin.Context) {
 
 // GeminiV1BetaGetModel writes one eligible Gemini model resource under the
 // requested public name. It rejects blank, wildcard or unsafe URL segments
-// before model resolution. Multi-channel lookup applies current user,
-// subscription and Gemini protocol permission before inspecting each group's
-// finite candidate set in priority order.
+// before model resolution. Composite lookup matches the saved prefix exactly
+// and then applies user, subscription and Gemini protocol permission for that
+// one group.
 //
 // Only the requested name and its configured exact alias target reach
 // ResolveSelected. Results are filtered by Gemini capability and the group's
 // custom list. When the public name is unavailable as a concrete model but
 // its alias target qualifies, metadata comes from that target while name and
-// displayName identify the requested alias or original resource. Unresolved
+// displayName identify the requested alias or prefixed resource. Unresolved
 // resources return Google not found.
 func (h *ModelsHandler) GeminiV1BetaGetModel(c *gin.Context) {
 	done, accepted := h.BeginRequest(c, "google")
@@ -79,39 +79,46 @@ func (h *ModelsHandler) GeminiV1BetaGetModel(c *gin.Context) {
 	}
 	name := strings.TrimPrefix(strings.TrimSpace(c.Param("model")), "/")
 	segment := name
+	if key.IsComposite {
+		_, rest, found := strings.Cut(name, "/")
+		if found {
+			segment = rest
+		}
+	}
 	if segment == "" || strings.ContainsAny(segment, "*?") || !h.backend.SafeModelSegment(segment) {
 		WriteGoogleError(c, http.StatusBadRequest, "Invalid model in URL")
 		return
 	}
-	if !key.IsComposite && (key.Group == nil || !key.Group.AllowsClientProtocol(protocol.ProtocolGeminiGenerateContent)) {
-		WriteGoogleError(c, http.StatusForbidden, "This group does not allow Gemini GenerateContent requests")
-		return
-	}
-	forced, _ := h.backend.ForcedPlatform(c)
-	forced = strings.TrimSpace(forced)
-	groups := []*routing.Group{key.Group}
+	group := key.Group
 	if key.IsComposite {
-		groups = nil
-		preferred, ready := h.CompositePreferredSubscription(c, key)
-		if ready {
-			for _, binding := range key.CompositeGroups {
-				if CompositeGroupAvailableToUser(key, preferred, binding.Group) {
-					groups = append(groups, binding.Group)
+		prefix, rest, found := strings.Cut(name, "/")
+		group = nil
+		if found {
+			preferred, ready := h.CompositePreferredSubscription(c, key)
+			if ready {
+				for _, binding := range key.CompositeGroups {
+					if binding.Prefix == prefix && CompositeGroupAvailableToUser(key, preferred, binding.Group) {
+						group = binding.Group
+						segment = rest
+						break
+					}
 				}
 			}
 		}
+	} else if group == nil || !group.AllowsClientProtocol(protocol.ProtocolGeminiGenerateContent) {
+		WriteGoogleError(c, http.StatusForbidden, "This group does not allow Gemini GenerateContent requests")
+		return
 	}
-	selected := []string{segment}
-	target, alias := key.ModelMapping[segment]
-	if alias {
-		selected = append(selected, target)
-	}
-	for _, group := range groups {
-		if group == nil || !group.AllowsClientProtocol(protocol.ProtocolGeminiGenerateContent) || !h.backend.Available() {
-			continue
+	if group != nil && group.AllowsClientProtocol(protocol.ProtocolGeminiGenerateContent) && h.backend.Available() {
+		forced, _ := h.backend.ForcedPlatform(c)
+		forced = strings.TrimSpace(forced)
+		// Limit resolution to this resource and its exact alias target. Full catalogue
+		// enumeration would add unrelated candidate work to every single-model lookup.
+		selected := []string{segment}
+		target, alias := key.ModelMapping[segment]
+		if alias {
+			selected = append(selected, target)
 		}
-		// Resolve this finite candidate set in channel order. A vendor slash remains
-		// part of the requested identifier and cannot select a different channel.
 		resolved := h.backend.ResolveSelected(c.Request.Context(), &group.ID, forced, selected)
 		if resolved.Err != nil {
 			WriteGoogleError(c, http.StatusServiceUnavailable, resolved.Err.Error())
@@ -128,21 +135,20 @@ func (h *ModelsHandler) GeminiV1BetaGetModel(c *gin.Context) {
 			visible[model.ID] = true
 		}
 		metadataID := segment
-		// Exact aliases use their eligible target's capability metadata while exposing
-		// the client name, matching the aliases advertised by the aggregated list.
-		if alias {
+		// An unavailable public alias can borrow its eligible target's capability
+		// metadata, then restore the public name without changing the target resolution.
+		if !visible[segment] && alias && visible[target] {
 			metadataID = target
 		}
-		if !visible[metadataID] {
-			continue
+		if visible[metadataID] {
+			model := h.catalog.GeminiModel(metadataID, forced == capability.PlatformAntigravity)
+			model.Name = "models/" + name
+			if name != metadataID {
+				model.DisplayName = name
+			}
+			c.JSON(http.StatusOK, model)
+			return
 		}
-		model := h.catalog.GeminiModel(metadataID, forced == capability.PlatformAntigravity)
-		model.Name = "models/" + name
-		if name != metadataID {
-			model.DisplayName = name
-		}
-		c.JSON(http.StatusOK, model)
-		return
 	}
 	WriteGoogleError(c, http.StatusNotFound, "Model is not available in this group")
 }
@@ -155,8 +161,8 @@ func (h *ModelsHandler) GeminiV1BetaGetModel(c *gin.Context) {
 // uncovered composite subscription also leaves that list empty.
 //
 // Each eligible group contributes concrete Gemini-capable IDs intersected
-// with its custom list, then available exact Key aliases. Each channel keeps
-// the complete original identifier, and duplicate public IDs retain their
+// with its custom list, then available exact Key aliases. A prefix is
+// attached after target eligibility, and duplicate public IDs retain their
 // first occurrence. Alias resources borrow target metadata and display their
 // public identity, so capability fields remain tied to an actually eligible
 // model.
@@ -172,7 +178,7 @@ func (h *ModelsHandler) requestableGeminiModels(c *gin.Context, key *apikey.APIK
 	forced, _ := h.backend.ForcedPlatform(c)
 	forced = strings.TrimSpace(forced)
 	seen := make(map[string]bool)
-	appendGroup := func(group *routing.Group) error {
+	appendGroup := func(group *routing.Group, prefix string) error {
 		if group == nil || !group.AllowsClientProtocol(protocol.ProtocolGeminiGenerateContent) {
 			return nil
 		}
@@ -191,10 +197,13 @@ func (h *ModelsHandler) requestableGeminiModels(c *gin.Context, key *apikey.APIK
 			available = FilterModelsByCustomList(available, nil, group.ModelsListConfig.Models)
 		}
 		aliases := apikey.AvailableAPIKeyModelAliases(available, key.ModelMapping)
-		// Append aliases after group filtering, then merge the public identities. This
+		// Append aliases after group filtering, then prefix the public identity. This
 		// keeps copied capability metadata tied to an eligible target in that binding.
 		for _, modelID := range append(available, aliases...) {
 			publicID := modelID
+			if prefix != "" {
+				publicID = prefix + "/" + publicID
+			}
 			if seen[publicID] {
 				continue
 			}
@@ -219,14 +228,14 @@ func (h *ModelsHandler) requestableGeminiModels(c *gin.Context, key *apikey.APIK
 		}
 		for _, binding := range key.CompositeGroups {
 			if CompositeGroupAvailableToUser(key, subscription, binding.Group) {
-				if err := appendGroup(binding.Group); err != nil {
+				if err := appendGroup(binding.Group, binding.Prefix); err != nil {
 					WriteGoogleError(c, http.StatusServiceUnavailable, err.Error())
 					return nil, false
 				}
 			}
 		}
 	} else {
-		if err := appendGroup(key.Group); err != nil {
+		if err := appendGroup(key.Group, ""); err != nil {
 			WriteGoogleError(c, http.StatusServiceUnavailable, err.Error())
 			return nil, false
 		}

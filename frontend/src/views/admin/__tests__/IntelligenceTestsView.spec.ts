@@ -94,8 +94,8 @@ const keyFixture = (overrides: Partial<ApiKey> = {}) =>
     group_id: 1,
     scope: 'personal',
     team_id: null,
-    use_default_groups: true,
-    groups: [{ group_id: 1 }],
+    is_composite: false,
+    composite_groups: [],
     fallback_when_group_unavailable: true,
     status: 'active',
     quota: 0,
@@ -228,13 +228,13 @@ describe('管理员降智检测', () => {
         keyPage(
           [
             keyFixture(),
-            keyFixture({ id: 2, groups: [] }),
+            keyFixture({ id: 2, is_composite: true }),
             keyFixture({
               id: 4,
-              groups: [{ group_id: 2 }],
+              composite_groups: [{ group_id: 1, prefix: 'a' }],
             }),
             keyFixture({ id: 5, fallback_when_group_unavailable: false }),
-            keyFixture({ id: 6, groups: [{ group_id: 2 }] }),
+            keyFixture({ id: 6, group_id: 2 }),
             keyFixture({ id: 7, status: 'inactive' }),
             keyFixture({ id: 8, expires_at: '2000-01-01T00:00:00Z' }),
             keyFixture({ id: 9, quota: 1, quota_used: 1 }),
@@ -292,9 +292,7 @@ describe('管理员降智检测', () => {
             resolveOld = resolve
           }),
       )
-      .mockResolvedValueOnce(
-        keyPage([keyFixture({ id: 30, group_id: 3, groups: [{ group_id: 3 }], name: 'Group 3' })]),
-      )
+      .mockResolvedValueOnce(keyPage([keyFixture({ id: 30, group_id: 3, name: 'Group 3' })]))
     const wrapper = mountPage()
     await flushPromises()
     await clickText(wrapper, 'intelligence.add')

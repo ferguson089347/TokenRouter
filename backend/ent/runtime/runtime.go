@@ -123,82 +123,78 @@ func init() {
 	apikeyDescIsComposite := apikeyFields[6].Descriptor()
 	// apikey.DefaultIsComposite holds the default value on creation for the is_composite field.
 	apikey.DefaultIsComposite = apikeyDescIsComposite.Default.(bool)
-	// apikeyDescUseDefaultGroups is the schema descriptor for use_default_groups field.
-	apikeyDescUseDefaultGroups := apikeyFields[7].Descriptor()
-	// apikey.DefaultUseDefaultGroups holds the default value on creation for the use_default_groups field.
-	apikey.DefaultUseDefaultGroups = apikeyDescUseDefaultGroups.Default.(bool)
 	// apikeyDescStatus is the schema descriptor for status field.
-	apikeyDescStatus := apikeyFields[8].Descriptor()
+	apikeyDescStatus := apikeyFields[7].Descriptor()
 	// apikey.DefaultStatus holds the default value on creation for the status field.
 	apikey.DefaultStatus = apikeyDescStatus.Default.(string)
 	// apikey.StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	apikey.StatusValidator = apikeyDescStatus.Validators[0].(func(string) error)
 	// apikeyDescFastModePolicy is the schema descriptor for fast_mode_policy field.
-	apikeyDescFastModePolicy := apikeyFields[9].Descriptor()
+	apikeyDescFastModePolicy := apikeyFields[8].Descriptor()
 	// apikey.DefaultFastModePolicy holds the default value on creation for the fast_mode_policy field.
 	apikey.DefaultFastModePolicy = apikeyDescFastModePolicy.Default.(string)
 	// apikey.FastModePolicyValidator is a validator for the "fast_mode_policy" field. It is called by the builders before save.
 	apikey.FastModePolicyValidator = apikeyDescFastModePolicy.Validators[0].(func(string) error)
 	// apikeyDescBillingMode is the schema descriptor for billing_mode field.
-	apikeyDescBillingMode := apikeyFields[10].Descriptor()
+	apikeyDescBillingMode := apikeyFields[9].Descriptor()
 	// apikey.DefaultBillingMode holds the default value on creation for the billing_mode field.
 	apikey.DefaultBillingMode = apikeyDescBillingMode.Default.(string)
 	// apikey.BillingModeValidator is a validator for the "billing_mode" field. It is called by the builders before save.
 	apikey.BillingModeValidator = apikeyDescBillingMode.Validators[0].(func(string) error)
 	// apikeyDescModelMapping is the schema descriptor for model_mapping field.
-	apikeyDescModelMapping := apikeyFields[12].Descriptor()
+	apikeyDescModelMapping := apikeyFields[11].Descriptor()
 	// apikey.DefaultModelMapping holds the default value on creation for the model_mapping field.
 	apikey.DefaultModelMapping = apikeyDescModelMapping.Default.(func() map[string]string)
 	// apikeyDescQuota is the schema descriptor for quota field.
-	apikeyDescQuota := apikeyFields[16].Descriptor()
+	apikeyDescQuota := apikeyFields[15].Descriptor()
 	// apikey.DefaultQuota holds the default value on creation for the quota field.
 	apikey.DefaultQuota = apikeyDescQuota.Default.(float64)
 	// apikeyDescQuotaUsed is the schema descriptor for quota_used field.
-	apikeyDescQuotaUsed := apikeyFields[17].Descriptor()
+	apikeyDescQuotaUsed := apikeyFields[16].Descriptor()
 	// apikey.DefaultQuotaUsed holds the default value on creation for the quota_used field.
 	apikey.DefaultQuotaUsed = apikeyDescQuotaUsed.Default.(float64)
 	// apikeyDescConcurrencyLimit is the schema descriptor for concurrency_limit field.
-	apikeyDescConcurrencyLimit := apikeyFields[19].Descriptor()
+	apikeyDescConcurrencyLimit := apikeyFields[18].Descriptor()
 	// apikey.DefaultConcurrencyLimit holds the default value on creation for the concurrency_limit field.
 	apikey.DefaultConcurrencyLimit = apikeyDescConcurrencyLimit.Default.(int)
 	// apikey.ConcurrencyLimitValidator is a validator for the "concurrency_limit" field. It is called by the builders before save.
 	apikey.ConcurrencyLimitValidator = apikeyDescConcurrencyLimit.Validators[0].(func(int) error)
 	// apikeyDescRpmLimit is the schema descriptor for rpm_limit field.
-	apikeyDescRpmLimit := apikeyFields[20].Descriptor()
+	apikeyDescRpmLimit := apikeyFields[19].Descriptor()
 	// apikey.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	apikey.DefaultRpmLimit = apikeyDescRpmLimit.Default.(int)
 	// apikey.RpmLimitValidator is a validator for the "rpm_limit" field. It is called by the builders before save.
 	apikey.RpmLimitValidator = apikeyDescRpmLimit.Validators[0].(func(int) error)
 	// apikeyDescRateLimit5h is the schema descriptor for rate_limit_5h field.
-	apikeyDescRateLimit5h := apikeyFields[21].Descriptor()
+	apikeyDescRateLimit5h := apikeyFields[20].Descriptor()
 	// apikey.DefaultRateLimit5h holds the default value on creation for the rate_limit_5h field.
 	apikey.DefaultRateLimit5h = apikeyDescRateLimit5h.Default.(float64)
 	// apikeyDescRateLimit1d is the schema descriptor for rate_limit_1d field.
-	apikeyDescRateLimit1d := apikeyFields[22].Descriptor()
+	apikeyDescRateLimit1d := apikeyFields[21].Descriptor()
 	// apikey.DefaultRateLimit1d holds the default value on creation for the rate_limit_1d field.
 	apikey.DefaultRateLimit1d = apikeyDescRateLimit1d.Default.(float64)
 	// apikeyDescRateLimit7d is the schema descriptor for rate_limit_7d field.
-	apikeyDescRateLimit7d := apikeyFields[23].Descriptor()
+	apikeyDescRateLimit7d := apikeyFields[22].Descriptor()
 	// apikey.DefaultRateLimit7d holds the default value on creation for the rate_limit_7d field.
 	apikey.DefaultRateLimit7d = apikeyDescRateLimit7d.Default.(float64)
 	// apikeyDescUsage5h is the schema descriptor for usage_5h field.
-	apikeyDescUsage5h := apikeyFields[24].Descriptor()
+	apikeyDescUsage5h := apikeyFields[23].Descriptor()
 	// apikey.DefaultUsage5h holds the default value on creation for the usage_5h field.
 	apikey.DefaultUsage5h = apikeyDescUsage5h.Default.(float64)
 	// apikeyDescUsage1d is the schema descriptor for usage_1d field.
-	apikeyDescUsage1d := apikeyFields[25].Descriptor()
+	apikeyDescUsage1d := apikeyFields[24].Descriptor()
 	// apikey.DefaultUsage1d holds the default value on creation for the usage_1d field.
 	apikey.DefaultUsage1d = apikeyDescUsage1d.Default.(float64)
 	// apikeyDescUsage7d is the schema descriptor for usage_7d field.
-	apikeyDescUsage7d := apikeyFields[26].Descriptor()
+	apikeyDescUsage7d := apikeyFields[25].Descriptor()
 	// apikey.DefaultUsage7d holds the default value on creation for the usage_7d field.
 	apikey.DefaultUsage7d = apikeyDescUsage7d.Default.(float64)
 	// apikeyDescFallbackWhenGroupUnavailable is the schema descriptor for fallback_when_group_unavailable field.
-	apikeyDescFallbackWhenGroupUnavailable := apikeyFields[30].Descriptor()
+	apikeyDescFallbackWhenGroupUnavailable := apikeyFields[29].Descriptor()
 	// apikey.DefaultFallbackWhenGroupUnavailable holds the default value on creation for the fallback_when_group_unavailable field.
 	apikey.DefaultFallbackWhenGroupUnavailable = apikeyDescFallbackWhenGroupUnavailable.Default.(bool)
 	// apikeyDescManagedBy is the schema descriptor for managed_by field.
-	apikeyDescManagedBy := apikeyFields[31].Descriptor()
+	apikeyDescManagedBy := apikeyFields[30].Descriptor()
 	// apikey.ManagedByValidator is a validator for the "managed_by" field. It is called by the builders before save.
 	apikey.ManagedByValidator = apikeyDescManagedBy.Validators[0].(func(string) error)
 	apikeycompositegroupMixin := schema.APIKeyCompositeGroup{}.Mixin()

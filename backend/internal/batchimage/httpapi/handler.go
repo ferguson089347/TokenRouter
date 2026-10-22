@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -26,7 +25,7 @@ import (
 // Batch image requests identify the job owner from the authenticated API key
 // and carry a separate billing-user choice into the use cases. JSON parsing
 // precedes owner lookup on submission, while model discovery expands available
-// ordered channels and merges models using their complete original identifiers.
+// composite groups and prefixes each returned model with its group binding.
 // Exact aliases retain every target model's platform entry.
 //
 // Downloads keep admitted request activity alive through response writing.
@@ -243,7 +242,7 @@ func (h *BatchImageHandler) List(c *gin.Context) {
 //
 // A missing required subscription produces an empty list. Eligible composite
 // groups also need batch-image permission; each group's aliases are expanded
-// before channel results are merged, keeping model and platform entries tied to the
+// before its prefix is added, keeping model and platform entries tied to the
 // binding the client later requests. Any group lookup error aborts the combined
 // response.
 func (h *BatchImageHandler) Models(c *gin.Context) {
@@ -285,11 +284,9 @@ func (h *BatchImageHandler) Models(c *gin.Context) {
 				return
 			}
 			for _, model := range AppendBatchImageAPIKeyModelAliases(models.Data, apiKey.ModelMapping) {
-				// Merge identifiers after alias expansion so each advertised alias
+				// Attach the binding prefix after alias expansion so each advertised alias
 				// selects the same composite group as its target when a client submits it.
-				if slices.ContainsFunc(out.Data, func(existing batchimage.BatchImagePublicModel) bool { return existing.ID == model.ID }) {
-					continue
-				}
+				model.ID = binding.Prefix + "/" + model.ID
 				out.Data = append(out.Data, model)
 			}
 		}

@@ -12,15 +12,12 @@ import (
 // credential configuration, payer observations, and group policy. Versioned
 // snapshots carry identity, group policy and configured limits needed by
 // request admission, while current spending-window usage is read separately.
-// Conversion reconstructs request-owned collections so channel selection and
+// Conversion reconstructs request-owned collections so prefix selection and
 // policy processing can change that view without mutating the cached entry.
 
 // APIKeyAuthSnapshot stores versioned credential configuration and hydrated
 // authentication identity views.
 type APIKeyAuthSnapshot struct {
-	// UseDefaultGroups requests fresh administrator channel resolution after this
-	// snapshot reconstructs a request-owned Key, keeping default edits outside its TTL.
-	UseDefaultGroups bool `json:"use_default_groups"` // follow administrator channel order
 	// Version controls cache acceptance. KeyApplyAuthCacheEntry treats every
 	// version other than the current schema as a miss requiring a reload.
 	Version  int    `json:"version"`           // authentication snapshot schema version
@@ -35,7 +32,7 @@ type APIKeyAuthSnapshot struct {
 	CreatedAt time.Time `json:"created_at"` // credential creation timestamp
 	// ordinary group binding identifier.
 	GroupID     *int64 `json:"group_id,omitempty"`
-	IsComposite bool   `json:"is_composite"` // multi-channel credential shape flag
+	IsComposite bool   `json:"is_composite"` // prefix selection mode flag
 	// ordered composite group snapshots.
 	CompositeGroups []APIKeyAuthCompositeGroupSnapshot `json:"composite_groups,omitempty"`
 	Name            string                             `json:"name"`             // saved credential display name
@@ -86,7 +83,7 @@ type APIKeyAuthSnapshot struct {
 	FallbackWhenGroupUnavailable bool `json:"fallback_when_group_unavailable"`
 }
 
-// APIKeyAuthCompositeGroupSnapshot stores one ordered channel binding with
+// APIKeyAuthCompositeGroupSnapshot stores one ordered prefix binding with
 // prefetched group access data.
 type APIKeyAuthCompositeGroupSnapshot struct {
 	ID      int64 `json:"id"`       // persisted mapping row identifier
@@ -94,8 +91,8 @@ type APIKeyAuthCompositeGroupSnapshot struct {
 	// Prefix and NormalizedPrefix retain display and lookup forms for the same
 	// binding. SortOrder preserves submitted order when requests and model lists
 	// iterate composite mappings.
-	Prefix string `json:"prefix"` // internal channel storage label
-	// normalized internal storage label.
+	Prefix string `json:"prefix"` // displayed group selection prefix
+	// lowercase prefix lookup text.
 	NormalizedPrefix string `json:"normalized_prefix"`
 	SortOrder        int    `json:"sort_order"` // configured mapping order index
 	// UserGroupRPMOverride is the payer-specific RPM value prefetched for this

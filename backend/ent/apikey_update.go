@@ -170,20 +170,6 @@ func (_u *APIKeyUpdate) SetNillableIsComposite(v *bool) *APIKeyUpdate {
 	return _u
 }
 
-// SetUseDefaultGroups sets the "use_default_groups" field.
-func (_u *APIKeyUpdate) SetUseDefaultGroups(v bool) *APIKeyUpdate {
-	_u.mutation.SetUseDefaultGroups(v)
-	return _u
-}
-
-// SetNillableUseDefaultGroups sets the "use_default_groups" field if the given value is not nil.
-func (_u *APIKeyUpdate) SetNillableUseDefaultGroups(v *bool) *APIKeyUpdate {
-	if v != nil {
-		_u.SetUseDefaultGroups(*v)
-	}
-	return _u
-}
-
 // SetStatus sets the "status" field.
 func (_u *APIKeyUpdate) SetStatus(v string) *APIKeyUpdate {
 	_u.mutation.SetStatus(v)
@@ -872,9 +858,6 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.IsComposite(); ok {
 		_spec.SetField(apikey.FieldIsComposite, field.TypeBool, value)
 	}
-	if value, ok := _u.mutation.UseDefaultGroups(); ok {
-		_spec.SetField(apikey.FieldUseDefaultGroups, field.TypeBool, value)
-	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
 	}
@@ -1346,20 +1329,6 @@ func (_u *APIKeyUpdateOne) SetIsComposite(v bool) *APIKeyUpdateOne {
 func (_u *APIKeyUpdateOne) SetNillableIsComposite(v *bool) *APIKeyUpdateOne {
 	if v != nil {
 		_u.SetIsComposite(*v)
-	}
-	return _u
-}
-
-// SetUseDefaultGroups sets the "use_default_groups" field.
-func (_u *APIKeyUpdateOne) SetUseDefaultGroups(v bool) *APIKeyUpdateOne {
-	_u.mutation.SetUseDefaultGroups(v)
-	return _u
-}
-
-// SetNillableUseDefaultGroups sets the "use_default_groups" field if the given value is not nil.
-func (_u *APIKeyUpdateOne) SetNillableUseDefaultGroups(v *bool) *APIKeyUpdateOne {
-	if v != nil {
-		_u.SetUseDefaultGroups(*v)
 	}
 	return _u
 }
@@ -2081,9 +2050,6 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.IsComposite(); ok {
 		_spec.SetField(apikey.FieldIsComposite, field.TypeBool, value)
-	}
-	if value, ok := _u.mutation.UseDefaultGroups(); ok {
-		_spec.SetField(apikey.FieldUseDefaultGroups, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)

@@ -122,11 +122,11 @@ describe('按客户端能力配置 Key', () => {
   it('复合 Key 示例使用可请求模型并复制带前缀的 ID', async () => {
     const wrapper = create(null)
     await wrapper.setProps({
-      compositeGroups: [{ group_id: 7, group: mixedGroup }],
+      compositeGroups: [{ group_id: 7, prefix: 'shared', group: mixedGroup }],
     })
-    expect(wrapper.text()).toContain('claude-custom')
+    expect(wrapper.text()).toContain('shared/claude-custom')
     await wrapper.get('button').trigger('click')
-    expect(copy).toHaveBeenCalledWith('claude-custom')
+    expect(copy).toHaveBeenCalledWith('shared/claude-custom')
     wrapper.unmount()
   })
 })

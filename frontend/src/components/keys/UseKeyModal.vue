@@ -14,11 +14,11 @@
             {{ binding.group?.display_name || binding.group?.name || `#${binding.group_id}` }}
           </p>
           <template v-if="binding.group?.models?.length">
-            <code class="text-xs">{{ binding.group.models[0] }}</code>
+            <code class="text-xs">{{ binding.prefix }}/{{ binding.group.models[0] }}</code>
             <button
               type="button"
               class="btn btn-secondary btn-sm ml-2"
-              @click="copyContent(binding.group.models[0], binding.group_id)"
+              @click="copyContent(`${binding.prefix}/${binding.group.models[0]}`, binding.group_id)"
             >
               {{ t('keys.useKeyModal.copy') }}
             </button>
@@ -27,20 +27,20 @@
         </div>
       </template>
       <div
-        v-if="!group && !compositeGroups?.length"
+        v-else-if="!group"
         class="rounded-control bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
       >
         <p class="font-medium">{{ t('keys.useKeyModal.noGroupTitle') }}</p>
         <p>{{ t('keys.useKeyModal.noGroupDescription') }}</p>
       </div>
       <div
-        v-else-if="group && !clients.length"
+        v-else-if="!clients.length"
         data-testid="no-text-protocols"
         class="text-sm text-gray-600 dark:text-gray-400"
       >
         {{ t('keys.useKeyModal.noTextProtocolsDescription') }}
       </div>
-      <template v-else-if="group">
+      <template v-else>
         <div class="flex flex-wrap gap-2" role="tablist">
           <button
             v-for="client in clients"
@@ -216,12 +216,10 @@ const modelOptions = computed(() =>
       }))
     : [],
 )
-// websocketAllowed enables optional websocket configuration for a fixed group view.
-// Universal channel lists use HTTP because their gateway entry rejects websocket
-// sessions; model capability metadata cannot override that credential restriction.
+// websocketAllowed requires group websocket support and, when model mappings exist,
+// websocket support for the currently selected model as well.
 const websocketAllowed = computed(
   () =>
-    !props.compositeGroups?.length &&
     protocols.value.includes('openai_responses_websocket') &&
     (!props.group?.model_protocols ||
       props.group.model_protocols[selectedModel.value]?.includes('openai_responses_websocket')),

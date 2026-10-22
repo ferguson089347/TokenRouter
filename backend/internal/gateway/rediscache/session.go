@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -158,10 +157,6 @@ return 1
 // gatewayCache combines scheduler sticky bindings with gateway protocol and
 // Live state on Redis.
 type gatewayCache struct {
-	channelOnce      sync.Once             // Initializes the bounded shared-pool client view.
-	channelRedis     *redis.Client         // Bounded automatic-routing Redis command view.
-	channelCooldowns channelLocalCooldowns // Bounded locally observed provider failures.
-
 	*schedulerredis.StickyCache               // inherited scheduler sticky binding operations
 	rdb                         *redis.Client // shared application Redis command client
 }

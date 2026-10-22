@@ -33,14 +33,19 @@ func TestUniversalAPIKeyRoutingMigration(t *testing.T) {
 	// while PostgreSQL remains available to the test's deferred cleanup operations.
 	defer func() { require.NoError(t, db.Close()) }()
 	before := fstest.MapFS{}
+	upgrade := fstest.MapFS{}
 	entries, err := fs.ReadDir(migrations.FS, ".")
 	require.NoError(t, err)
 	for _, entry := range entries {
-		if entry.Name() == "308_universal_api_key_routing.sql" {
+		if entry.Name() > "308_universal_api_key_routing.sql" {
 			continue
 		}
 		data, err := migrations.FS.ReadFile(entry.Name())
 		require.NoError(t, err)
+		upgrade[entry.Name()] = &fstest.MapFile{Data: data}
+		if entry.Name() == "308_universal_api_key_routing.sql" {
+			continue
+		}
 		before[entry.Name()] = &fstest.MapFile{Data: data}
 	}
 	require.NoError(t, postgres.ApplyMigrations(ctx, db, before))
@@ -54,8 +59,8 @@ func TestUniversalAPIKeyRoutingMigration(t *testing.T) {
  INSERT INTO api_key_composite_groups(api_key_id,group_id,prefix,normalized_prefix,sort_order) VALUES
  (902,902,'provider','provider',0),(902,901,'group_902','group_902',1);`)
 	require.NoError(t, err)
-	require.NoError(t, postgres.ApplyMigrations(ctx, db, migrations.FS))
-	require.NoError(t, postgres.ApplyMigrations(ctx, db, migrations.FS))
+	require.NoError(t, postgres.ApplyMigrations(ctx, db, upgrade))
+	require.NoError(t, postgres.ApplyMigrations(ctx, db, upgrade))
 	for _, tc := range []struct {
 		id      int64         // Stored credential identifier.
 		inherit bool          // Expected default inheritance.

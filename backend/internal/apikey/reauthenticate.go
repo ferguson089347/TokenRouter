@@ -66,9 +66,6 @@ func (s *APIKeyService) Reauthenticate(ctx context.Context, previous *APIKey, in
 	if key.Status == StatusAPIKeyQuotaExhausted {
 		return nil, ErrAPIKeyQuotaExhausted
 	}
-	if err := s.ApplyRoutingDefaults(ctx, key); err != nil {
-		return nil, err
-	}
 	// The selected group remains the connection target, while current scope
 	// and payer checks prevent a stored binding change from granting a later turn.
 	if previous.GroupID != nil {

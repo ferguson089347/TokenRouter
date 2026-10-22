@@ -64,25 +64,3 @@ func TestAPIKeyFromService_MapsNilLastUsedAt(t *testing.T) {
 func APIKeyFromService(v *apikey.APIKey) *APIKey[json.RawMessage] {
 	return APIKeyFromKey(apikey.CopyAPIKey(v), func(*routing.Group) *json.RawMessage { return nil })
 }
-
-// TestAPIKeyResponseUsesUniversalRoutingShape serializes an inherited Key with
-// one channel. Clients receive ordered group data and the inheritance flag,
-// while retired routing discriminators and stored labels remain internal.
-func TestAPIKeyResponseUsesUniversalRoutingShape(t *testing.T) {
-	source := &apikey.APIKey{UseDefaultGroups: true, IsComposite: true, CompositeGroups: []apikey.APIKeyCompositeGroup{{GroupID: 9, Prefix: "internal", Group: &routing.Group{ID: 9, Name: "channel"}}}}
-	data, err := json.Marshal(APIKeyFromService(source))
-	require.NoError(t, err)
-	var result map[string]any
-	require.NoError(t, json.Unmarshal(data, &result))
-	require.Equal(t, true, result["use_default_groups"])
-	require.Equal(t, "auto", result["routing_mode"])
-	groups, ok := result["groups"].([]any)
-	require.True(t, ok)
-	require.Len(t, groups, 1)
-	channel, ok := groups[0].(map[string]any)
-	require.True(t, ok)
-	require.Equal(t, float64(9), channel["group_id"])
-	require.NotContains(t, channel, "prefix")
-	require.NotContains(t, result, "composite_groups")
-	require.NotContains(t, result, "is_composite")
-}

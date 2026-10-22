@@ -52,7 +52,7 @@ describe('用户公开自测', () => {
           id: 9,
           name: 'Personal key',
           key: 'private-credential',
-          groups: [{ group_id: 7 }],
+          group_id: 7,
           status: 'active',
           quota: 0,
           quota_used: 0,
@@ -61,7 +61,7 @@ describe('用户公开自测', () => {
         {
           id: 11,
           name: 'Unconfigured channel',
-          groups: [{ group_id: 99 }],
+          group_id: 99,
           status: 'active',
           quota: 0,
           quota_used: 0,
@@ -70,7 +70,7 @@ describe('用户公开自测', () => {
         {
           id: 10,
           name: 'Team key',
-          groups: [{ group_id: 7 }],
+          group_id: 7,
           status: 'active',
           team_id: 1,
           quota: 0,

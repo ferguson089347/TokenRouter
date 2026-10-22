@@ -32,17 +32,21 @@ func (s *IntelligenceService) CommunityRun(ctx context.Context, userID int64, in
 		return nil, ErrIntelligenceDisabled
 	}
 	if userID <= 0 || in.APIKeyID <= 0 {
-		return nil, intelligenceInvalid("请选择自己的有效个人 Key")
+		return nil, intelligenceInvalid("请选择自己的有效个人普通 Key")
 	}
 	key, err := s.keys.GetByID(ctx, in.APIKeyID)
-	if err != nil || key == nil || key.UserID != userID {
-		return nil, intelligenceInvalid("请选择自己的有效个人 Key")
+	if err != nil || key == nil || key.GroupID == nil || key.UserID != userID || !intelligenceValidKey(key, *key.GroupID) {
+		return nil, intelligenceInvalid("请选择自己的有效个人普通 Key")
+	}
+	group, err := s.groups.GetByID(ctx, *key.GroupID)
+	if err != nil || group == nil || group.Status != "active" {
+		return nil, intelligenceInvalid("检测 Key 的分组不可用")
 	}
 	visible, err := s.visibleGroups(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	if len(visible) == 0 {
+	if !visible[group.ID] {
 		return nil, ErrIntelligenceNotFound
 	}
 	configs, err := s.repo.ListConfigs(ctx)
@@ -50,11 +54,7 @@ func (s *IntelligenceService) CommunityRun(ctx context.Context, userID int64, in
 		return nil, err
 	}
 	for _, site := range configs {
-		if !site.Enabled || site.Benchmark != "drawing" || !visible[site.GroupID] || !intelligenceValidKey(key, site.GroupID) {
-			continue
-		}
-		group, err := s.groups.GetByID(ctx, site.GroupID)
-		if err != nil || group == nil || !group.IsActive() {
+		if site.GroupID != group.ID || !site.Enabled || site.Benchmark != "drawing" {
 			continue
 		}
 		base, err := validateIntelligenceBaseURL(site.BaseURL)

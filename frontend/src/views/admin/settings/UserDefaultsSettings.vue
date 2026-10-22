@@ -1,5 +1,4 @@
 <template>
-  <ApiKeyDefaults />
   <SettingsCard
     :title="t('admin.settings.defaults.title')"
     :description="t('admin.settings.defaults.description')"
@@ -191,7 +190,6 @@
 </template>
 
 <script setup lang="ts">
-import ApiKeyDefaults from './ApiKeyDefaults.vue'
 import Collapse from '@/components/common/Collapse.vue'
 import SettingToggleRow from '@/components/common/settings/SettingToggleRow.vue'
 import SettingsCard from '@/components/common/settings/SettingsCard.vue'

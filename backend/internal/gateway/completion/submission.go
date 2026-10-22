@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/TokenFlux/TokenRouter/internal/gateway/requeststate"
 	"github.com/TokenFlux/TokenRouter/internal/infra/telemetry"
 	"github.com/TokenFlux/TokenRouter/internal/infra/telemetry/timing"
 )
@@ -58,9 +57,6 @@ func SubmitTask(pool *UsageRecordWorkerPool, source context.Context, task UsageR
 	if task == nil {
 		return
 	}
-	// Mark before queue submission because the routing coordinator may finish
-	// this attempt before asynchronous settlement starts and observes its usage.
-	requeststate.BlockChannelReplay(source)
 	original := task
 	observeUsageWrite(source, "pending", "", nil)
 	task = WrapTaskContext(source, func(ctx context.Context) {

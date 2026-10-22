@@ -7,18 +7,19 @@ import (
 	"strings"
 )
 
-// composite.go validates ordered channel bindings and their internal row labels.
-// The persistent relationship records a group identifier, a unique label and a
-// sort position for each channel. User-facing routing supplies generated labels
-// from group identifiers, and the gateway uses complete model names to select
-// channels through the eligibility rules in routing.go.
+// composite.go validates composite Key bindings and resolves model prefixes to
+// their routing groups. Prefix matching is case insensitive, while the
+// remaining model ID retains any further slashes for later protocol and model
+// processing. The request resolver returns the matched binding inside the
+// Key's slice, so callers treat that binding as input when creating an
+// effective request view.
 //
-// Structural validation rejects empty or excessive lists, duplicate groups and
-// conflicting normalized labels before group permission lookup begins. Preparing
-// bindings loads their groups and keeps the submitted order for persistence and
-// model enumeration. Runtime scope checks require a channel membership for user
-// Keys, while fixed server execution views separately validate their selected
-// task group and payer permission.
+// Creation and replacement validate the entire binding list before loading
+// group permissions. Duplicate group IDs and repeated lowercase prefixes are
+// rejected, and submitted order becomes SortOrder for storage and model
+// enumeration. Runtime scope checks allow ordinary keys to consider positive
+// target IDs, while composite keys require a saved binding; payer permission
+// remains a separate admission decision.
 
 const (
 	// Composite configuration bounds constrain serialized authentication data
@@ -28,14 +29,14 @@ const (
 )
 
 // KeyCompositeKeyPrefixPattern defines ASCII prefix characters accepted for
-// persisted channel row labels.
+// persisted composite bindings and request lookup.
 var KeyCompositeKeyPrefixPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
-// APIKeyCompositeGroupInput supplies a target group and its internal storage
-// label.
+// APIKeyCompositeGroupInput supplies a target group and its displayed selection
+// prefix.
 type APIKeyCompositeGroupInput struct {
 	GroupID int64  `json:"group_id"` // requested target group identifier
-	Prefix  string `json:"prefix"`   // internal channel row label
+	Prefix  string `json:"prefix"`   // submitted group selection prefix
 }
 
 // AllowsRuntimeGroup reports whether a positive target ID fits this Key's
@@ -67,6 +68,61 @@ func NormalizeCompositeKeyPrefix(prefix string) (display string, normalized stri
 		return "", "", false
 	}
 	return display, strings.ToLower(display), true
+}
+
+// SplitCompositeModel trims model and separates a prefix from the remaining
+// model ID at the first slash. Missing separators or empty trimmed parts return
+// empty results with false.
+//
+// Later slashes belong to the model ID, so GPT/vendor/model becomes prefix GPT
+// with model ID vendor/model. Whitespace around either part is removed before
+// request selection, allowing the binding lookup to normalize its prefix while
+// the model processing receives the complete remaining ID.
+func SplitCompositeModel(model string) (prefix string, modelID string, ok bool) {
+	model = strings.TrimSpace(model)
+	// Split once because provider model IDs can contain additional slashes;
+	// those remaining segments identify the model after the group is selected.
+	parts := strings.SplitN(model, "/", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	prefix = strings.TrimSpace(parts[0])
+	modelID = strings.TrimSpace(parts[1])
+	if prefix == "" || modelID == "" {
+		return "", "", false
+	}
+	return prefix, modelID, true
+}
+
+// ResolveCompositeModel returns the matched binding and unprefixed model ID for
+// a composite request. A nil or ordinary Key returns the supplied model
+// unchanged with no binding; composite requests distinguish missing, invalid,
+// and unknown prefixes.
+//
+// Lookup compares the normalized request prefix with saved NormalizedPrefix
+// values in binding order. The result points into CompositeGroups and shares
+// its group data, so callers create their request selection view before
+// changing binding or group state. Remaining slashes stay in the returned model
+// ID for later handling.
+func (k *APIKey) ResolveCompositeModel(model string) (*APIKeyCompositeGroup, string, error) {
+	if k == nil || !k.IsComposite {
+		return nil, model, nil
+	}
+	prefix, modelID, ok := SplitCompositeModel(model)
+	if !ok {
+		return nil, "", ErrCompositeKeyPrefixRequired
+	}
+	_, normalized, valid := NormalizeCompositeKeyPrefix(prefix)
+	if !valid {
+		return nil, "", ErrCompositeKeyPrefixInvalid
+	}
+	for i := range k.CompositeGroups {
+		binding := &k.CompositeGroups[i]
+		if binding.NormalizedPrefix == normalized {
+			return binding, modelID, nil
+		}
+	}
+	return nil, "", ErrCompositeKeyPrefixNotFound
 }
 
 // KeyValidateCompositeGroupInputs validates count, positive group IDs, and

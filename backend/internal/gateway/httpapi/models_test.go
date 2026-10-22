@@ -100,7 +100,7 @@ func TestGeminiModelGetRequiresRequestableModel(t *testing.T) {
 
 // TestGeminiModelsCompositePermissionsAndForcedPlatform combines a permitted
 // Gemini binding with a text-only binding under forced Antigravity. List and
-// resource lookup expose the original model identifier, and platform forcing cannot
+// resource lookup retain the permitted prefix, and platform forcing cannot
 // bypass denied group protocol permission.
 func TestGeminiModelsCompositePermissionsAndForcedPlatform(t *testing.T) {
 	allowed := &routing.Group{ID: 1, Status: "active", AllowedProtocols: []protocol.ProtocolID{protocol.ProtocolGeminiGenerateContent}}
@@ -110,11 +110,11 @@ func TestGeminiModelsCompositePermissionsAndForcedPlatform(t *testing.T) {
 	handler := NewModelsHandler(p, &modelsCatalogStub{})
 	handler.GeminiV1BetaListModels(c)
 	require.Equal(t, 200, w.Code)
-	require.Contains(t, w.Body.String(), "models/gemini-2.5-flash")
+	require.Contains(t, w.Body.String(), "models/mixed/gemini-2.5-flash")
 	require.NotContains(t, w.Body.String(), "models/text/")
 	require.Equal(t, []string{"antigravity"}, p.resolvedPlatforms)
 	c, w = modelsContext()
-	c.Params = gin.Params{{Key: "model", Value: "/gemini-2.5-flash"}}
+	c.Params = gin.Params{{Key: "model", Value: "/mixed/gemini-2.5-flash"}}
 	handler.GeminiV1BetaGetModel(c)
 	require.Equal(t, 200, w.Code)
 	p.key = &apikey.APIKey{Group: disabled}

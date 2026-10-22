@@ -175,13 +175,14 @@
 
           <template #cell-group="{ row }">
             <button
+              v-if="row.is_composite"
               type="button"
               data-test="composite-group-summary"
               class="-mx-1 -my-1 flex max-w-[22rem] flex-wrap items-center gap-1.5 rounded-control p-1 text-left transition duration-normal hover:bg-gray-100 dark:hover:bg-dark-700"
               :title="t('keys.composite.editMappings')"
               @click="editKey(row)"
             >
-              <!-- Channel chips show routing priority; excess channels appear in the remaining count. -->
+              <!-- Composite mappings show prefix and group in branded chips, with excess mappings represented by the remaining count. -->
               <span
                 v-for="binding in visibleCompositeGroups(row)"
                 :key="`${row.id}-${binding.group_id}`"
@@ -190,7 +191,9 @@
                   compositeGroupChipClass(binding.group?.display_brand),
                 ]"
               >
-                <span class="max-w-24 truncate font-mono font-medium">{{
+                <span class="max-w-24 truncate font-mono font-medium">{{ binding.prefix }}</span>
+                <span class="opacity-40">/</span>
+                <span class="max-w-28 truncate opacity-75">{{
                   binding.group?.display_name || binding.group?.name || `#${binding.group_id}`
                 }}</span>
               </span>
@@ -201,6 +204,31 @@
                 {{ t('keys.composite.moreMappings', { count: hiddenCompositeGroupCount(row) }) }}
               </span>
             </button>
+            <div v-else class="group/dropdown relative">
+              <button
+                :ref="(el) => setGroupButtonRef(row.id, el)"
+                @click="openGroupSelector(row)"
+                class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-control px-2 py-1 transition duration-normal hover:bg-gray-100 dark:hover:bg-dark-700"
+                :title="t('keys.clickToChangeGroup')"
+              >
+                <GroupBadge
+                  v-if="row.group"
+                  :name="row.group.display_name || row.group.name"
+                  :display-brand="row.group.display_brand"
+                  :rate-multiplier="row.group.rate_multiplier"
+                  :user-rate-multiplier="userGroupRates[row.group.id]"
+                />
+                <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
+                  t('keys.noGroup')
+                }}</span>
+                <Icon
+                  name="sort"
+                  size="xs"
+                  :animate-on-hover="false"
+                  class="h-3.5 w-3.5 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
+                />
+              </button>
+            </div>
           </template>
 
           <template #cell-usage="{ row }">
@@ -556,659 +584,620 @@
     <BaseDialog
       :show="showCreateModal || showEditModal"
       :title="showEditModal ? t('keys.editKey') : t('keys.createKey')"
-      :subtitle="t('keys.routing.subtitle')"
       width="normal"
       @close="closeModals"
     >
-      <template #header-icon>
-        <span
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-surface bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400"
-        >
-          <Icon name="key" size="md" :animate-on-hover="false" />
-        </span>
-      </template>
       <form
         id="key-form"
         @submit.prevent="handleSubmit"
         class="key-form-controls min-w-0 max-w-full space-y-5"
       >
         <div>
-          <label class="input-label">{{ t('keys.routing.nameOptional') }}</label>
+          <label class="input-label">{{ t('keys.nameLabel') }}</label>
           <input
             v-model="formData.name"
             type="text"
+            required
             class="input"
             :placeholder="t('keys.namePlaceholder')"
             data-tour="key-form-name"
           />
         </div>
 
-        <div class="space-y-3">
-          <label class="input-label mb-0">{{ t('keys.routing.mode') }}</label>
-          <SettingsSegmented
-            :model-value="formData.routing_mode"
-            :options="routingModeOptions"
-            :ariaLabel="t('keys.routing.mode')"
-            block
-            data-test="routing-mode-select"
-            @update:model-value="formData.routing_mode = $event as 'auto' | 'single'"
+        <!-- The shared toggle switches composite routing into the full mapping editor. -->
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <label class="input-label mb-0">{{ t('keys.composite.label') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+              {{ t('keys.composite.hint') }}
+            </p>
+          </div>
+          <Toggle
+            :model-value="formData.is_composite"
+            size="sm"
+            data-test="composite-key-toggle"
+            @update:model-value="onCompositeModeChange"
           />
+        </div>
+
+        <div class="space-y-3">
+          <label class="input-label">{{ t('keys.billing.modeLabel') }}</label>
           <Select
-            v-if="formData.routing_mode === 'single'"
+            v-model="formData.billing_mode"
+            :options="billingModeOptions"
+            :placeholder="t('keys.billing.modeLabel')"
+            data-test="api-key-billing-mode"
+            @change="onBillingModeChange"
+          />
+
+          <div v-if="formData.billing_mode === 'subscription'">
+            <label class="input-label">{{ t('keys.billing.subscriptionLabel') }}</label>
+            <Select
+              v-model="formData.preferred_subscription_id"
+              :options="billingSubscriptionOptions"
+              :placeholder="t('keys.billing.selectSubscription')"
+              :searchable="true"
+              :disabled="billingOptionsLoading"
+              data-test="api-key-preferred-subscription"
+              @change="onPreferredSubscriptionChange"
+            />
+          </div>
+        </div>
+
+        <div v-if="!formData.is_composite">
+          <label class="input-label">{{ t('keys.groupLabel') }}</label>
+          <Select
             v-model="formData.group_id"
             :options="formGroupOptions"
             :placeholder="t('keys.selectGroup')"
-            searchable
-            data-test="single-group-select"
+            :searchable="true"
+            :search-placeholder="t('keys.searchGroup')"
+            :disabled="formGroupsLoading"
+            data-tour="key-form-group"
           >
-            <template #selected>
+            <template #selected="{ option }">
               <GroupBadge
-                v-if="selectedFormGroup"
-                :name="selectedFormGroup.label"
-                :display-brand="selectedFormGroup.displayBrand"
-                :rate-multiplier="selectedFormGroup.rate"
-                :user-rate-multiplier="selectedFormGroup.userRate"
-                class="max-w-full"
+                v-if="option"
+                :name="(option as unknown as GroupOption).label"
+                :display-brand="(option as unknown as GroupOption).displayBrand"
+                :rate-multiplier="(option as unknown as GroupOption).rate"
+                :user-rate-multiplier="(option as unknown as GroupOption).userRate"
               />
-              <span v-else>{{ t('keys.selectGroup') }}</span>
+              <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
             </template>
             <template #option="{ option, selected }">
               <GroupOptionItem
-                :name="option.label"
-                :display-brand="option.displayBrand"
-                :description="option.description"
-                :rate-multiplier="option.rate"
-                :user-rate-multiplier="option.userRate"
+                :name="(option as unknown as GroupOption).label"
+                :display-brand="(option as unknown as GroupOption).displayBrand"
+                :rate-multiplier="(option as unknown as GroupOption).rate"
+                :user-rate-multiplier="(option as unknown as GroupOption).userRate"
+                :description="(option as unknown as GroupOption).description"
                 :selected="selected"
               />
             </template>
           </Select>
         </div>
 
-        <!-- One ordered list presents administrator priority without repeating channel names in a summary. -->
-        <section
-          v-if="formData.routing_mode === 'auto'"
-          class="overflow-hidden rounded-surface border border-gray-200 dark:border-dark-600"
-          aria-labelledby="key-routing-order"
+        <RuleListEditor
+          v-else
+          :items="formData.composite_groups"
+          :item-key="(binding) => binding.local_id"
+          :add-label="t('keys.composite.addMapping')"
+          add-placement="footer"
+          :min="1"
+          :max="20"
+          reorderable
+          data-test="composite-group-editor"
+          @add="addCompositeBinding"
+          @remove="removeCompositeBinding"
+          @move="moveCompositeBinding"
         >
-          <div
-            class="border-b border-gray-100 bg-gray-50/70 px-4 py-3 dark:border-dark-600 dark:bg-dark-950"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <h4
-                id="key-routing-order"
-                class="text-sm font-medium text-gray-900 dark:text-dark-100"
-                >{{ t('keys.routing.order') }}</h4
-              >
-              <span class="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-dark-400">
-                <Icon name="lock" size="xs" :animate-on-hover="false" />
-                {{ t('keys.routing.adminManaged') }}
-              </span>
-            </div>
-            <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-dark-400">{{
-              t('keys.routing.orderHint')
-            }}</p>
-          </div>
-          <ol
-            class="max-h-64 divide-y divide-gray-100 overflow-y-auto dark:divide-dark-700"
-            data-test="routing-order"
-          >
-            <li
-              v-for="(channel, index) in draftChannels"
-              :key="channel.id"
-              class="flex items-start gap-3 px-4 py-3"
+          <template #row="{ item: binding, index }">
+            <div
+              class="grid min-w-0 grid-cols-1 items-start gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(7rem,0.65fr)]"
             >
-              <span
-                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-compact bg-gray-100 font-mono text-xs text-gray-500 dark:bg-dark-700 dark:text-dark-400"
-                >{{ index + 1 }}</span
-              >
-              <GroupOptionItem
-                :name="channel.name"
-                :display-brand="channel.displayBrand"
-                :description="channel.description"
-                :rate-multiplier="channel.rate"
-                :user-rate-multiplier="channel.userRate"
-                :show-checkmark="false"
-              />
-            </li>
-          </ol>
-        </section>
-
-        <button
-          type="button"
-          class="flex w-full items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm text-gray-500 transition-colors hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/30 dark:border-dark-700 dark:text-dark-400 dark:hover:text-dark-100"
-          data-test="advanced-options-toggle"
-          :aria-expanded="advancedExpanded"
-          aria-controls="key-advanced-options"
-          @click="advancedExpanded = !advancedExpanded"
-        >
-          <span class="inline-flex items-center gap-2">
-            <Icon name="cog" size="sm" :animate-on-hover="false" />
-            {{ t('keys.routing.advanced') }}
-          </span>
-          <Icon name="chevronDown" size="sm" :class="{ 'rotate-180': advancedExpanded }" />
-        </button>
-        <Collapse :open="advancedExpanded">
-          <div id="key-advanced-options" class="space-y-5">
-            <div class="space-y-3">
-              <label class="input-label">{{ t('keys.billing.modeLabel') }}</label>
               <Select
-                v-model="formData.billing_mode"
-                :options="billingModeOptions"
-                :placeholder="t('keys.billing.modeLabel')"
-                data-test="api-key-billing-mode"
-                @change="onBillingModeChange"
+                v-model="binding.group_id"
+                :options="formGroupOptions"
+                :placeholder="t('keys.selectGroup')"
+                :searchable="true"
+                :disabled="formGroupsLoading"
+                class="min-w-0"
               />
-
-              <div v-if="formData.billing_mode === 'subscription'">
-                <label class="input-label">{{ t('keys.billing.subscriptionLabel') }}</label>
-                <Select
-                  v-model="formData.preferred_subscription_id"
-                  :options="billingSubscriptionOptions"
-                  :placeholder="t('keys.billing.selectSubscription')"
-                  :searchable="true"
-                  :disabled="billingOptionsLoading"
-                  data-test="api-key-preferred-subscription"
-                  @change="onPreferredSubscriptionChange"
-                />
-              </div>
-            </div>
-
-            <!-- The shared selector sets this key's Fast policy; server policy still decides the effective request behavior. -->
-            <div>
-              <label class="input-label">{{ t('keys.fastModePolicyLabel') }}</label>
-              <Select
-                v-model="formData.fast_mode_policy"
-                :options="fastModePolicyOptions"
-                :placeholder="t('keys.fastModePolicyLabel')"
-                data-test="fast-mode-policy-select"
-              />
-            </div>
-
-            <!-- This switch allows request routing to fall back when the chosen group is unavailable. -->
-            <div class="flex items-center justify-between">
-              <label class="input-label mb-0">{{ t('keys.fallbackWhenGroupUnavailable') }}</label>
-              <Toggle v-model="formData.fallback_when_group_unavailable" size="sm" />
-            </div>
-
-            <!-- Model redirects are edited as rows; removing every row submits an empty mapping object during update. -->
-            <ModelMappingEditor
-              v-model="formData.model_mapping_rows"
-              :title="t('keys.modelRedirect.label')"
-              :hint="t('keys.modelRedirect.hint')"
-              :add-label="t('keys.modelRedirect.addRule')"
-              :empty-text="t('keys.modelRedirect.empty')"
-              :max="MODEL_REDIRECT_MAX_RULES"
-              :source-label="t('keys.modelRedirect.source')"
-              :target-label="t('keys.modelRedirect.target')"
-              :source-placeholder="t('keys.modelRedirect.sourcePlaceholder')"
-              :target-placeholder="t('keys.modelRedirect.targetPlaceholder')"
-              :field-errors="modelMappingFieldErrors"
-              test-id="model-mapping"
-              data-test="model-mapping-editor"
-            >
-              <template #title-suffix>
-                <ModelRedirectHelp />
-              </template>
-            </ModelMappingEditor>
-
-            <!-- Custom Key Section (only for create) -->
-            <div v-if="!showEditModal" class="space-y-3">
-              <div class="flex items-center justify-between">
-                <label class="input-label mb-0">{{ t('keys.customKeyLabel') }}</label>
-                <Toggle v-model="formData.use_custom_key" size="sm" off-tone="soft" />
-              </div>
-              <div v-if="formData.use_custom_key">
+              <div class="min-w-0">
                 <input
-                  v-model="formData.custom_key"
+                  v-model="binding.prefix"
                   type="text"
-                  class="input font-mono"
-                  :placeholder="t('keys.customKeyPlaceholder')"
-                  :class="{ 'border-red-500 dark:border-red-500': customKeyError }"
+                  maxlength="32"
+                  class="input min-w-0 font-mono"
+                  :class="{ 'input-error': compositeBindingError(index) }"
+                  :placeholder="t('keys.composite.prefixPlaceholder')"
                 />
-                <p v-if="customKeyError" class="mt-1 text-sm text-red-500">{{ customKeyError }}</p>
-                <p v-else class="input-hint">{{ t('keys.customKeyHint') }}</p>
+                <p v-if="compositeBindingError(index)" class="input-error-text">
+                  {{ compositeBindingError(index) }}
+                </p>
               </div>
             </div>
+          </template>
+        </RuleListEditor>
 
-            <div v-if="showEditModal" class="space-y-3">
-              <div class="flex items-center justify-between gap-4">
-                <label class="input-label mb-0">{{ t('keys.statusLabel') }}</label>
-                <Toggle
-                  :model-value="formData.status === 'active'"
-                  :disabled="Boolean(selectedKey?.team_owner_disabled)"
-                  :aria-label="t('keys.statusLabel')"
-                  :aria-describedby="
-                    selectedKey?.team_owner_disabled ? 'team-owner-disabled-hint' : undefined
-                  "
-                  data-test="key-status-toggle"
-                  @update:model-value="onStatusToggle"
-                />
-              </div>
-              <p
-                v-if="selectedKey?.team_owner_disabled"
-                id="team-owner-disabled-hint"
-                class="mt-2 flex items-start gap-2 rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300"
-              >
-                <Icon name="lock" size="sm" class="mt-0.5 shrink-0" />
-                <span>{{ t('keys.teamOwnerDisabledHint') }}</span>
-              </p>
+        <!-- The shared selector sets this key's Fast policy; server policy still decides the effective request behavior. -->
+        <div>
+          <label class="input-label">{{ t('keys.fastModePolicyLabel') }}</label>
+          <Select
+            v-model="formData.fast_mode_policy"
+            :options="fastModePolicyOptions"
+            :placeholder="t('keys.fastModePolicyLabel')"
+            data-test="fast-mode-policy-select"
+          />
+        </div>
+
+        <!-- This switch allows request routing to fall back when the chosen group is unavailable. -->
+        <div class="flex items-center justify-between">
+          <label class="input-label mb-0">{{ t('keys.fallbackWhenGroupUnavailable') }}</label>
+          <Toggle v-model="formData.fallback_when_group_unavailable" size="sm" />
+        </div>
+
+        <!-- Model redirects are edited as rows; removing every row submits an empty mapping object during update. -->
+        <ModelMappingEditor
+          v-model="formData.model_mapping_rows"
+          :title="t('keys.modelRedirect.label')"
+          :hint="t('keys.modelRedirect.hint')"
+          :add-label="t('keys.modelRedirect.addRule')"
+          :empty-text="t('keys.modelRedirect.empty')"
+          :max="MODEL_REDIRECT_MAX_RULES"
+          :source-label="t('keys.modelRedirect.source')"
+          :target-label="t('keys.modelRedirect.target')"
+          :source-placeholder="t('keys.modelRedirect.sourcePlaceholder')"
+          :target-placeholder="t('keys.modelRedirect.targetPlaceholder')"
+          :field-errors="modelMappingFieldErrors"
+          test-id="model-mapping"
+          data-test="model-mapping-editor"
+        >
+          <template #title-suffix>
+            <ModelRedirectHelp />
+          </template>
+        </ModelMappingEditor>
+
+        <!-- Custom Key Section (only for create) -->
+        <div v-if="!showEditModal" class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="input-label mb-0">{{ t('keys.customKeyLabel') }}</label>
+            <Toggle v-model="formData.use_custom_key" size="sm" off-tone="soft" />
+          </div>
+          <div v-if="formData.use_custom_key">
+            <input
+              v-model="formData.custom_key"
+              type="text"
+              class="input font-mono"
+              :placeholder="t('keys.customKeyPlaceholder')"
+              :class="{ 'border-red-500 dark:border-red-500': customKeyError }"
+            />
+            <p v-if="customKeyError" class="mt-1 text-sm text-red-500">{{ customKeyError }}</p>
+            <p v-else class="input-hint">{{ t('keys.customKeyHint') }}</p>
+          </div>
+        </div>
+
+        <div v-if="showEditModal" class="space-y-3">
+          <div class="flex items-center justify-between gap-4">
+            <label class="input-label mb-0">{{ t('keys.statusLabel') }}</label>
+            <Toggle
+              :model-value="formData.status === 'active'"
+              :disabled="Boolean(selectedKey?.team_owner_disabled)"
+              :aria-label="t('keys.statusLabel')"
+              :aria-describedby="
+                selectedKey?.team_owner_disabled ? 'team-owner-disabled-hint' : undefined
+              "
+              data-test="key-status-toggle"
+              @update:model-value="onStatusToggle"
+            />
+          </div>
+          <p
+            v-if="selectedKey?.team_owner_disabled"
+            id="team-owner-disabled-hint"
+            class="mt-2 flex items-start gap-2 rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-900/20 dark:text-amber-300"
+          >
+            <Icon name="lock" size="sm" class="mt-0.5 shrink-0" />
+            <span>{{ t('keys.teamOwnerDisabledHint') }}</span>
+          </p>
+        </div>
+
+        <!-- IP Restriction Section -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="input-label mb-0">{{ t('keys.ipRestriction') }}</label>
+            <Toggle v-model="formData.enable_ip_restriction" size="sm" off-tone="soft" />
+          </div>
+
+          <div v-if="formData.enable_ip_restriction" class="space-y-4 pt-2">
+            <div>
+              <label class="input-label">{{ t('keys.ipWhitelist') }}</label>
+              <textarea
+                v-model="formData.ip_whitelist"
+                rows="3"
+                class="input font-mono text-sm"
+                :placeholder="t('keys.ipWhitelistPlaceholder')"
+              />
+              <p class="input-hint">{{ t('keys.ipWhitelistHint') }}</p>
             </div>
 
-            <!-- IP Restriction Section -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <label class="input-label mb-0">{{ t('keys.ipRestriction') }}</label>
-                <Toggle v-model="formData.enable_ip_restriction" size="sm" off-tone="soft" />
-              </div>
-
-              <div v-if="formData.enable_ip_restriction" class="space-y-4 pt-2">
-                <div>
-                  <label class="input-label">{{ t('keys.ipWhitelist') }}</label>
-                  <textarea
-                    v-model="formData.ip_whitelist"
-                    rows="3"
-                    class="input font-mono text-sm"
-                    :placeholder="t('keys.ipWhitelistPlaceholder')"
-                  />
-                  <p class="input-hint">{{ t('keys.ipWhitelistHint') }}</p>
-                </div>
-
-                <div>
-                  <label class="input-label">{{ t('keys.ipBlacklist') }}</label>
-                  <textarea
-                    v-model="formData.ip_blacklist"
-                    rows="3"
-                    class="input font-mono text-sm"
-                    :placeholder="t('keys.ipBlacklistPlaceholder')"
-                  />
-                  <p class="input-hint">{{ t('keys.ipBlacklistHint') }}</p>
-                </div>
-              </div>
+            <div>
+              <label class="input-label">{{ t('keys.ipBlacklist') }}</label>
+              <textarea
+                v-model="formData.ip_blacklist"
+                rows="3"
+                class="input font-mono text-sm"
+                :placeholder="t('keys.ipBlacklistPlaceholder')"
+              />
+              <p class="input-hint">{{ t('keys.ipBlacklistHint') }}</p>
             </div>
+          </div>
+        </div>
 
-            <!-- Quota Limit Section -->
-            <div class="space-y-3">
-              <label class="input-label">{{ t('keys.quotaLimit') }}</label>
-              <!-- Switch commented out - always show input, 0 = unlimited
+        <!-- Quota Limit Section -->
+        <div class="space-y-3">
+          <label class="input-label">{{ t('keys.quotaLimit') }}</label>
+          <!-- Switch commented out - always show input, 0 = unlimited
           <div class="flex items-center justify-between">
             <label class="input-label mb-0">{{ t('keys.quotaLimit') }}</label>
             <Toggle v-model="formData.enable_quota" size="sm" off-tone="soft" />
           </div>
           -->
 
-              <div class="space-y-4">
-                <div>
-                  <div class="relative">
-                    <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
-                    <input
-                      v-model.number="formData.quota"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input input-has-icon input-icon-text"
-                      :placeholder="t('keys.quotaAmountPlaceholder')"
-                    />
-                  </div>
-                  <p class="input-hint">{{ t('keys.quotaAmountHint') }}</p>
-                </div>
-
-                <!-- Quota used display (only in edit mode) -->
-                <div v-if="showEditModal && selectedKey && selectedKey.quota > 0">
-                  <label class="input-label">{{ t('keys.quotaUsed') }}</label>
-                  <div class="flex items-center gap-2">
-                    <div
-                      class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 dark:bg-dark-700"
-                    >
-                      <span class="font-medium text-gray-900 dark:text-white">
-                        {{ formatBalanceAmount(selectedKey.quota_used, { fractionDigits: 4 }) }}
-                      </span>
-                      <span class="mx-2 text-gray-400">/</span>
-                      <span class="text-gray-500 dark:text-gray-400">
-                        {{ formatBalanceAmount(selectedKey.quota, { fractionDigits: 2 }) }}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      @click="confirmResetQuota"
-                      class="btn btn-secondary text-sm"
-                      :title="t('keys.resetQuotaUsed')"
-                    >
-                      {{ t('keys.reset') }}
-                    </button>
-                  </div>
-                </div>
+          <div class="space-y-4">
+            <div>
+              <div class="relative">
+                <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
+                <input
+                  v-model.number="formData.quota"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input input-has-icon input-icon-text"
+                  :placeholder="t('keys.quotaAmountPlaceholder')"
+                />
               </div>
+              <p class="input-hint">{{ t('keys.quotaAmountHint') }}</p>
             </div>
 
-            <!-- Request-count limits and spending limits have separate controls and units. -->
-            <div class="space-y-3">
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label for="key-concurrency-limit" class="input-label">{{
-                    t('keys.concurrencyLimit')
-                  }}</label>
-                  <input
-                    id="key-concurrency-limit"
-                    v-model.number="formData.concurrency_limit"
-                    type="number"
-                    min="0"
-                    max="2147483647"
-                    step="1"
-                    class="input"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label for="key-rpm-limit" class="input-label">{{ t('keys.rpmLimit') }}</label>
-                  <input
-                    id="key-rpm-limit"
-                    v-model.number="formData.rpm_limit"
-                    type="number"
-                    min="0"
-                    max="2147483647"
-                    step="1"
-                    class="input"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              <p class="input-hint">{{ t('keys.requestLimitsHint') }}</p>
-            </div>
-
-            <!-- Rate Limit Section -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <label class="input-label mb-0">{{ t('keys.rateLimitSection') }}</label>
-                <Toggle v-model="formData.enable_rate_limit" size="sm" off-tone="soft" />
-              </div>
-
-              <div v-if="formData.enable_rate_limit" class="space-y-4 pt-2">
-                <p class="input-hint -mt-2">{{ t('keys.rateLimitHint') }}</p>
-                <!-- 5-Hour Limit -->
-                <div>
-                  <label class="input-label">{{ t('keys.rateLimit5h') }}</label>
-                  <div class="relative">
-                    <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
-                    <input
-                      v-model.number="formData.rate_limit_5h"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input input-has-icon input-icon-text"
-                      :placeholder="'0'"
-                    />
-                  </div>
-                  <!-- Usage info (edit mode only) -->
-                  <div
-                    v-if="showEditModal && selectedKey && selectedKey.rate_limit_5h > 0"
-                    class="mt-2"
-                  >
-                    <div class="flex items-center gap-2">
-                      <div
-                        class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 text-sm dark:bg-dark-700"
-                      >
-                        <span
-                          :class="[
-                            'font-medium',
-                            selectedKey.usage_5h >= selectedKey.rate_limit_5h
-                              ? 'text-red-500'
-                              : selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8
-                                ? 'text-yellow-500'
-                                : 'text-gray-900 dark:text-white',
-                          ]"
-                        >
-                          {{ formatBalanceAmount(selectedKey.usage_5h, { fractionDigits: 4 }) }}
-                        </span>
-                        <span class="mx-2 text-gray-400">/</span>
-                        <span class="text-gray-500 dark:text-gray-400">
-                          {{
-                            formatBalanceAmount(selectedKey.rate_limit_5h, { fractionDigits: 2 })
-                          }}
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600"
-                    >
-                      <div
-                        :class="[
-                          'h-full rounded-full transition-[width,background-color]',
-                          selectedKey.usage_5h >= selectedKey.rate_limit_5h
-                            ? 'bg-red-500'
-                            : selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500',
-                        ]"
-                        :style="{
-                          width:
-                            Math.min(
-                              (selectedKey.usage_5h / selectedKey.rate_limit_5h) * 100,
-                              100,
-                            ) + '%',
-                        }"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Daily Limit -->
-                <div>
-                  <label class="input-label">{{ t('keys.rateLimit1d') }}</label>
-                  <div class="relative">
-                    <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
-                    <input
-                      v-model.number="formData.rate_limit_1d"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input input-has-icon input-icon-text"
-                      :placeholder="'0'"
-                    />
-                  </div>
-                  <!-- Usage info (edit mode only) -->
-                  <div
-                    v-if="showEditModal && selectedKey && selectedKey.rate_limit_1d > 0"
-                    class="mt-2"
-                  >
-                    <div class="flex items-center gap-2">
-                      <div
-                        class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 text-sm dark:bg-dark-700"
-                      >
-                        <span
-                          :class="[
-                            'font-medium',
-                            selectedKey.usage_1d >= selectedKey.rate_limit_1d
-                              ? 'text-red-500'
-                              : selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8
-                                ? 'text-yellow-500'
-                                : 'text-gray-900 dark:text-white',
-                          ]"
-                        >
-                          {{ formatBalanceAmount(selectedKey.usage_1d, { fractionDigits: 4 }) }}
-                        </span>
-                        <span class="mx-2 text-gray-400">/</span>
-                        <span class="text-gray-500 dark:text-gray-400">
-                          {{
-                            formatBalanceAmount(selectedKey.rate_limit_1d, { fractionDigits: 2 })
-                          }}
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600"
-                    >
-                      <div
-                        :class="[
-                          'h-full rounded-full transition-[width,background-color]',
-                          selectedKey.usage_1d >= selectedKey.rate_limit_1d
-                            ? 'bg-red-500'
-                            : selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500',
-                        ]"
-                        :style="{
-                          width:
-                            Math.min(
-                              (selectedKey.usage_1d / selectedKey.rate_limit_1d) * 100,
-                              100,
-                            ) + '%',
-                        }"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 7-Day Limit -->
-                <div>
-                  <label class="input-label">{{ t('keys.rateLimit7d') }}</label>
-                  <div class="relative">
-                    <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
-                    <input
-                      v-model.number="formData.rate_limit_7d"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      class="input input-has-icon input-icon-text"
-                      :placeholder="'0'"
-                    />
-                  </div>
-                  <!-- Usage info (edit mode only) -->
-                  <div
-                    v-if="showEditModal && selectedKey && selectedKey.rate_limit_7d > 0"
-                    class="mt-2"
-                  >
-                    <div class="flex items-center gap-2">
-                      <div
-                        class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 text-sm dark:bg-dark-700"
-                      >
-                        <span
-                          :class="[
-                            'font-medium',
-                            selectedKey.usage_7d >= selectedKey.rate_limit_7d
-                              ? 'text-red-500'
-                              : selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8
-                                ? 'text-yellow-500'
-                                : 'text-gray-900 dark:text-white',
-                          ]"
-                        >
-                          {{ formatBalanceAmount(selectedKey.usage_7d, { fractionDigits: 4 }) }}
-                        </span>
-                        <span class="mx-2 text-gray-400">/</span>
-                        <span class="text-gray-500 dark:text-gray-400">
-                          {{
-                            formatBalanceAmount(selectedKey.rate_limit_7d, { fractionDigits: 2 })
-                          }}
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600"
-                    >
-                      <div
-                        :class="[
-                          'h-full rounded-full transition-[width,background-color]',
-                          selectedKey.usage_7d >= selectedKey.rate_limit_7d
-                            ? 'bg-red-500'
-                            : selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500',
-                        ]"
-                        :style="{
-                          width:
-                            Math.min(
-                              (selectedKey.usage_7d / selectedKey.rate_limit_7d) * 100,
-                              100,
-                            ) + '%',
-                        }"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Reset Rate Limit button (edit mode only) -->
-                <div
-                  v-if="
-                    showEditModal &&
-                    selectedKey &&
-                    (selectedKey.rate_limit_5h > 0 ||
-                      selectedKey.rate_limit_1d > 0 ||
-                      selectedKey.rate_limit_7d > 0)
-                  "
-                >
-                  <button
-                    type="button"
-                    @click="confirmResetRateLimit"
-                    class="btn btn-secondary text-sm"
-                  >
-                    {{ t('keys.resetRateLimitUsage') }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Expiration Section -->
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <label class="input-label mb-0">{{ t('keys.expiration') }}</label>
-                <Toggle v-model="formData.enable_expiration" size="sm" off-tone="soft" />
-              </div>
-
-              <div v-if="formData.enable_expiration" class="space-y-4 pt-2">
-                <!-- Quick select buttons (for both create and edit mode) -->
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    v-for="days in ['7', '30', '90']"
-                    :key="days"
-                    type="button"
-                    @click="setExpirationDays(parseInt(days))"
-                    :class="[
-                      'rounded-control px-3 py-1.5 text-sm transition-colors',
-                      formData.expiration_preset === days
-                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/8 dark:text-primary-500'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600',
-                    ]"
-                  >
-                    {{
-                      showEditModal
-                        ? t('keys.extendDays', { days })
-                        : t('keys.expiresInDays', { days })
-                    }}
-                  </button>
-                  <button
-                    type="button"
-                    @click="formData.expiration_preset = 'custom'"
-                    :class="[
-                      'rounded-control px-3 py-1.5 text-sm transition-colors',
-                      formData.expiration_preset === 'custom'
-                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/8 dark:text-primary-500'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600',
-                    ]"
-                  >
-                    {{ t('keys.customDate') }}
-                  </button>
-                </div>
-
-                <!-- Date picker (always show for precise adjustment) -->
-                <div>
-                  <label class="input-label">{{ t('keys.expirationDate') }}</label>
-                  <input v-model="formData.expiration_date" type="datetime-local" class="input" />
-                  <p class="input-hint">{{ t('keys.expirationDateHint') }}</p>
-                </div>
-
-                <!-- Current expiration display (only in edit mode) -->
-                <div v-if="showEditModal && selectedKey?.expires_at" class="text-sm">
-                  <span class="text-gray-500 dark:text-gray-400"
-                    >{{ t('keys.currentExpiration') }}:
-                  </span>
+            <!-- Quota used display (only in edit mode) -->
+            <div v-if="showEditModal && selectedKey && selectedKey.quota > 0">
+              <label class="input-label">{{ t('keys.quotaUsed') }}</label>
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 dark:bg-dark-700">
                   <span class="font-medium text-gray-900 dark:text-white">
-                    {{ formatDateTime(selectedKey.expires_at) }}
+                    {{ formatBalanceAmount(selectedKey.quota_used, { fractionDigits: 4 }) }}
+                  </span>
+                  <span class="mx-2 text-gray-400">/</span>
+                  <span class="text-gray-500 dark:text-gray-400">
+                    {{ formatBalanceAmount(selectedKey.quota, { fractionDigits: 2 }) }}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  @click="confirmResetQuota"
+                  class="btn btn-secondary text-sm"
+                  :title="t('keys.resetQuotaUsed')"
+                >
+                  {{ t('keys.reset') }}
+                </button>
               </div>
             </div>
           </div>
-        </Collapse>
+        </div>
+
+        <!-- Request-count limits and spending limits have separate controls and units. -->
+        <div class="space-y-3">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label for="key-concurrency-limit" class="input-label">{{
+                t('keys.concurrencyLimit')
+              }}</label>
+              <input
+                id="key-concurrency-limit"
+                v-model.number="formData.concurrency_limit"
+                type="number"
+                min="0"
+                max="2147483647"
+                step="1"
+                class="input"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label for="key-rpm-limit" class="input-label">{{ t('keys.rpmLimit') }}</label>
+              <input
+                id="key-rpm-limit"
+                v-model.number="formData.rpm_limit"
+                type="number"
+                min="0"
+                max="2147483647"
+                step="1"
+                class="input"
+                placeholder="0"
+              />
+            </div>
+          </div>
+          <p class="input-hint">{{ t('keys.requestLimitsHint') }}</p>
+        </div>
+
+        <!-- Rate Limit Section -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="input-label mb-0">{{ t('keys.rateLimitSection') }}</label>
+            <Toggle v-model="formData.enable_rate_limit" size="sm" off-tone="soft" />
+          </div>
+
+          <div v-if="formData.enable_rate_limit" class="space-y-4 pt-2">
+            <p class="input-hint -mt-2">{{ t('keys.rateLimitHint') }}</p>
+            <!-- 5-Hour Limit -->
+            <div>
+              <label class="input-label">{{ t('keys.rateLimit5h') }}</label>
+              <div class="relative">
+                <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
+                <input
+                  v-model.number="formData.rate_limit_5h"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input input-has-icon input-icon-text"
+                  :placeholder="'0'"
+                />
+              </div>
+              <!-- Usage info (edit mode only) -->
+              <div
+                v-if="showEditModal && selectedKey && selectedKey.rate_limit_5h > 0"
+                class="mt-2"
+              >
+                <div class="flex items-center gap-2">
+                  <div
+                    class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 text-sm dark:bg-dark-700"
+                  >
+                    <span
+                      :class="[
+                        'font-medium',
+                        selectedKey.usage_5h >= selectedKey.rate_limit_5h
+                          ? 'text-red-500'
+                          : selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8
+                            ? 'text-yellow-500'
+                            : 'text-gray-900 dark:text-white',
+                      ]"
+                    >
+                      {{ formatBalanceAmount(selectedKey.usage_5h, { fractionDigits: 4 }) }}
+                    </span>
+                    <span class="mx-2 text-gray-400">/</span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      {{ formatBalanceAmount(selectedKey.rate_limit_5h, { fractionDigits: 2 }) }}
+                    </span>
+                  </div>
+                </div>
+                <div
+                  class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600"
+                >
+                  <div
+                    :class="[
+                      'h-full rounded-full transition-[width,background-color]',
+                      selectedKey.usage_5h >= selectedKey.rate_limit_5h
+                        ? 'bg-red-500'
+                        : selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8
+                          ? 'bg-yellow-500'
+                          : 'bg-green-500',
+                    ]"
+                    :style="{
+                      width:
+                        Math.min((selectedKey.usage_5h / selectedKey.rate_limit_5h) * 100, 100) +
+                        '%',
+                    }"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Daily Limit -->
+            <div>
+              <label class="input-label">{{ t('keys.rateLimit1d') }}</label>
+              <div class="relative">
+                <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
+                <input
+                  v-model.number="formData.rate_limit_1d"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input input-has-icon input-icon-text"
+                  :placeholder="'0'"
+                />
+              </div>
+              <!-- Usage info (edit mode only) -->
+              <div
+                v-if="showEditModal && selectedKey && selectedKey.rate_limit_1d > 0"
+                class="mt-2"
+              >
+                <div class="flex items-center gap-2">
+                  <div
+                    class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 text-sm dark:bg-dark-700"
+                  >
+                    <span
+                      :class="[
+                        'font-medium',
+                        selectedKey.usage_1d >= selectedKey.rate_limit_1d
+                          ? 'text-red-500'
+                          : selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8
+                            ? 'text-yellow-500'
+                            : 'text-gray-900 dark:text-white',
+                      ]"
+                    >
+                      {{ formatBalanceAmount(selectedKey.usage_1d, { fractionDigits: 4 }) }}
+                    </span>
+                    <span class="mx-2 text-gray-400">/</span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      {{ formatBalanceAmount(selectedKey.rate_limit_1d, { fractionDigits: 2 }) }}
+                    </span>
+                  </div>
+                </div>
+                <div
+                  class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600"
+                >
+                  <div
+                    :class="[
+                      'h-full rounded-full transition-[width,background-color]',
+                      selectedKey.usage_1d >= selectedKey.rate_limit_1d
+                        ? 'bg-red-500'
+                        : selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8
+                          ? 'bg-yellow-500'
+                          : 'bg-green-500',
+                    ]"
+                    :style="{
+                      width:
+                        Math.min((selectedKey.usage_1d / selectedKey.rate_limit_1d) * 100, 100) +
+                        '%',
+                    }"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 7-Day Limit -->
+            <div>
+              <label class="input-label">{{ t('keys.rateLimit7d') }}</label>
+              <div class="relative">
+                <span class="input-icon text-gray-500">{{ balanceUnitSymbol }}</span>
+                <input
+                  v-model.number="formData.rate_limit_7d"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  class="input input-has-icon input-icon-text"
+                  :placeholder="'0'"
+                />
+              </div>
+              <!-- Usage info (edit mode only) -->
+              <div
+                v-if="showEditModal && selectedKey && selectedKey.rate_limit_7d > 0"
+                class="mt-2"
+              >
+                <div class="flex items-center gap-2">
+                  <div
+                    class="flex-1 h-9 rounded-control bg-gray-100 px-3 py-1.5 text-sm dark:bg-dark-700"
+                  >
+                    <span
+                      :class="[
+                        'font-medium',
+                        selectedKey.usage_7d >= selectedKey.rate_limit_7d
+                          ? 'text-red-500'
+                          : selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8
+                            ? 'text-yellow-500'
+                            : 'text-gray-900 dark:text-white',
+                      ]"
+                    >
+                      {{ formatBalanceAmount(selectedKey.usage_7d, { fractionDigits: 4 }) }}
+                    </span>
+                    <span class="mx-2 text-gray-400">/</span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      {{ formatBalanceAmount(selectedKey.rate_limit_7d, { fractionDigits: 2 }) }}
+                    </span>
+                  </div>
+                </div>
+                <div
+                  class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600"
+                >
+                  <div
+                    :class="[
+                      'h-full rounded-full transition-[width,background-color]',
+                      selectedKey.usage_7d >= selectedKey.rate_limit_7d
+                        ? 'bg-red-500'
+                        : selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8
+                          ? 'bg-yellow-500'
+                          : 'bg-green-500',
+                    ]"
+                    :style="{
+                      width:
+                        Math.min((selectedKey.usage_7d / selectedKey.rate_limit_7d) * 100, 100) +
+                        '%',
+                    }"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Reset Rate Limit button (edit mode only) -->
+            <div
+              v-if="
+                showEditModal &&
+                selectedKey &&
+                (selectedKey.rate_limit_5h > 0 ||
+                  selectedKey.rate_limit_1d > 0 ||
+                  selectedKey.rate_limit_7d > 0)
+              "
+            >
+              <button
+                type="button"
+                @click="confirmResetRateLimit"
+                class="btn btn-secondary text-sm"
+              >
+                {{ t('keys.resetRateLimitUsage') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expiration Section -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="input-label mb-0">{{ t('keys.expiration') }}</label>
+            <Toggle v-model="formData.enable_expiration" size="sm" off-tone="soft" />
+          </div>
+
+          <div v-if="formData.enable_expiration" class="space-y-4 pt-2">
+            <!-- Quick select buttons (for both create and edit mode) -->
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="days in ['7', '30', '90']"
+                :key="days"
+                type="button"
+                @click="setExpirationDays(parseInt(days))"
+                :class="[
+                  'rounded-control px-3 py-1.5 text-sm transition-colors',
+                  formData.expiration_preset === days
+                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/8 dark:text-primary-500'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600',
+                ]"
+              >
+                {{
+                  showEditModal ? t('keys.extendDays', { days }) : t('keys.expiresInDays', { days })
+                }}
+              </button>
+              <button
+                type="button"
+                @click="formData.expiration_preset = 'custom'"
+                :class="[
+                  'rounded-control px-3 py-1.5 text-sm transition-colors',
+                  formData.expiration_preset === 'custom'
+                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/8 dark:text-primary-500'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600',
+                ]"
+              >
+                {{ t('keys.customDate') }}
+              </button>
+            </div>
+
+            <!-- Date picker (always show for precise adjustment) -->
+            <div>
+              <label class="input-label">{{ t('keys.expirationDate') }}</label>
+              <input v-model="formData.expiration_date" type="datetime-local" class="input" />
+              <p class="input-hint">{{ t('keys.expirationDateHint') }}</p>
+            </div>
+
+            <!-- Current expiration display (only in edit mode) -->
+            <div v-if="showEditModal && selectedKey?.expires_at" class="text-sm">
+              <span class="text-gray-500 dark:text-gray-400"
+                >{{ t('keys.currentExpiration') }}:
+              </span>
+              <span class="font-medium text-gray-900 dark:text-white">
+                {{ formatDateTime(selectedKey.expires_at) }}
+              </span>
+            </div>
+          </div>
+        </div>
       </form>
       <template #footer>
         <div class="flex justify-end gap-3">
@@ -1384,15 +1373,86 @@
         </div>
       </template>
     </BaseDialog>
+
+    <!-- Group Selector Dropdown (Teleported to body to avoid overflow clipping) -->
+    <Teleport to="body">
+      <MotionTransition name="dropdown-fade">
+        <div
+          v-if="groupSelectorKeyId !== null && dropdownPosition"
+          :inert="!(groupSelectorKeyId !== null && dropdownPosition) || undefined"
+          ref="dropdownRef"
+          class="dropdown animate-in fade-in slide-in-from-top-2 fixed z-teleport-dropdown w-max max-w-[calc(100vw-16px)] overflow-hidden duration-normal sm:min-w-[380px] py-0"
+          style="pointer-events: auto !important"
+          :style="{
+            top: dropdownPosition.top !== undefined ? dropdownPosition.top + 'px' : undefined,
+            bottom:
+              dropdownPosition.bottom !== undefined ? dropdownPosition.bottom + 'px' : undefined,
+            left: dropdownPosition.left + 'px',
+          }"
+        >
+          <!-- Group search uses the shared input so its surface and focus treatment follow the current global theme. -->
+          <div class="border-b border-gray-100 p-2 dark:border-dark-700">
+            <SearchInput
+              v-model="groupSearchQuery"
+              :placeholder="t('keys.searchGroup')"
+              @click.stop
+            />
+          </div>
+          <!-- Group list -->
+          <div class="max-h-80 overflow-y-auto p-1.5">
+            <button
+              v-for="option in filteredGroupOptions"
+              :key="option.value ?? 'null'"
+              @click="changeGroup(selectedKeyForGroup!, option.value)"
+              :class="[
+                'flex w-full items-center justify-between rounded-control px-3 py-2.5 text-sm transition-colors',
+                'border-b border-gray-100 last:border-0 dark:border-dark-700',
+                selectedKeyForGroup?.group_id === option.value ||
+                (!selectedKeyForGroup?.group_id && option.value === null)
+                  ? 'bg-primary-50 dark:bg-primary-500/8 dark:text-primary-500'
+                  : 'hover:bg-gray-100 dark:hover:bg-dark-700',
+              ]"
+              :title="option.description || undefined"
+            >
+              <GroupOptionItem
+                :name="option.label"
+                :display-brand="option.displayBrand"
+                :rate-multiplier="option.rate"
+                :user-rate-multiplier="option.userRate"
+                :description="option.description"
+                :selected="
+                  selectedKeyForGroup?.group_id === option.value ||
+                  (!selectedKeyForGroup?.group_id && option.value === null)
+                "
+              />
+            </button>
+            <!-- Empty state when search has no results -->
+            <div
+              v-if="filteredGroupOptions.length === 0"
+              class="py-4 text-center text-sm text-gray-400 dark:text-gray-500"
+            >
+              {{ t('keys.noGroupFound') }}
+            </div>
+          </div>
+        </div>
+      </MotionTransition>
+    </Teleport>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import Collapse from '@/components/common/Collapse.vue'
 import { useLocaleRefresh } from '@/composables/useLocaleRefresh'
 import Skeleton from '@/components/common/Skeleton.vue'
 import MotionTransition from '@/components/common/MotionTransition.vue'
-import { watch, ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import {
+  watch,
+  ref,
+  reactive,
+  computed,
+  onMounted,
+  onUnmounted,
+  type ComponentPublicInstance,
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
@@ -1410,13 +1470,11 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
-import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-import SettingsSegmented from '@/components/common/settings/SettingsSegmented.vue'
 import FilterDropdown from '@/components/common/FilterDropdown.vue'
 import FilterField from '@/components/common/FilterField.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import SearchInput from '@/components/common/SearchInput.vue'
+import RuleListEditor from '@/components/common/RuleListEditor.vue'
 import ModelMappingEditor from '@/components/common/ModelMappingEditor.vue'
 import Icon from '@/components/icons/Icon.vue'
 import KeyActionMenu from '@/components/keys/KeyActionMenu.vue'
@@ -1424,6 +1482,8 @@ import { buildKeyFormPayload } from '@/components/keys/keyForm'
 import UseKeyModal from '@/components/keys/UseKeyModal.vue'
 import ModelRedirectHelp from '@/components/keys/ModelRedirectHelp.vue'
 import EndpointPopover from '@/components/keys/EndpointPopover.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
+import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import ScopeDropdown, { type DataScope } from '@/components/team/ScopeDropdown.vue'
 import type {
   ApiKey,
@@ -1460,6 +1520,11 @@ import {
 } from '@/utils/clientConfig'
 import { buildMagpieImportUrl } from '@/utils/magpieImport'
 
+// KeysView.vue manages personal and team API keys, their billing and routing
+// settings, and client configuration exports. The selected scope supplies keys
+// and visible groups, while row actions use the selected key for editing,
+// rotation, and imports into desktop clients.
+
 // KeysView.vue manages API-key listings and the forms used to create, update,
 // rotate, and remove keys for the selected ownership scope. The page coordinates
 // group choices, billing options, usage observations, and per-key dialogs while
@@ -1485,6 +1550,17 @@ const formatDateTimeLocal = (isoDate: string): string => {
   const pad = (n: number) => n.toString().padStart(2, '0')
   // Omit seconds and milliseconds to match the datetime-local control's precision.
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// GroupOption combines a routing-group identity with labels and rates used by the selector.
+interface GroupOption {
+  search_terms?: string[] // Additional group search aliases.
+  value: number // Routing-group numeric identity.
+  label: string // Group display name.
+  description: string | null // Optional group description text.
+  displayBrand: string | null // Optional badge brand identifier.
+  rate: number // Default group billing multiplier.
+  userRate: number | null // Account-specific multiplier when present.
 }
 
 // Route scope, account presentation, clipboard support, and onboarding state connect key-
@@ -1518,10 +1594,7 @@ const COMPOSITE_GROUP_PREVIEW_LIMIT = 4
 // most one mapping above the nominal limit remains fully visible; larger sets show the
 // leading slice.
 const visibleCompositeGroups = (row: ApiKey) => {
-  const groups =
-    row.routing_mode === 'single' && row.group_id
-      ? [{ group_id: row.group_id, group: row.group }]
-      : (row.groups ?? [])
+  const groups = row.composite_groups ?? []
   if (groups.length <= COMPOSITE_GROUP_PREVIEW_LIMIT + 1) {
     return groups
   }
@@ -1565,7 +1638,7 @@ const concurrencyTitle = (row: ApiKey) => {
 
 // hiddenCompositeGroupCount reports how many mappings remain outside the inline row preview.
 const hiddenCompositeGroupCount = (row: ApiKey) => {
-  return (row.groups?.length ?? 0) - visibleCompositeGroups(row).length
+  return (row.composite_groups?.length ?? 0) - visibleCompositeGroups(row).length
 }
 
 // allColumns supplies localized table definitions; the visibility configuration below
@@ -1732,19 +1805,6 @@ const filterGroupId = ref<string | number>('')
 
 // Dialog flags and selected records retain the target for each page operation, separating
 // rotation, local CLI import, client import, and general key editing.
-// Disclosure state belongs to one editor session. Hidden advanced controls keep
-// their draft values until save or close, so folding never clears restrictions.
-const advancedExpanded = ref(false)
-const defaultChannelIDs = ref<number[]>([])
-
-// applyDefaultChannels restores the current administrator order inside the draft.
-// Updates apply while inheritance remains selected, leaving custom rows intact.
-// The server repeats payer and subscription filtering when this Key is used.
-function applyDefaultChannels() {
-  if (formData.value.use_default_groups)
-    formData.value.composite_groups = defaultChannelIDs.value.map((id) => newCompositeBinding(id))
-}
-
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const showDeleteDialog = ref(false)
@@ -1756,7 +1816,6 @@ const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
 const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
-const columnDropdownRef = ref<HTMLElement | null>(null)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 // Action-menu and group-selector state retains the row target and viewport position, while
@@ -1767,36 +1826,69 @@ const actionMenuPosition = ref<{
   left: number // Viewport menu left pixels.
 } | null>(null)
 const copiedKeyId = ref<number | null>(null)
+const groupSelectorKeyId = ref<number | null>(null)
 // Public settings control team scope and import visibility; element refs support teleported
 // panels and per-key group-button positioning.
 const publicSettings = ref<PublicSettings | null>(null)
 const teamFeatureEnabled = computed(() => publicSettings.value?.team_enabled !== false)
+const dropdownRef = ref<HTMLElement | null>(null)
+const columnDropdownRef = ref<HTMLElement | null>(null)
+const dropdownPosition = ref<{
+  // top measures pixels from the viewport top; upward placement omits this
+  // anchor and uses bottom to position the panel.
+  top?: number
+  // bottom measures pixels from the viewport bottom when the positioning helper
+  // selects available space above the panel's trigger.
+  bottom?: number
+  left: number // Viewport panel left pixels.
+} | null>(null)
+const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 // abortController owns the latest list and usage batch; compositeBindingSequence supplies
 // stable draft identities, and formGroupsRequestID orders subscription-specific group
 // lookups.
 let abortController: AbortController | null = null
 let compositeBindingSequence = 0
 let formGroupsRequestID = 0
-let routingOptionsRequestID = 0
 
 // newCompositeBinding creates a draft mapping with a monotonically increasing local
-// identity. Administrator defaults supply these read-only rows, and their sequence
-// is displayed directly to explain automatic routing priority.
-const newCompositeBinding = (groupId: number | null = null) => ({
+// identity. Reordering keeps that identity so the editor retains its input elements; prefix
+// defaults empty for user confirmation.
+const newCompositeBinding = (groupId: number | null = null, prefix = '') => ({
   local_id: ++compositeBindingSequence,
   group_id: groupId,
+  prefix,
 })
+
+// selectedKeyForGroup resolves the open inline group selector against the current key list,
+// returning null when its target row is absent.
+const selectedKeyForGroup = computed(() => {
+  if (groupSelectorKeyId.value === null) return null
+  return apiKeys.value.find((k) => k.id === groupSelectorKeyId.value) || null
+})
+
+// setGroupButtonRef registers a row's actual button element for floating-panel positioning.
+// Component instances and null remove the entry so stale elements are not used after table
+// rows unmount.
+const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance | null) => {
+  if (el instanceof HTMLElement) {
+    groupButtonRefs.value.set(keyId, el)
+  } else {
+    groupButtonRefs.value.delete(keyId)
+  }
+}
 
 // formData holds the shared create/edit draft; request conversion uses keyForm.ts for
 // restrictions while this page owns identity, billing, composite bindings, and status rules.
 const formData = ref({
   name: '', // Editable key display name.
-  // Inherited drafts refresh the administrator order on the server. Custom drafts
-  // submit the displayed channel rows as the complete ordered replacement.
-  routing_mode: 'auto' as 'auto' | 'single', // Default automatic channel routing.
-  group_id: null as number | null, // Selected fixed group when mode is single.
-  use_default_groups: true, // Follow administrator channel defaults.
-  composite_groups: [] as Array<ReturnType<typeof newCompositeBinding>>, // Stable ordered channel draft rows.
+  // group_id and composite_groups retain the single-group and prefix-mapping
+  // drafts. is_composite selects which submitKeyForm sends and which it omits.
+  // Inactive mappings remain available when switching modes. Enabling composite
+  // mode adds its first row when the list is empty; disabling an originally
+  // composite key clears group_id for a fresh single-group choice.
+  group_id: null as number | null, // Single routing-group identity.
+  is_composite: false, // Prefix-routing mode enabled flag.
+  composite_groups: [] as Array<ReturnType<typeof newCompositeBinding>>, // Stable prefix-to-group draft rows.
   status: 'active' as 'active' | 'inactive', // Editable active/inactive selection.
   fast_mode_policy: 'follow_request' as ApiKeyFastModePolicy, // Request Fast-mode override policy.
   // billing_mode selects how preferred_subscription_id is submitted: subscription
@@ -1887,32 +1979,6 @@ const customKeyError = computed(() => {
   return ''
 })
 
-// draftChannels resolves group presentation in administrator priority order.
-// General and subscription-filtered catalogues supply localized labels, configured
-// brands, descriptions and billing rates for the same presentation as group choices.
-// Missing metadata retains the numeric group label until its catalogue is available.
-const draftChannels = computed(() =>
-  formData.value.composite_groups.map((binding) => {
-    const group =
-      groups.value.find((group) => group.id === binding.group_id) ??
-      formGroups.value.find((group) => group.id === binding.group_id)
-    return {
-      id: binding.local_id, // Stable draft row identity.
-      name: group?.display_name || group?.name || `#${binding.group_id}`, // Localized channel label.
-      displayBrand: group?.display_brand?.trim() || null, // Configured provider brand.
-      description: group?.description, // Administrator channel description.
-      rate: group?.rate_multiplier, // Ordinary billing multiplier.
-      userRate: group ? (userGroupRates.value[group.id] ?? null) : null, // Account-specific billing multiplier.
-    }
-  }),
-)
-
-// routingModeOptions supplies the two fixed routing choices and their shared icons.
-const routingModeOptions = computed(() => [
-  { value: 'auto' as const, label: t('keys.routing.auto'), icon: 'bolt' as const },
-  { value: 'single' as const, label: t('keys.routing.single'), icon: 'layers' as const },
-])
-
 // fastModePolicyOptions offers request-following, forced-on, and forced-off policies while
 // the shared Select component owns keyboard and popup interaction.
 const fastModePolicyOptions = computed(() => [
@@ -1982,6 +2048,7 @@ const shouldSubmitEditStatus = (key: ApiKey, status: 'active' | 'inactive') => {
 // visible groups, and server key statuses used by the list endpoint.
 const groupFilterOptions = computed(() => [
   { value: '', label: t('keys.allGroups') },
+  { value: 0, label: t('keys.noGroup') },
   ...groups.value.map((g) => ({ value: g.id, label: g.name })),
 ])
 
@@ -2039,28 +2106,115 @@ const buildGroupOptions = (source: Group[]) =>
     userRate: userGroupRates.value[group.id] ?? null,
   }))
 
-// formGroupOptions presents only server-approved channels for the current draft.
-// Subscription selection narrows this list while table filters retain visible groups.
+// formGroupOptions uses server-approved form groups while allGroupOptions retains the
+// broader list for filtering and ordinary inline group selection.
 const formGroupOptions = computed(() => buildGroupOptions(formGroups.value))
+const allGroupOptions = computed(() => buildGroupOptions(groups.value))
 
-// selectedFormGroup supplies typed presentation metadata for the fixed-group trigger.
-const selectedFormGroup = computed(() =>
-  formGroupOptions.value.find((option) => option.value === formData.value.group_id),
-)
-
-// compositeFormError validates the one user-selectable routing target.
-// Automatic routing uses administrator settings, while single mode requires a group.
-const compositeFormError = computed(() =>
-  formData.value.routing_mode === 'single' && !formData.value.group_id
-    ? t('keys.groupRequired')
-    : '',
-)
-
-// pruneFormGroupBindings removes channels outside the selected subscription plan.
-// A fixed group outside that plan is cleared before the user submits the draft.
-const pruneFormGroupBindings = (allowedGroupIDs: Set<number>) => {
-  if (formData.value.group_id !== null && !allowedGroupIDs.has(formData.value.group_id))
+// onCompositeModeChange switches between single-group and prefix-mapped form
+// representations. Enabling creates an initial mapping from the current group when needed,
+// keeping its prefix empty for the user. Disabling an originally composite key clears the
+// single group so it must be selected; other drafts can recover their first mapping's group
+// when none is already selected. Existing mapping objects remain available for later mode
+// switches.
+const onCompositeModeChange = (enabled: boolean) => {
+  if (enabled) {
+    if (formData.value.composite_groups.length === 0) {
+      formData.value.composite_groups = [newCompositeBinding(formData.value.group_id)]
+    }
+    formData.value.is_composite = true
+    return
+  }
+  formData.value.is_composite = false
+  if (selectedKey.value?.is_composite) {
     formData.value.group_id = null
+  } else if (formData.value.group_id === null) {
+    formData.value.group_id = formData.value.composite_groups[0]?.group_id ?? null
+  }
+}
+
+// addCompositeBinding adds an empty mapping while the draft contains fewer than twenty rows.
+// Its stable local ID is assigned by newCompositeBinding for later editor movement and field
+// retention.
+const addCompositeBinding = () => {
+  if (formData.value.composite_groups.length >= 20) return
+  formData.value.composite_groups.push(newCompositeBinding())
+}
+
+// removeCompositeBinding removes the requested row while retaining at least one mapping. The
+// caller supplies a current editor index so removal targets the row displayed by that
+// action.
+const removeCompositeBinding = (index: number) => {
+  if (formData.value.composite_groups.length <= 1) return
+  formData.value.composite_groups.splice(index, 1)
+}
+
+// moveCompositeBinding relocates a mapping while preserving its object identity and local
+// ID. Out-of-range target positions are ignored; the editor supplies the current source
+// index for the requested move.
+const moveCompositeBinding = (index: number, target: number) => {
+  if (target < 0 || target >= formData.value.composite_groups.length) return
+  const [binding] = formData.value.composite_groups.splice(index, 1)
+  if (binding) formData.value.composite_groups.splice(target, 0, binding)
+}
+
+// compositeBindingError returns the first validation issue for a draft mapping. It requires
+// a selected group and a trimmed valid prefix, then rejects case-insensitive duplicate
+// prefixes and duplicate group identities across other rows.
+const compositeBindingError = (index: number) => {
+  const binding = formData.value.composite_groups[index]
+  if (!binding?.group_id) return t('keys.composite.groupRequired')
+  const prefix = binding.prefix.trim()
+  if (!prefix) return t('keys.composite.prefixRequired')
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(prefix)) return t('keys.composite.prefixInvalid')
+  const duplicatePrefix = formData.value.composite_groups.some(
+    (item, itemIndex) =>
+      itemIndex !== index && item.prefix.trim().toLowerCase() === prefix.toLowerCase(),
+  )
+  if (duplicatePrefix) return t('keys.composite.prefixDuplicate')
+  const duplicateGroup = formData.value.composite_groups.some(
+    (item, itemIndex) => itemIndex !== index && item.group_id === binding.group_id,
+  )
+  if (duplicateGroup) return t('keys.composite.groupDuplicate')
+  return ''
+}
+
+// compositeFormError validates mapping count and row rules only in composite mode, allowing
+// the inactive mapping draft to remain while editing a single-group key.
+const compositeFormError = computed(() => {
+  if (!formData.value.is_composite) return ''
+  if (formData.value.composite_groups.length === 0) return t('keys.composite.mappingRequired')
+  if (formData.value.composite_groups.length > 20) return t('keys.composite.tooManyMappings')
+  for (let index = 0; index < formData.value.composite_groups.length; index++) {
+    const error = compositeBindingError(index)
+    if (error) return error
+  }
+  return ''
+})
+
+// groupSearchQuery filters the inline selector across search terms, display labels,
+// branding, and descriptions while retaining all options for an empty query.
+const groupSearchQuery = ref('')
+const filteredGroupOptions = computed(() => {
+  const query = groupSearchQuery.value.trim().toLowerCase()
+  if (!query) return allGroupOptions.value
+  return allGroupOptions.value.filter((opt) => {
+    return (
+      opt.search_terms?.some((text) => text.toLowerCase().includes(query)) ||
+      opt.label.toLowerCase().includes(query) ||
+      (opt.displayBrand && opt.displayBrand.toLowerCase().includes(query)) ||
+      (opt.description && opt.description.toLowerCase().includes(query))
+    )
+  })
+})
+
+// pruneFormGroupBindings clears a disallowed single group and removes composite bindings
+// outside the supplied allowed set. Subscription changes use it to prevent submitting
+// mappings no longer covered by the selected plan.
+const pruneFormGroupBindings = (allowedGroupIDs: Set<number>) => {
+  if (formData.value.group_id !== null && !allowedGroupIDs.has(formData.value.group_id)) {
+    formData.value.group_id = null
+  }
   formData.value.composite_groups = formData.value.composite_groups.filter(
     (binding) => binding.group_id !== null && allowedGroupIDs.has(binding.group_id),
   )
@@ -2371,38 +2525,12 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
   loadApiKeys()
 }
 
-// loadDefaultChannels loads authorized defaults for the current editor session.
-// Session changes discard late results. Loading failures retain the current draft
-// and show an error so users can retry by reopening the editor.
-// The response must still match the request generation, scope and visible editor
-// before it publishes defaults. Closing or opening another editor retires the
-// prior generation. The resulting administrator order remains read-only while
-// single-group edits retain their separately selected target.
-async function loadDefaultChannels() {
-  const requestID = ++routingOptionsRequestID
-  const currentScope = scope.value
-  try {
-    const value = await keysAPI.getRoutingOptions(currentScope)
-    if (
-      requestID !== routingOptionsRequestID ||
-      currentScope !== scope.value ||
-      (!showCreateModal.value && !showEditModal.value)
-    )
-      return
-    defaultChannelIDs.value = value.group_ids
-    applyDefaultChannels()
-  } catch {
-    if (requestID === routingOptionsRequestID) appStore.showError(t('keys.failedToLoad'))
-  }
-}
-
-// openCreateModal opens a default-inheriting draft with advanced controls folded.
-// Billing options, channels and defaults load independently. The server validates
-// current defaults again on submission, including payer permission and plan coverage.
+// openCreateModal opens the create draft and starts billing and group-choice loading. Those
+// loaders handle their own errors, leaving the dialog available while candidate lists
+// resolve.
 const openCreateModal = () => {
-  advancedExpanded.value = false
   showCreateModal.value = true
-  void Promise.all([loadDefaultChannels(), loadBillingOptions(), loadFormGroups()])
+  void Promise.all([loadBillingOptions(), loadFormGroups()])
 }
 
 // editKey converts a persisted key into the shared edit draft and loads its billing choices.
@@ -2412,16 +2540,16 @@ const openCreateModal = () => {
 // billing, Fast, and restriction values receive the defaults expected by the form controls
 // before it opens.
 const editKey = (key: ApiKey) => {
-  advancedExpanded.value = false
   selectedKey.value = key
   const hasIPRestriction = key.ip_whitelist?.length > 0 || key.ip_blacklist?.length > 0
   const hasExpiration = !!key.expires_at
   formData.value = {
     name: key.name,
-    routing_mode: key.routing_mode ?? 'auto',
     group_id: key.group_id,
-    use_default_groups: true,
-    composite_groups: (key.groups || []).map((binding) => newCompositeBinding(binding.group_id)),
+    is_composite: key.is_composite ?? false,
+    composite_groups: (key.composite_groups || []).map((binding) =>
+      newCompositeBinding(binding.group_id, binding.prefix),
+    ),
     // Terminal server states display as inactive in this two-state editor; submission separately decides whether a status update is allowed for the persisted state.
     status: key.status === 'active' ? 'active' : 'inactive',
     fast_mode_policy: key.fast_mode_policy ?? 'follow_request',
@@ -2450,7 +2578,7 @@ const editKey = (key: ApiKey) => {
   }
   formGroups.value = []
   showEditModal.value = true
-  void Promise.all([loadDefaultChannels(), loadBillingOptions(), loadFormGroups()])
+  void Promise.all([loadBillingOptions(), loadFormGroups()])
 }
 
 // onStatusToggle updates the editable active or inactive value unless a team-owner lock
@@ -2512,11 +2640,77 @@ const closeKeyActionMenu = () => {
   actionMenuPosition.value = null
 }
 
+// openGroupSelector opens an inline selector for ordinary non-subscription keys and routes
+// other keys into the full editor. It positions the panel from the registered row button and
+// clears search on a newly selected row.
+const openGroupSelector = (key: ApiKey) => {
+  if (key.is_composite || key.billing_mode === 'subscription') {
+    editKey(key)
+    return
+  }
+  if (groupSelectorKeyId.value === key.id) {
+    groupSelectorKeyId.value = null
+    dropdownPosition.value = null
+  } else {
+    const buttonEl = groupButtonRefs.value.get(key.id)
+    if (buttonEl) {
+      const rect = buttonEl.getBoundingClientRect()
+      // Estimate a comfortable group-panel height before choosing its side, and allow the positioning helper to use near-full viewport width on narrow screens.
+      const position = getFloatingPanelPosition(rect, window.innerWidth, window.innerHeight, {
+        align: 'left',
+        maxWidth: 380,
+        viewportPadding: 8,
+        gap: 4,
+        maxHeightRatio: 1,
+        minComfortableHeight: 400,
+      })
+      if (position.bottom !== null) {
+        // Anchor upward when the positioning helper selects space above the trigger.
+        dropdownPosition.value = { bottom: position.bottom, left: position.left }
+      } else {
+        // Otherwise use the helper's downward top coordinate.
+        dropdownPosition.value = { top: position.top ?? undefined, left: position.left }
+      }
+    }
+    groupSelectorKeyId.value = key.id
+    groupSearchQuery.value = ''
+  }
+}
+
+// submitGroupChange saves a key's single-group assignment and starts a list refresh after
+// success. Request failures propagate to changeGroup, which owns the user-facing error
+// notification for this action.
+const submitGroupChange = async (key: ApiKey, newGroupId: number | null) => {
+  await keysAPI.update(key.id, { group_id: newGroupId })
+  appStore.showSuccess(t('keys.groupChangedSuccess'))
+  loadApiKeys()
+}
+
+// changeGroup closes the inline selector before saving a different group assignment.
+// Selecting the existing group skips the request, while failed updates report a localized
+// error and leave server state authoritative.
+const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
+  groupSelectorKeyId.value = null
+  dropdownPosition.value = null
+  if (key.group_id === newGroupId) return
+
+  try {
+    await submitGroupChange(key, newGroupId)
+  } catch {
+    appStore.showError(t('keys.failedToChangeGroup'))
+  }
+}
+
 // closeGroupSelector dismisses group and column menus when a document click falls outside
 // their controls. Group trigger ancestors count as inside so their click handlers can manage
 // their own open state.
 const closeGroupSelector = (event: MouseEvent) => {
   const target = event.target as HTMLElement
+  // Treat group triggers and panel contents as internal clicks while independently dismissing column settings when the click leaves its own root.
+  if (!target.closest('.group\\/dropdown') && !dropdownRef.value?.contains(target)) {
+    groupSelectorKeyId.value = null
+    dropdownPosition.value = null
+  }
   if (columnDropdownRef.value && !columnDropdownRef.value.contains(target)) {
     showColumnDropdown.value = false
   }
@@ -2571,14 +2765,13 @@ const handleRotate = async () => {
   }
 }
 
-// submitKeyForm persists the current Key draft and closes it after success.
-// Automatic routing sends its inheritance flag; single mode sends the selected
-// group identifier. Creation includes ownership and an optional custom secret,
-// while editing sends the selected Key ID and permitted lifecycle changes.
-//
-// Restriction conversion keeps create lifetimes distinct from update timestamps.
-// Successful writes refresh the list, and a failed request leaves the draft open
-// with the server's actionable message so the user can correct or retry it.
+// submitKeyForm converts validated restriction inputs and submits either a create or update
+// payload. Editing sends billing fields only when the mode or preferred subscription
+// changed, and includes status only when server-state rules permit it. Composite mappings
+// submit trimmed prefixes and suppress the single-group field. Creation carries ownership
+// scope and optional custom secret, then advances onboarding only after success at the
+// matching submission step. Successful requests close and reset the draft before refreshing
+// the list.
 const submitKeyForm = async () => {
   const { ipWhitelist, ipBlacklist, quota, expiresInDays, expiresAt, rateLimitData, modelMapping } =
     buildKeyFormPayload(formData.value, showEditModal.value)
@@ -2587,10 +2780,14 @@ const submitKeyForm = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
-        routing_mode: formData.value.routing_mode,
-        group_id: formData.value.routing_mode === 'single' ? formData.value.group_id : undefined,
-        use_default_groups: formData.value.routing_mode === 'auto',
-
+        group_id: formData.value.is_composite ? undefined : formData.value.group_id,
+        is_composite: formData.value.is_composite,
+        composite_groups: formData.value.is_composite
+          ? formData.value.composite_groups.map((binding) => ({
+              group_id: binding.group_id!,
+              prefix: binding.prefix.trim(),
+            }))
+          : undefined,
         fast_mode_policy: formData.value.fast_mode_policy,
         model_mapping: modelMapping,
         ip_whitelist: ipWhitelist,
@@ -2626,10 +2823,14 @@ const submitKeyForm = async () => {
       const payload: CreateApiKeyRequest = {
         name: formData.value.name,
         scope: scope.value,
-        routing_mode: formData.value.routing_mode,
-        group_id: formData.value.routing_mode === 'single' ? formData.value.group_id : undefined,
-        use_default_groups: formData.value.routing_mode === 'auto',
-
+        group_id: formData.value.is_composite ? undefined : formData.value.group_id,
+        is_composite: formData.value.is_composite,
+        composite_groups: formData.value.is_composite
+          ? formData.value.composite_groups.map((binding) => ({
+              group_id: binding.group_id!,
+              prefix: binding.prefix.trim(),
+            }))
+          : undefined,
         fast_mode_policy: formData.value.fast_mode_policy,
         billing_mode: formData.value.billing_mode,
         preferred_subscription_id:
@@ -2688,8 +2889,8 @@ const onScopeChange = () => {
   ])
 }
 
-// handleSubmit validates integer request limits, model redirects, the selected group,
-// and the selected billing source before submitting the shared draft. Custom-secret checks
+// handleSubmit validates integer request limits, model redirects, composite mappings,
+// billing selection, and required group identity before submission. Custom-secret checks
 // apply only to creation; accepted drafts delegate payload conversion and persistence to
 // submitKeyForm.
 const handleSubmit = async () => {
@@ -2712,13 +2913,19 @@ const handleSubmit = async () => {
     return
   }
 
-  if (compositeFormError.value) {
+  if (formData.value.is_composite && compositeFormError.value) {
     appStore.showError(compositeFormError.value)
     return
   }
 
   if (formData.value.billing_mode === 'subscription' && !formData.value.preferred_subscription_id) {
     appStore.showError(t('keys.billing.subscriptionRequired'))
+    return
+  }
+
+  // Single-group keys require a selected group, including drafts converted from composite mode, so an implicit stale binding cannot enter the submitted payload.
+  if (!formData.value.is_composite && formData.value.group_id === null) {
+    appStore.showError(t('keys.groupRequired'))
     return
   }
 
@@ -2762,7 +2969,6 @@ const handleDelete = async () => {
 // against the reset draft. The request itself keeps running, but its completion
 // checks the captured sequence before updating choices or releasing loading.
 const closeModals = () => {
-  routingOptionsRequestID++
   showCreateModal.value = false
   showEditModal.value = false
   selectedKey.value = null
@@ -2772,9 +2978,8 @@ const closeModals = () => {
   formGroups.value = []
   formData.value = {
     name: '',
-    routing_mode: 'auto',
     group_id: null,
-    use_default_groups: true,
+    is_composite: false,
     composite_groups: [],
     status: 'active',
     fast_mode_policy: 'follow_request',
@@ -2870,60 +3075,28 @@ const resetRateLimitUsage = async () => {
   }
 }
 
-// groupWithModels merges channel capabilities for client configuration generation.
-// Missing channels return undefined. Each model exposes the union of its supported
-// protocols, while the earliest channel supplies attributes for a repeated name.
-// Key redirects are applied after aggregation so exported names match gateway calls.
+// groupWithModels resolves the group catalog used by client configuration and applies key
+// redirects through groupForKeyConfig. Available group data overrides embedded key metadata;
+// ungrouped or missing keys return undefined.
 const groupWithModels = (key: ApiKey | null): Group | undefined => {
-  if (!key) return undefined
-  if (key.routing_mode === 'single')
-    return groupForKeyConfig(
-      groups.value.find((group) => group.id === key.group_id) ?? key.group,
-      key.model_mapping,
-    )
-  const channels = (key.groups ?? []).flatMap((binding) => {
-    const group =
-      groups.value.find((candidate) => candidate.id === binding.group_id) ?? binding.group
-    return group ? [group] : []
-  })
-  const first = channels[0]
-  if (!first) return undefined
-  const combined: Group = {
-    ...first,
-    allowed_protocols: [...new Set(channels.flatMap((group) => group.allowed_protocols ?? []))],
-    models: [...new Set(channels.flatMap((group) => group.models ?? []))],
-    model_protocols: channels.reduce<Record<string, Group['allowed_protocols']>>(
-      (result, group) => {
-        for (const [model, protocols] of Object.entries(group.model_protocols ?? {})) {
-          result[model] = [...new Set([...(result[model] ?? []), ...protocols])]
-        }
-        return result
-      },
-      {},
-    ),
-    model_attributes: Object.assign(
-      {},
-      ...channels
-        .slice()
-        .reverse()
-        .map((group) => group.model_attributes ?? {}),
-    ),
-  }
-  return groupForKeyConfig(combined, key.model_mapping)
+  if (!key?.group_id) return undefined
+  const available = groups.value.find((group) => group.id === key.group_id)
+  return groupForKeyConfig(
+    available ? { ...key.group, ...available } : (key.group ?? undefined),
+    key.model_mapping,
+  )
 }
 // Selected single and composite group views combine loaded catalog metadata with key
 // redirects before passing capabilities to client configuration instructions.
 const selectedKeyGroup = computed(() => groupWithModels(selectedKey.value))
 const selectedCompositeGroups = computed(() =>
-  (selectedKey.value?.routing_mode === 'single' ? [] : (selectedKey.value?.groups ?? [])).map(
-    (binding) => ({
-      ...binding,
-      group: groupForKeyConfig(
-        groups.value.find((group) => group.id === binding.group_id) ?? binding.group,
-        selectedKey.value?.model_mapping,
-      ),
-    }),
-  ),
+  (selectedKey.value?.composite_groups ?? []).map((binding) => ({
+    ...binding,
+    group: groupForKeyConfig(
+      groups.value.find((group) => group.id === binding.group_id) ?? binding.group,
+      selectedKey.value?.model_mapping,
+    ),
+  })),
 )
 // Client-import state retains its chosen client and model, deriving options from the pending
 // key's effective group capabilities before opening an external protocol link.
@@ -2959,9 +3132,11 @@ const importToCcswitch = (row: ApiKey) => {
 // handoff page. Composite keys combine their bound groups' protocols; unavailable
 // destinations show an error before a browser window opens.
 const importToMagpie = (row: ApiKey) => {
-  const keyGroups = (row.groups ?? []).map(
-    (binding) => groups.value.find((group) => group.id === binding.group_id) ?? binding.group,
-  )
+  const keyGroups = row.is_composite
+    ? (row.composite_groups ?? []).map(
+        (binding) => groups.value.find((group) => group.id === binding.group_id) ?? binding.group,
+      )
+    : [groups.value.find((group) => group.id === row.group_id) ?? row.group]
   const url = buildMagpieImportUrl({
     baseUrl: publicSettings.value?.api_base_url || window.location.origin,
     providerName: publicSettings.value?.site_name || 'TokenRouter',

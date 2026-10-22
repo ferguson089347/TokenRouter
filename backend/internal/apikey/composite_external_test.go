@@ -32,6 +32,27 @@ type compositeUserRepoStub struct {
 	user *identity.User // configured payer permission view
 }
 
+// TestAPIKeyResolveCompositeModel supplies mixed-case, unknown, missing, and
+// invalid prefixes against one saved binding. It checks the selected group,
+// retention of later model slashes, and distinct prefix errors.
+func TestAPIKeyResolveCompositeModel(t *testing.T) {
+	key := &apikey.APIKey{IsComposite: true, CompositeGroups: []apikey.APIKeyCompositeGroup{
+		{GroupID: 1, Prefix: "GPT", NormalizedPrefix: "gpt"},
+	}}
+
+	binding, model, err := key.ResolveCompositeModel("gPt/vendor/model")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), binding.GroupID)
+	require.Equal(t, "vendor/model", model)
+
+	_, _, err = key.ResolveCompositeModel("vendor/model")
+	require.ErrorIs(t, err, apikey.ErrCompositeKeyPrefixNotFound)
+	_, _, err = key.ResolveCompositeModel("missing-prefix")
+	require.ErrorIs(t, err, apikey.ErrCompositeKeyPrefixRequired)
+	_, _, err = key.ResolveCompositeModel("bad prefix/model")
+	require.ErrorIs(t, err, apikey.ErrCompositeKeyPrefixInvalid)
+}
+
 // TestValidateCompositeGroupInputs supplies empty, oversized, duplicate-prefix,
 // and duplicate-group binding lists. It checks that structural validation
 // returns the specific error for each independently invalid configuration.
@@ -59,7 +80,7 @@ func TestValidateCompositeGroupInputs(t *testing.T) {
 
 // TestCompositeAPIKeyAuthSnapshotRoundTrip converts a composite Key containing
 // a hydrated image-capable group into a snapshot and back. It checks binding
-// metadata, protocol and multiplier fields, and an ordinary GroupID remaining
+// selection, protocol and multiplier fields, and an ordinary GroupID remaining
 // absent.
 func TestCompositeAPIKeyAuthSnapshotRoundTrip(t *testing.T) {
 	key := &apikey.APIKey{
@@ -107,6 +128,11 @@ func TestCompositeAPIKeyAuthSnapshotRoundTrip(t *testing.T) {
 		protocol.ProtocolOpenAIResponses,
 		protocol.ProtocolOpenAIChatCompletions,
 	}, restored.CompositeGroups[0].Group.AllowedProtocols)
+
+	binding, model, err := restored.ResolveCompositeModel("gpt/gpt-5")
+	require.NoError(t, err)
+	require.Equal(t, int64(40), binding.GroupID)
+	require.Equal(t, "gpt-5", model)
 }
 
 // TestAPIKeyUpdateConvertsBetweenOrdinaryAndComposite changes an owned ordinary

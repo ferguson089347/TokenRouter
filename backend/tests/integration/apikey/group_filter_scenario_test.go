@@ -75,38 +75,3 @@ func TestAPIKeyRepositoryListByUserIDUngroupedIncludesDeletedGroups(t *testing.T
 	}
 	require.ElementsMatch(t, []string{"unbound", "deleted-group"}, names)
 }
-
-// TestAPIKeyRepositoryInheritedGroupFilter changes resolved administrator membership
-// while inherited credentials keep stale saved rows. Filtering follows current
-// membership for inherited Keys and saved bindings for custom Keys.
-func TestAPIKeyRepositoryInheritedGroupFilter(t *testing.T) {
-	repo, client := newAPIKeyRepoSQLite(t)
-	ctx := context.Background()
-	user := mustCreateAPIKeyRepoUser(t, ctx, client, "inherited-filter@example.test")
-	group, err := client.Group.Create().SetName("channel").Save(ctx)
-	require.NoError(t, err)
-	for _, inherit := range []bool{true, false} {
-		name := "custom"
-		if inherit {
-			name = "inherited"
-		}
-		key, err := client.APIKey.Create().SetUserID(user.ID).SetName(name).
-			SetKey("filter-" + name).SetIsComposite(true).SetUseDefaultGroups(inherit).Save(ctx)
-		require.NoError(t, err)
-		_, err = client.APIKeyCompositeGroup.Create().SetAPIKeyID(key.ID).
-			SetGroupID(group.ID).SetPrefix("stored").SetNormalizedPrefix("stored").Save(ctx)
-		require.NoError(t, err)
-	}
-	for _, matches := range []bool{false, true} {
-		keys, page, err := repo.ListByUserID(ctx, user.ID,
-			pagination.PaginationParams{Page: 1, PageSize: 10},
-			apikey.APIKeyListFilters{GroupID: &group.ID, MatchInheritedGroups: matches})
-		require.NoError(t, err)
-		if matches {
-			require.EqualValues(t, 2, page.Total)
-		} else {
-			require.EqualValues(t, 1, page.Total)
-			require.Equal(t, "custom", keys[0].Name)
-		}
-	}
-}

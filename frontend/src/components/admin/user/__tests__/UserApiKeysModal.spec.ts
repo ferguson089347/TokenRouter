@@ -53,8 +53,6 @@ import UserApiKeysModal from '../UserApiKeysModal.vue'
 // last. Tests supply composite mappings or a regular group through those overrides
 // while reusing the required quota and timing fields.
 const createApiKey = (overrides: Partial<ApiKey> = {}): ApiKey => ({
-  use_default_groups: true, // Administrator defaults inheritance.
-  groups: [], // Ordered routing channel bindings.
   id: 1, // Fixture record identifier.
   user_id: 99, // Owning user identifier.
   key: 'sk-test-key', // Fixture API credential.
@@ -147,10 +145,11 @@ describe('UserApiKeysModal', () => {
     apiMocks.getUserApiKeys.mockResolvedValue({
       items: [
         createApiKey({
-          groups: [
+          is_composite: true, // Prefix-routing key flag.
+          composite_groups: [
             {
               group_id: 10, // Assigned group identifier.
-              // Model routing prefix.
+              prefix: 'GPT', // Model routing prefix.
               group: {
                 id: 10, // Fixture record identifier.
                 name: 'OpenAI 主组', // Fixture display name.
@@ -159,7 +158,7 @@ describe('UserApiKeysModal', () => {
             },
             {
               group_id: 20, // Assigned group identifier.
-              // Model routing prefix.
+              prefix: 'Claude', // Model routing prefix.
               group: {
                 id: 20, // Fixture record identifier.
                 name: 'Anthropic 主组', // Fixture display name.
@@ -178,25 +177,42 @@ describe('UserApiKeysModal', () => {
     const wrapper = await mountAndOpen()
     const mappings = wrapper.get('[data-testid="composite-group-mappings"]')
 
-    expect(mappings.text()).toContain('OpenAI')
+    expect(mappings.text()).toContain('GPT')
     expect(mappings.text()).toContain('OpenAI 主组')
-    expect(mappings.text()).toContain('Anthropic')
+    expect(mappings.text()).toContain('Claude')
     expect(mappings.text()).toContain('Anthropic 主组')
     expect(mappings.text()).not.toContain('admin.users.none')
     expect(wrapper.find('[data-testid="api-key-group-selector"]').exists()).toBe(false)
     expect(apiMocks.updateApiKeyGroup).not.toHaveBeenCalled()
   })
 
-  // A universal Key with one channel uses the same read-only channel presentation.
-  // The administrator modal cannot submit a retired single-group mutation request.
-  it('single-channel Keys use the unified channel list', async () => {
-    const group = { id: 10, name: 'OpenAI 主组' } as any
+  // A regular key has one current group and receives that group in the catalog. The
+  // modal must render its group badge and ordinary selector, with no composite-mapping
+  // section.
+  it('普通 Key 继续显示并使用原有换组入口', async () => {
+    const currentGroup = {
+      id: 10, // Fixture record identifier.
+      name: 'OpenAI 主组', // Fixture display name.
+      platform: 'openai', // Group provider platform.
+    } as any
     apiMocks.getUserApiKeys.mockResolvedValue({
-      items: [createApiKey({ groups: [{ group_id: 10, group }] })],
+      items: [
+        createApiKey({
+          group_id: 10, // Assigned group identifier.
+          group: currentGroup, // Resolved group record.
+        }),
+      ], // Returned response records.
+      total: 1, // Matching record count.
+      page: 1, // One-based result page.
+      page_size: 20, // Rows per page.
+      pages: 1, // Available page count.
     })
+    apiMocks.getAllGroups.mockResolvedValue([currentGroup])
+
     const wrapper = await mountAndOpen()
-    expect(wrapper.get('[data-testid="composite-group-mappings"]').text()).toContain('OpenAI 主组')
-    expect(wrapper.find('[data-testid="api-key-group-selector"]').exists()).toBe(false)
-    expect(apiMocks.updateApiKeyGroup).not.toHaveBeenCalled()
+
+    expect(wrapper.get('[data-testid="group-badge"]').text()).toBe('OpenAI 主组')
+    expect(wrapper.get('[data-testid="api-key-group-selector"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="composite-group-mappings"]').exists()).toBe(false)
   })
 })

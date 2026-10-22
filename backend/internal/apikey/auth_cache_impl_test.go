@@ -116,7 +116,6 @@ func migrateSnapshotPricingFields(value any) {
 		// assertion rejects version 40 before any snapshot fields are reconstructed.
 		if _, ok := node["version"]; ok {
 			node["version"] = KeyApiKeyAuthSnapshotVersion
-			node["use_default_groups"] = false
 			node["concurrency_limit"] = float64(0)
 			node["rpm_limit"] = float64(0)
 		}

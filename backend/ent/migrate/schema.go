@@ -19,7 +19,6 @@ var (
 		{Name: "key", Type: field.TypeString, Unique: true, Size: 128},
 		{Name: "name", Type: field.TypeString, Size: 100},
 		{Name: "is_composite", Type: field.TypeBool, Default: false},
-		{Name: "use_default_groups", Type: field.TypeBool, Default: true},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
 		{Name: "fast_mode_policy", Type: field.TypeString, Size: 32, Default: "follow_request"},
 		{Name: "billing_mode", Type: field.TypeString, Size: 32, Default: "auto"},
@@ -56,19 +55,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "api_keys_groups_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[33]},
+				Columns:    []*schema.Column{APIKeysColumns[32]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_teams_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[34]},
+				Columns:    []*schema.Column{APIKeysColumns[33]},
 				RefColumns: []*schema.Column{TeamsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_users_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[35]},
+				Columns:    []*schema.Column{APIKeysColumns[34]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -77,22 +76,22 @@ var (
 			{
 				Name:    "apikey_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[35]},
+				Columns: []*schema.Column{APIKeysColumns[34]},
 			},
 			{
 				Name:    "apikey_team_id",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[34]},
+				Columns: []*schema.Column{APIKeysColumns[33]},
 			},
 			{
 				Name:    "apikey_group_id",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[33]},
+				Columns: []*schema.Column{APIKeysColumns[32]},
 			},
 			{
 				Name:    "apikey_status",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[9]},
+				Columns: []*schema.Column{APIKeysColumns[8]},
 			},
 			{
 				Name:    "apikey_deleted_at",
@@ -102,17 +101,17 @@ var (
 			{
 				Name:    "apikey_last_used_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[14]},
+				Columns: []*schema.Column{APIKeysColumns[13]},
 			},
 			{
 				Name:    "apikey_quota_quota_used",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[17], APIKeysColumns[18]},
+				Columns: []*schema.Column{APIKeysColumns[16], APIKeysColumns[17]},
 			},
 			{
 				Name:    "apikey_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[19]},
+				Columns: []*schema.Column{APIKeysColumns[18]},
 			},
 		},
 	}

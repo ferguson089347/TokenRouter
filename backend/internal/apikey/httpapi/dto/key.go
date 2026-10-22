@@ -18,19 +18,14 @@ import (
 // wall-clock helpers, then calculates reset timestamps for windows still
 // current at those calls. Model redirects receive a copied map; the other
 // scalar pointers and IP slices retain their input storage. Each composite
-// binding receives its group presentation in routing priority order, and TeamID
+// binding receives its group presentation and displayed prefix, and TeamID
 // presence selects the response scope.
 
 // APIKey is the console credential response with caller-selected group
 // presentation data.
 type APIKey[G any] struct {
-	RoutingMode string `json:"routing_mode"` // auto or single route selection
-
-	// UseDefaultGroups identifies administrator inheritance. CompositeGroups presents
-	// authorized inherited channels or the saved custom order supplied by the service.
-	UseDefaultGroups bool  `json:"use_default_groups"` // current administrator defaults inheritance
-	ID               int64 `json:"id"`                 // persisted credential record identifier
-	UserID           int64 `json:"user_id"`            // persisted creator user identifier
+	ID     int64 `json:"id"`      // persisted credential record identifier
+	UserID int64 `json:"user_id"` // persisted creator user identifier
 	// TeamID and Scope describe the same presentation scope: any present TeamID
 	// selects team, while nil selects personal. Conversion retains the supplied
 	// TeamID pointer, so response consumers treat it as shared input.
@@ -40,7 +35,8 @@ type APIKey[G any] struct {
 	Key               string                    `json:"key"`                 // current authentication credential text
 	Name              string                    `json:"name"`                // saved credential display name
 	GroupID           *int64                    `json:"group_id"`            // ordinary or selected group identifier
-	CompositeGroups   []APIKeyCompositeGroup[G] `json:"groups"`              // ordered presented composite group bindings
+	IsComposite       bool                      `json:"is_composite"`        // prefix selection mode flag
+	CompositeGroups   []APIKeyCompositeGroup[G] `json:"composite_groups"`    // ordered presented composite group bindings
 	Status            string                    `json:"status"`              // stored credential lifecycle state
 	FastModePolicy    string                    `json:"fast_mode_policy"`    // stored Key acceleration preference
 	// BillingMode and PreferredSubscriptionID describe the selected payer funding
@@ -83,10 +79,12 @@ type APIKey[G any] struct {
 	Group     *G         `json:"group,omitempty"`       // caller-presented selected group data
 }
 
-// APIKeyCompositeGroup presents one channel with its caller-mapped group details.
+// APIKeyCompositeGroup presents a composite prefix and its caller-mapped target
+// group.
 type APIKeyCompositeGroup[G any] struct {
-	GroupID int64 `json:"group_id"`        // configured target group identifier
-	Group   *G    `json:"group,omitempty"` // caller-presented target group data
+	GroupID int64  `json:"group_id"`        // configured target group identifier
+	Prefix  string `json:"prefix"`          // displayed group selection prefix
+	Group   *G     `json:"group,omitempty"` // caller-presented target group data
 }
 
 // APIKeyFromKey builds a console Key response using the supplied group mapper,
@@ -105,13 +103,13 @@ func APIKeyFromKey[G any](k *apikey.APIKey, group func(*routing.Group) *G) *APIK
 	}
 	out := &APIKey[G]{
 		ID:                           k.ID,
-		UseDefaultGroups:             k.UseDefaultGroups,
 		UserID:                       k.UserID,
 		TeamID:                       k.TeamID,
 		TeamOwnerDisabled:            k.TeamOwnerDisabled,
 		Key:                          k.Key,
 		Name:                         k.Name,
 		GroupID:                      k.GroupID,
+		IsComposite:                  k.IsComposite,
 		Status:                       k.Status,
 		FastModePolicy:               k.FastModePolicy,
 		BillingMode:                  k.BillingMode,
@@ -145,13 +143,9 @@ func APIKeyFromKey[G any](k *apikey.APIKey, group func(*routing.Group) *G) *APIK
 	for _, binding := range k.CompositeGroups {
 		out.CompositeGroups = append(out.CompositeGroups, APIKeyCompositeGroup[G]{
 			GroupID: binding.GroupID,
+			Prefix:  binding.Prefix,
 			Group:   group(binding.Group),
 		})
-	}
-	if k.IsComposite {
-		out.RoutingMode = "auto"
-	} else {
-		out.RoutingMode = "single"
 	}
 	if k.TeamID != nil {
 		out.Scope = "team"

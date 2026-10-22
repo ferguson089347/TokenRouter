@@ -232,7 +232,6 @@ func NewAPIKeyAuthorization(apiKeyService *apikey.APIKeyService, subscriptionSer
 		// Hold the key lease while downstream handlers wait or stream. Returning
 		// from their chain releases admission capacity even when they finish with an error.
 		defer release()
-		c.Set("api_key_admission", "accepted")
 		c.Next()
 	}
 }
@@ -359,7 +358,6 @@ func NewGoogleAPIKeyAuthorization(apiKeyService *apikey.APIKeyService, subscript
 		// Hold the key lease while downstream handlers wait or stream. Returning
 		// from their chain releases admission capacity even when they finish with an error.
 		defer release()
-		c.Set("api_key_admission", "accepted")
 		c.Next()
 	}
 }
@@ -463,19 +461,9 @@ func acquireKeyRequest(c *gin.Context, keys *apikey.APIKeyService, key *apikey.A
 		// separately so an idle connection does not occupy a request-capacity lease.
 		return func() {}, true
 	}
-	value, _ := c.Get(channelRoutingContextKey)
-	execution, _ := value.(*channelRoutingExecution)
-	if execution != nil && execution.active && execution.release != nil {
-		return func() {}, true
-	}
 	ctx, release, retry, err := keys.AcquireRequest(c.Request.Context(), key)
 	if err == nil {
 		c.Request = c.Request.WithContext(ctx)
-		if execution != nil && execution.active {
-			execution.release = release
-			execution.request = execution.request.WithContext(ctx)
-			return func() {}, true
-		}
 		return release, true
 	}
 	status := http.StatusTooManyRequests

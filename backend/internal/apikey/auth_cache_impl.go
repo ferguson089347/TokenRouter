@@ -37,7 +37,7 @@ import (
 // KeyApiKeyAuthSnapshotVersion identifies the serialized fields accepted by
 // positive-cache reconstruction, requiring older snapshots to reload
 // authentication data.
-const KeyApiKeyAuthSnapshotVersion = 48
+const KeyApiKeyAuthSnapshotVersion = 49
 
 // KeyApiKeyAuthCacheConfig stores captured local, shared and negative cache
 // lifetime choices.
@@ -570,7 +570,6 @@ func (s *APIKeyService) KeySnapshotFromAPIKey(ctx context.Context, apiKey *APIKe
 		CreatedAt:                    apiKey.CreatedAt,
 		GroupID:                      clonePointer(apiKey.GroupID),
 		IsComposite:                  apiKey.IsComposite,
-		UseDefaultGroups:             apiKey.UseDefaultGroups,
 		Name:                         apiKey.Name,
 		Status:                       apiKey.Status,
 		FastModePolicy:               apiKey.FastModePolicy,
@@ -675,7 +674,6 @@ func (s *APIKeyService) KeySnapshotToAPIKey(key string, snapshot *APIKeyAuthSnap
 		CreatedAt:                    snapshot.CreatedAt,
 		GroupID:                      clonePointer(snapshot.GroupID),
 		IsComposite:                  snapshot.IsComposite,
-		UseDefaultGroups:             snapshot.UseDefaultGroups,
 		Key:                          key,
 		Name:                         snapshot.Name,
 		Status:                       snapshot.Status,

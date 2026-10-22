@@ -60,22 +60,14 @@ type GroupCapacityReader interface {
 // CreateAPIKeyRequest carries user creation input before service defaults and
 // final validation.
 type CreateAPIKeyRequest struct {
-	// RoutingMode defaults to auto. Single mode uses GroupID and disables
-	// inheritance. Automatic group order comes from administrator settings.
-	RoutingMode string `json:"routing_mode"` // auto or single selection
-	GroupID     *int64 `json:"group_id"`     // single-mode target group identifier
-
-	// GroupIDs is decoded only to reject user attempts to override administrator
-	// priority. UseDefaultGroups can be false only when routing mode is single.
-	GroupIDs         []int64 `json:"group_ids"`          // rejected user channel priority input
-	UseDefaultGroups *bool   `json:"use_default_groups"` // omitted selects administrator defaults
-	// Name is optional for creation; blank text selects the service's default
-	// display name after trimming the supplied creation value.
-	Name        string   `json:"name"`                                          // submitted credential display name
-	Scope       string   `json:"scope" binding:"omitempty,oneof=personal team"` // requested personal or team scope
-	CustomKey   *string  `json:"custom_key"`                                    // optional custom credential text
-	IPWhitelist []string `json:"ip_whitelist"`                                  // submitted allowed address patterns
-	IPBlacklist []string `json:"ip_blacklist"`                                  // submitted denied address patterns
+	Name            string                             `json:"name" binding:"required"`                       // submitted credential display name
+	Scope           string                             `json:"scope" binding:"omitempty,oneof=personal team"` // requested personal or team scope
+	GroupID         *int64                             `json:"group_id"`                                      // requested ordinary group binding
+	IsComposite     bool                               `json:"is_composite"`                                  // submitted prefix selection mode
+	CompositeGroups []apikey.APIKeyCompositeGroupInput `json:"composite_groups"`                              // complete submitted prefix group bindings
+	CustomKey       *string                            `json:"custom_key"`                                    // optional custom credential text
+	IPWhitelist     []string                           `json:"ip_whitelist"`                                  // submitted allowed address patterns
+	IPBlacklist     []string                           `json:"ip_blacklist"`                                  // submitted denied address patterns
 	// FastModePolicy and BillingMode retain transport text for final service
 	// normalization. An empty policy follows the request; an empty funding mode
 	// chooses automatic allocation, with PreferredSubscriptionID used for
@@ -111,26 +103,24 @@ type CreateAPIKeyRequest struct {
 // UpdateAPIKeyRequest retains omitted, clear and replacement values for user
 // Key configuration.
 type UpdateAPIKeyRequest struct {
-	RoutingMode *string `json:"routing_mode"` // optional auto or single replacement
-	GroupID     *int64  `json:"group_id"`     // single-mode target group identifier
-
-	GroupIDs         *[]int64 `json:"group_ids"`          // rejected user channel replacement input
-	UseDefaultGroups *bool    `json:"use_default_groups"` // optional default inheritance selection
 	// Name and Status are forwarded as changes when their strings are nonempty.
 	// Empty values are omitted by the handler; Status binding accepts the listed
 	// active or inactive transport choices.
-	Name string `json:"name"` // submitted credential display name
-	// GroupIDs, IPWhitelist, IPBlacklist and ModelMapping retain pointer
+	Name        string `json:"name"`         // submitted credential display name
+	GroupID     *int64 `json:"group_id"`     // requested ordinary group binding
+	IsComposite *bool  `json:"is_composite"` // submitted prefix selection mode
+	// CompositeGroups, IPWhitelist, IPBlacklist and ModelMapping retain pointer
 	// presence so omission leaves saved values and empty supplied collections
 	// replace them. Service validation checks the complete submitted mapping or IP
 	// set.
-	Status                  string             `json:"status" binding:"omitempty,oneof=active inactive"` // submitted credential lifecycle choice
-	IPWhitelist             *[]string          `json:"ip_whitelist"`                                     // submitted allowed address patterns
-	IPBlacklist             *[]string          `json:"ip_blacklist"`                                     // submitted denied address patterns
-	FastModePolicy          *string            `json:"fast_mode_policy"`                                 // submitted Key acceleration preference
-	BillingMode             *string            `json:"billing_mode"`                                     // submitted funding source mode
-	PreferredSubscriptionID *int64             `json:"preferred_subscription_id"`                        // submitted payer subscription identifier
-	ModelMapping            *map[string]string `json:"model_mapping"`                                    // submitted Key model redirect rules
+	CompositeGroups         *[]apikey.APIKeyCompositeGroupInput `json:"composite_groups"`                                 // complete submitted prefix group bindings
+	Status                  string                              `json:"status" binding:"omitempty,oneof=active inactive"` // submitted credential lifecycle choice
+	IPWhitelist             *[]string                           `json:"ip_whitelist"`                                     // submitted allowed address patterns
+	IPBlacklist             *[]string                           `json:"ip_blacklist"`                                     // submitted denied address patterns
+	FastModePolicy          *string                             `json:"fast_mode_policy"`                                 // submitted Key acceleration preference
+	BillingMode             *string                             `json:"billing_mode"`                                     // submitted funding source mode
+	PreferredSubscriptionID *int64                              `json:"preferred_subscription_id"`                        // submitted payer subscription identifier
+	ModelMapping            *map[string]string                  `json:"model_mapping"`                                    // submitted Key model redirect rules
 	// Quota, ConcurrencyLimit, RPMLimit, RateLimit5h, RateLimit1d and RateLimit7d
 	// retain omitted pointers. Supplied zero clears that allowance; the final
 	// service validator rejects invalid amounts or request counts.
@@ -379,9 +369,9 @@ func (h *APIKeyHandler[G]) Create(c *gin.Context) {
 	svcReq := apikey.CreateAPIKeyRequest{
 		Name:                         req.Name,
 		Scope:                        req.Scope,
-		IsComposite:                  true,
-		CompositeGroups:              apikey.RoutingGroupInputs(req.GroupIDs),
-		UseDefaultGroups:             req.UseDefaultGroups == nil || *req.UseDefaultGroups,
+		GroupID:                      req.GroupID,
+		IsComposite:                  req.IsComposite,
+		CompositeGroups:              req.CompositeGroups,
 		CustomKey:                    req.CustomKey,
 		IPWhitelist:                  req.IPWhitelist,
 		IPBlacklist:                  req.IPBlacklist,
@@ -393,34 +383,6 @@ func (h *APIKeyHandler[G]) Create(c *gin.Context) {
 		ModelMapping:                 req.ModelMapping,
 		ExpiresInDays:                req.ExpiresInDays,
 		FallbackWhenGroupUnavailable: req.FallbackWhenGroupUnavailable,
-	}
-	if req.RoutingMode != "" && req.RoutingMode != "auto" && req.RoutingMode != "single" {
-		response.BadRequest(c, "Invalid routing mode")
-		return
-	}
-	if req.RoutingMode == "single" {
-		if req.GroupID == nil || *req.GroupID <= 0 || len(req.GroupIDs) > 0 {
-			response.BadRequest(c, "Single routing requires one group")
-			return
-		}
-		svcReq.IsComposite = false
-		svcReq.GroupID = req.GroupID
-		svcReq.UseDefaultGroups = false
-		svcReq.CompositeGroups = nil
-	} else if req.GroupID != nil {
-		response.BadRequest(c, "group_id requires single routing mode")
-		return
-	}
-	if req.GroupIDs != nil {
-		response.BadRequest(c, "Automatic route order is managed by administrators")
-		return
-	}
-	if svcReq.IsComposite {
-		if req.UseDefaultGroups != nil && !*req.UseDefaultGroups {
-			response.BadRequest(c, "Automatic routes follow administrator settings")
-			return
-		}
-		svcReq.UseDefaultGroups = true
 	}
 	if req.Quota != nil {
 		svcReq.Quota = *req.Quota
@@ -477,7 +439,8 @@ func (h *APIKeyHandler[G]) Update(c *gin.Context) {
 	}
 
 	svcReq := apikey.UpdateAPIKeyRequest{
-		UseDefaultGroups:             req.UseDefaultGroups,
+		IsComposite:                  req.IsComposite,
+		CompositeGroups:              req.CompositeGroups,
 		IPWhitelist:                  req.IPWhitelist,
 		IPBlacklist:                  req.IPBlacklist,
 		FastModePolicy:               req.FastModePolicy,
@@ -494,41 +457,10 @@ func (h *APIKeyHandler[G]) Update(c *gin.Context) {
 		ResetRateLimitUsage:          req.ResetRateLimitUsage,
 		FallbackWhenGroupUnavailable: req.FallbackWhenGroupUnavailable,
 	}
-	if req.GroupIDs != nil {
-		response.BadRequest(c, "Automatic route order is managed by administrators")
-		return
-	}
-	if req.UseDefaultGroups != nil && !*req.UseDefaultGroups && (req.RoutingMode == nil || *req.RoutingMode != "single") {
-		response.BadRequest(c, "Automatic routes follow administrator settings")
-		return
-	}
-	if req.RoutingMode != nil {
-		if *req.RoutingMode != "auto" && *req.RoutingMode != "single" {
-			response.BadRequest(c, "Invalid routing mode")
-			return
-		}
-		automatic := *req.RoutingMode == "auto"
-		svcReq.IsComposite = &automatic
-		if !automatic {
-			if req.GroupID == nil || *req.GroupID <= 0 || req.GroupIDs != nil {
-				response.BadRequest(c, "Single routing requires one group")
-				return
-			}
-			svcReq.GroupID = req.GroupID
-			custom := false
-			svcReq.UseDefaultGroups = &custom
-		}
-	} else if req.GroupID != nil {
-		response.BadRequest(c, "group_id requires single routing mode")
-		return
-	}
-	if req.RoutingMode != nil && *req.RoutingMode == "auto" {
-		inherit := true
-		svcReq.UseDefaultGroups = &inherit
-	}
 	if req.Name != "" {
 		svcReq.Name = &req.Name
 	}
+	svcReq.GroupID = req.GroupID
 	if req.Status != "" {
 		svcReq.Status = &req.Status
 	}
@@ -741,20 +673,4 @@ func (h *APIKeyHandler[G]) GetUserGroupRates(c *gin.Context) {
 	}
 
 	response.Success(c, rates)
-}
-
-// RoutingOptions returns authorized administrator defaults for this console scope.
-// Clients intersect these identifiers with their loaded subscription choices; the
-// service repeats that intersection when creating and using the credential.
-func (h *APIKeyHandler[G]) RoutingOptions(c *gin.Context) {
-	subject, ok := authctx.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not authenticated")
-		return
-	}
-	ids, err := h.apiKeyService.DefaultGroupIDsForScope(c.Request.Context(), subject.UserID, c.DefaultQuery("scope", "personal"))
-	if response.ErrorFrom(c, err) {
-		return
-	}
-	response.Success(c, gin.H{"group_ids": ids})
 }

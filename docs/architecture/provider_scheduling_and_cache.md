@@ -103,7 +103,7 @@ OpenAI 兼容选择、诊断和 WS 复核共用 `ModelPolicy.SupportsCompatibleR
 <a id="scheduler_snapshot_consistency"></a>
 ## 快照一致性
 
-跨平台分组的调度 Redis 快照命名空间是 `sched:v5:`。完整和轻量两种提供商快照都带有 `upstream_protocols`、认证方式和 `responses_ws_connection_mode`，分组认证快照（版本 46）带有准入集合、转换映射和 Responses 图片策略。协议候选过滤在评分前执行，每次换号、fresh 复核和数据库复核时重新检查；转发目标只保存在本次的提供商副本里，共享缓存保持原样。
+跨平台分组的调度 Redis 快照命名空间是 `sched:v5:`。完整和轻量两种提供商快照都带有 `upstream_protocols`、认证方式和 `responses_ws_connection_mode`，分组认证快照（版本 49）带有准入集合、转换映射和 Responses 图片策略。协议候选过滤在评分前执行，每次换号、fresh 复核和数据库复核时重新检查；转发目标只保存在本次的提供商副本里，共享缓存保持原样。
 
 调度事件的格式、去重编码和 SQL 读写在 `scheduler` 和 `scheduler/postgres`。同一事务里写入的事件，提交后尽力发布。`scheduler.SnapshotService` 负责重建、事件消费和受限回退，网关读取和生命周期都直接绑定这个实例。`scheduler/rediscache` 负责 `sched:v5` 的快照发布、epoch 和 tombstone，bucket 锁继续使用 `sched:v4:lock:`，其中 `codec.ProviderCodec` 负责完整和轻量提供商的存储格式和字段过滤，使用 Provider 的字段名，并区分 nil 和空集合。
 
@@ -196,9 +196,7 @@ API Key 的上游用量查询属于控制面，结果只存在浏览器缓存里
 
 ### 分组定价快照
 
-认证缓存版本为 48。认证模块维护缓存 key、TTL 和 jitter、负缓存、发布订阅及 outbox 延迟二次失效规则。快照是否完整由版本号判断，与旧媒体字段是否为空无关。认证快照里的 `RoutingPolicy` 保存独立的模型策略和功能策略，映射、白名单和嵌套的功能值在每个请求中都深拷贝一份。`ModelPricing` 保存完整的分组价卡，包括上下文区间、Fast 和 Flex、Max 推理和分时规则。普通 Key 和复合 Key 使用各自的分组数据副本；单个请求修改金额指针、模型列表、区间或分时段时，改的是副本，缓存保持原样。分组更新的事务提交后，使用现有的按分组失效机制；价格继承和价格展示使用同一套解析规则，见[分组模型价卡与倍率继承](../domains/routing_and_billing.md#group_model_pricing)。
-
-继承管理员渠道的 Key 在缓存重建请求副本后重新读取 `api_key_default_groups`，按当前活动状态与付款权限生成绑定。切换 `use_default_groups` 会写认证失效 outbox；单纯修改默认渠道内容由后续读取直接生效。
+认证缓存版本为 47。认证模块维护缓存 key、TTL 和 jitter、负缓存、发布订阅及 outbox 延迟二次失效规则。快照是否完整由版本号判断，与旧媒体字段是否为空无关。认证快照里的 `RoutingPolicy` 保存独立的模型策略和功能策略，映射、白名单和嵌套的功能值在每个请求中都深拷贝一份。`ModelPricing` 保存完整的分组价卡，包括上下文区间、Fast 和 Flex、Max 推理和分时规则。普通 Key 和复合 Key 使用各自的分组数据副本；单个请求修改金额指针、模型列表、区间或分时段时，改的是副本，缓存保持原样。分组更新的事务提交后，使用现有的按分组失效机制；价格继承和价格展示使用同一套解析规则，见[分组模型价卡与倍率继承](../domains/routing_and_billing.md#group_model_pricing)。
 
 ### Key 认证快照的归属
 

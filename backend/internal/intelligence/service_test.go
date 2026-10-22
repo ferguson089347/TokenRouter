@@ -222,18 +222,6 @@ func TestIntelligenceConfigurationCredentialAndProtocolBoundaries(t *testing.T) 
 		_, err = s.SaveConfig(context.Background(), 1, intelligenceInput(""))
 		require.NoError(t, err)
 	})
-	// A universal personal credential contains the requested test channel among
-	// several bindings. Configuration accepts its private reference and leaves model
-	// selection to the Key's current gateway channel order.
-	t.Run("通用个人 Key 可用于已绑定渠道", func(t *testing.T) {
-		s, repo, _, key := newIntelligenceFixture()
-		key.IsComposite = true
-		key.GroupID = nil
-		key.CompositeGroups = []apikey.APIKeyCompositeGroup{{GroupID: 7}, {GroupID: 8}}
-		_, err := s.SaveConfig(context.Background(), 0, intelligenceInput(key.Key))
-		require.NoError(t, err)
-		require.Equal(t, key.ID, repo.config.APIKeyID)
-	})
 	for _, tc := range []struct {
 		name   string               // fixture scenario name
 		mutate func(*apikey.APIKey) // scenario input mutation

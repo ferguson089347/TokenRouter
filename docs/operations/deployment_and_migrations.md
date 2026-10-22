@@ -99,7 +99,7 @@ Apple container 的新栈使用 `org.tokenrouter.stack` 标签；已有的 `sub2
 
 `306_intelligence_drawing_prompt.sql` 为检测配置增加空字符串默认值的 `prompt` 列；画图在本站生成 HTML 后提交评价。已有远端任务继续查询；回退到远端生成版本前，关闭检测并等待活动任务结束，避免旧工作者把本地生成阶段当作未知提交。
 
-`308_universal_api_key_routing.sql` 转换用户 Key 的路由配置并增加默认渠道继承。该变更要求前后端与所有实例一起升级，操作步骤见[通用 API Key 升级](upgrade_notes.md#universal_api_keys)。
+`308_universal_api_key_routing.sql` 的管理员默认路由已由 `309_restore_explicit_api_key_routing.sql` 撤回。308 保留用于迁移校验，309 恢复显式分组并删除继承配置；部署与路由备份要求见[恢复显式分组 Key](upgrade_notes.md#explicit_api_key_routing)。
 
 `307_intelligence_user_tests.sql` 为配置增加 `source`，既有记录默认为 `site`。唯一身份改为来源、分组、模型、测试类型，使用户自测使用独立的共享历史。回退到不识别来源的二进制前须停用用户测试并核对配置数量；旧列表查询会把用户配置与站点配置一起读取。
 

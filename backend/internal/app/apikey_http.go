@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"log/slog"
-	"slices"
 
 	"github.com/TokenFlux/TokenRouter/internal/apikey"
 	keyhttp "github.com/TokenFlux/TokenRouter/internal/apikey/httpapi"
@@ -23,21 +22,8 @@ import (
 
 // provideKeyHTTP constructs key handlers with group presentation and capacity
 // readers. The presentation callback resolves models when requested and returns
-// the group response even when model attribute lookup fails. Assembly also installs
-// catalogue-based model eligibility before any request uses channel selection.
+// the group response even when model attribute lookup fails.
 func provideKeyHTTP(keys *apikey.APIKeyService, capacity *routing.CapacityService, catalogue *routing.RequestableCatalogue, attributes *routing.ModelAttributeService) *keyhttp.APIKeyHandler[dto.Group] {
-	keys.SetGroupModelResolver(func(ctx context.Context, groupID int64, model, clientProtocol, platform string) (bool, error) {
-		result := catalogue.ResolveSelectedModels(ctx, &groupID, platform, []string{model})
-		if result.Err != nil {
-			return false, result.Err
-		}
-		for _, candidate := range result.Models {
-			if candidate.ID == model && (clientProtocol == "" || slices.Contains(candidate.Protocols, protocol.ProtocolID(clientProtocol))) {
-				return true, nil
-			}
-		}
-		return false, nil
-	})
 	handler := keyhttp.NewAPIKeyHandler(keys, func(group *routing.Group, summary *accessview.GroupCapacitySummary) *dto.Group {
 		result := dto.GroupFromRouting(apikey.RoutingGroup(group))
 		if result != nil && summary != nil {
@@ -80,10 +66,8 @@ func provideKeyHTTP(keys *apikey.APIKeyService, capacity *routing.CapacityServic
 }
 
 // provideKeyAdminHTTP binds API key administration and group response conversion.
-func provideKeyAdminHTTP(keys *apikey.Admin, core *apikey.APIKeyService) *keyhttp.AdminAPIKeyHandler[dto.Group] {
-	handler := keyhttp.NewAdminAPIKeyHandler(keys, func(group *routing.Group) *dto.Group {
+func provideKeyAdminHTTP(keys *apikey.Admin) *keyhttp.AdminAPIKeyHandler[dto.Group] {
+	return keyhttp.NewAdminAPIKeyHandler(keys, func(group *routing.Group) *dto.Group {
 		return dto.GroupFromRouting(apikey.RoutingGroup(group))
 	})
-	handler.SetRoutingService(core)
-	return handler
 }

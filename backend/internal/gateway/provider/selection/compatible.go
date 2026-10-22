@@ -68,7 +68,6 @@ func (s *Compatible) SelectProviderForModel(ctx context.Context, groupID *int64,
 // select-only context, and any release handle returned by that path is invoked
 // before exposing the provider.
 func (s *Compatible) SelectProviderForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*gatewayprovider.ExecutionProvider, error) {
-	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	ctx = s.withOpenAIQuotaAutoPauseContext(ctx)
 	resolvedCtx, resolvedGroupID, err := s.resolveOpenAISchedulerGroup(ctx, groupID)
 	if err != nil {
@@ -213,7 +212,6 @@ func (s *Compatible) withOpenAIQuotaAutoPauseContext(ctx context.Context) contex
 // helper receives its resolved provider-layer identity and the unchanged
 // exclusion set.
 func (s *Compatible) selectProviderForModelWithExclusions(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyProviderID int64, requiredCapability providercore.OpenAIEndpointCapability) (*gatewayprovider.ExecutionProvider, error) {
-	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	routingModel := s.resolveGroupRoutingModel(ctx, groupID, requestedModel)
 	return s.selectProviderForModelWithExclusionsForRouting(ctx, groupID, platform, sessionHash, requestedModel, routingModel, excludedIDs, requireCompact, stickyProviderID, requiredCapability)
 }
@@ -223,7 +221,6 @@ func (s *Compatible) selectProviderForModelWithExclusions(ctx context.Context, g
 // admission, honors a nonblank forced platform from context, and captures
 // sticky eligibility inputs for provider rechecks.
 func (s *Compatible) selectProviderForModelWithExclusionsForRouting(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, routingModel string, excludedIDs map[int64]struct{}, requireCompact bool, stickyProviderID int64, requiredCapability providercore.OpenAIEndpointCapability) (*gatewayprovider.ExecutionProvider, error) {
-	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	resolvedCtx, _, groupErr := s.resolveOpenAISchedulerGroup(ctx, groupID)
 	if groupErr != nil {
 		return nil, groupErr
@@ -243,7 +240,6 @@ func (s *Compatible) selectProviderForModelWithExclusionsForRouting(ctx context.
 // acquired resources or a wait plan; callers finish resource acquisition and
 // release according to that result.
 func (s *Compatible) SelectProviderWithLoadAwareness(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*gatewayprovider.SelectionResult, error) {
-	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	return s.selectProviderWithLoadAwareness(s.withOpenAIQuotaAutoPauseContext(ctx), groupID, "", sessionHash, requestedModel, excludedIDs, false, "")
 }
 
@@ -252,7 +248,6 @@ func (s *Compatible) SelectProviderWithLoadAwareness(ctx context.Context, groupI
 // requirements, and endpoint capability through so provider eligibility uses
 // the same dispatch identity.
 func (s *Compatible) selectProviderWithLoadAwareness(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability providercore.OpenAIEndpointCapability) (*gatewayprovider.SelectionResult, error) {
-	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	routingModel := s.resolveGroupRoutingModel(ctx, groupID, requestedModel)
 	return s.selectProviderWithLoadAwarenessForRouting(ctx, groupID, platform, sessionHash, requestedModel, routingModel, excludedIDs, requireCompact, requiredCapability)
 }
@@ -262,7 +257,6 @@ func (s *Compatible) selectProviderWithLoadAwareness(ctx context.Context, groupI
 // filtering precede candidate policy capture, and the returned scope restores
 // the provider with its resource decision.
 func (s *Compatible) selectProviderWithLoadAwarenessForRouting(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, routingModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability providercore.OpenAIEndpointCapability) (*gatewayprovider.SelectionResult, error) {
-	excludedIDs = requeststate.ChannelProviderExclusions(ctx, nil, excludedIDs)
 	resolvedCtx, _, groupErr := s.resolveOpenAISchedulerGroup(ctx, groupID)
 	if groupErr != nil {
 		return nil, groupErr

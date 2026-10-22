@@ -17,7 +17,6 @@ func RegisterUserRoutes[G any](authenticated *gin.RouterGroup, endpoint *APIKeyH
 	{
 		keys.GET("", endpoint.List)
 		keys.GET("/billing-options", endpoint.GetBillingOptions)
-		keys.GET("/routing-options", endpoint.RoutingOptions)
 		keys.GET("/:id", endpoint.GetByID)
 		keys.POST("", endpoint.Create)
 		keys.PUT("/:id", endpoint.Update)

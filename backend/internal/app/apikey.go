@@ -14,7 +14,6 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/pkg/timezone"
 	routingpostgres "github.com/TokenFlux/TokenRouter/internal/routing/postgres"
 	"github.com/TokenFlux/TokenRouter/internal/scheduler"
-	"github.com/TokenFlux/TokenRouter/internal/settings"
 	"github.com/TokenFlux/TokenRouter/internal/settings/preaggregation"
 	"github.com/TokenFlux/TokenRouter/internal/team"
 	usagepostgres "github.com/TokenFlux/TokenRouter/internal/usage/postgres"
@@ -54,12 +53,10 @@ func provideKeys(
 	concurrency *scheduler.ConcurrencyService,
 	teams team.TeamRepository,
 	calendar timezone.Calendar,
-	settingsStore *settings.Store,
 ) *apikey.APIKeyService {
 	options := &apikey.Options{
-		Now:             time.Now,
-		RoutingSettings: settingsStore,
-		Calendar:        calendar,
+		Now:      time.Now,
+		Calendar: calendar,
 		APIKeyAuth: apikey.APIKeyAuthCacheConfig{
 			L1Size:             cfg.APIKeyAuth.L1Size,
 			L1TTLSeconds:       cfg.APIKeyAuth.L1TTLSeconds,

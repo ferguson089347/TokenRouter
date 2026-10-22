@@ -196,7 +196,7 @@ func (s *IntelligenceService) SaveConfig(ctx context.Context, id int64, in Intel
 		key, err = s.keys.GetByID(ctx, c.APIKeyID)
 	}
 	if err != nil || !intelligenceValidKey(key, c.GroupID) {
-		return nil, intelligenceInvalid("请选择有效、未过期且包含所选渠道的个人站内 API Key")
+		return nil, intelligenceInvalid("需要有效、未过期且仅绑定所选分组的普通站内 API Key，不支持复合、团队或系统托管 Key")
 	}
 	c.APIKeyID = key.ID
 	c.APIKeyConfigured = true
@@ -218,14 +218,17 @@ func intelligenceInvalid(message string) error {
 	return apperror.BadRequest("INTELLIGENCE_INVALID", message)
 }
 
-// intelligenceValidKey checks a personal credential's access to a test channel.
-// Current lifecycle, quota and owner state apply to the entire Key. Multi-channel
-// credentials need a matching binding; fixed internal views need the exact group.
+// intelligenceValidKey checks whether a personal ordinary Key can test the
+// selected group. Current lifecycle, quota, owner state, and group binding all
+// participate; the Key's unavailable-group routing preference remains
+// eligible.
 func intelligenceValidKey(key *apikey.APIKey, groupID int64) bool {
+	// The unavailable-group setting affects gateway routing after submission;
+	// ordinary Keys remain eligible while their bound group is active.
 	return key != nil && key.Key != "" &&
 		key.IsActive() && !key.IsExpired() && !key.IsQuotaExhausted() &&
-		((key.IsComposite && key.AllowsRuntimeGroup(groupID)) ||
-			(!key.IsComposite && len(key.CompositeGroups) == 0 && key.GroupID != nil && *key.GroupID == groupID)) &&
+		!key.IsComposite && len(key.CompositeGroups) == 0 &&
+		key.GroupID != nil && *key.GroupID == groupID &&
 		key.TeamID == nil && key.ManagedBy == nil &&
 		key.User != nil && key.User.Status == "active" && key.User.DeletedAt == nil
 }

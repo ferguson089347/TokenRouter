@@ -143,20 +143,6 @@ func (_c *APIKeyCreate) SetNillableIsComposite(v *bool) *APIKeyCreate {
 	return _c
 }
 
-// SetUseDefaultGroups sets the "use_default_groups" field.
-func (_c *APIKeyCreate) SetUseDefaultGroups(v bool) *APIKeyCreate {
-	_c.mutation.SetUseDefaultGroups(v)
-	return _c
-}
-
-// SetNillableUseDefaultGroups sets the "use_default_groups" field if the given value is not nil.
-func (_c *APIKeyCreate) SetNillableUseDefaultGroups(v *bool) *APIKeyCreate {
-	if v != nil {
-		_c.SetUseDefaultGroups(*v)
-	}
-	return _c
-}
-
 // SetStatus sets the "status" field.
 func (_c *APIKeyCreate) SetStatus(v string) *APIKeyCreate {
 	_c.mutation.SetStatus(v)
@@ -573,10 +559,6 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultIsComposite
 		_c.mutation.SetIsComposite(v)
 	}
-	if _, ok := _c.mutation.UseDefaultGroups(); !ok {
-		v := apikey.DefaultUseDefaultGroups
-		_c.mutation.SetUseDefaultGroups(v)
-	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := apikey.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -675,9 +657,6 @@ func (_c *APIKeyCreate) check() error {
 	}
 	if _, ok := _c.mutation.IsComposite(); !ok {
 		return &ValidationError{Name: "is_composite", err: errors.New(`ent: missing required field "APIKey.is_composite"`)}
-	}
-	if _, ok := _c.mutation.UseDefaultGroups(); !ok {
-		return &ValidationError{Name: "use_default_groups", err: errors.New(`ent: missing required field "APIKey.use_default_groups"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "APIKey.status"`)}
@@ -811,10 +790,6 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.IsComposite(); ok {
 		_spec.SetField(apikey.FieldIsComposite, field.TypeBool, value)
 		_node.IsComposite = value
-	}
-	if value, ok := _c.mutation.UseDefaultGroups(); ok {
-		_spec.SetField(apikey.FieldUseDefaultGroups, field.TypeBool, value)
-		_node.UseDefaultGroups = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
@@ -1170,18 +1145,6 @@ func (u *APIKeyUpsert) SetIsComposite(v bool) *APIKeyUpsert {
 // UpdateIsComposite sets the "is_composite" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateIsComposite() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldIsComposite)
-	return u
-}
-
-// SetUseDefaultGroups sets the "use_default_groups" field.
-func (u *APIKeyUpsert) SetUseDefaultGroups(v bool) *APIKeyUpsert {
-	u.Set(apikey.FieldUseDefaultGroups, v)
-	return u
-}
-
-// UpdateUseDefaultGroups sets the "use_default_groups" field to the value that was provided on create.
-func (u *APIKeyUpsert) UpdateUseDefaultGroups() *APIKeyUpsert {
-	u.SetExcluded(apikey.FieldUseDefaultGroups)
 	return u
 }
 
@@ -1782,20 +1745,6 @@ func (u *APIKeyUpsertOne) SetIsComposite(v bool) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateIsComposite() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateIsComposite()
-	})
-}
-
-// SetUseDefaultGroups sets the "use_default_groups" field.
-func (u *APIKeyUpsertOne) SetUseDefaultGroups(v bool) *APIKeyUpsertOne {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.SetUseDefaultGroups(v)
-	})
-}
-
-// UpdateUseDefaultGroups sets the "use_default_groups" field to the value that was provided on create.
-func (u *APIKeyUpsertOne) UpdateUseDefaultGroups() *APIKeyUpsertOne {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.UpdateUseDefaultGroups()
 	})
 }
 
@@ -2630,20 +2579,6 @@ func (u *APIKeyUpsertBulk) SetIsComposite(v bool) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateIsComposite() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateIsComposite()
-	})
-}
-
-// SetUseDefaultGroups sets the "use_default_groups" field.
-func (u *APIKeyUpsertBulk) SetUseDefaultGroups(v bool) *APIKeyUpsertBulk {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.SetUseDefaultGroups(v)
-	})
-}
-
-// UpdateUseDefaultGroups sets the "use_default_groups" field to the value that was provided on create.
-func (u *APIKeyUpsertBulk) UpdateUseDefaultGroups() *APIKeyUpsertBulk {
-	return u.Update(func(s *APIKeyUpsert) {
-		s.UpdateUseDefaultGroups()
 	})
 }
 

@@ -258,8 +258,6 @@ base URL 模式只在提供商没有保存手动端点时生效，可以选 CLI 
 
 `provider_scheduling_thresholds` 是整体替换的 JSON map，允许 OpenAI、Anthropic、Grok、Kimi 和 Zhipu 的 1 到 100 的整数，100 表示关闭这个平台的自动停调；提供商可以在自己的凭据里覆盖。管理设置的部分更新省略这个字段时，保留数据库里的值和进程缓存，前端的初始默认值不会被当成一次更新。
 
-`api_key_default_groups` 保存管理员配置的有序渠道 ID 数组，由 Key 管理接口写入。继承默认渠道的 Key 在读取请求副本时重新解析该设置，按付款权限过滤；`api_key_routing_cooldown_seconds` 保存故障提供商的冷却秒数，默认 60，范围 0 至 3600；单分组由 Key 的 `group_id` 保存。详见[通用 API Key](../domains/composite_api_keys.md)。
-
 ## 领域配置
 
 结构化的、有关联关系和独立生命周期的业务配置，使用专门的表：

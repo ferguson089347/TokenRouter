@@ -105,11 +105,6 @@ func IsComposite(v bool) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldIsComposite, v))
 }
 
-// UseDefaultGroups applies equality check predicate on the "use_default_groups" field. It's identical to UseDefaultGroupsEQ.
-func UseDefaultGroups(v bool) predicate.APIKey {
-	return predicate.APIKey(sql.FieldEQ(FieldUseDefaultGroups, v))
-}
-
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldStatus, v))
@@ -573,16 +568,6 @@ func IsCompositeEQ(v bool) predicate.APIKey {
 // IsCompositeNEQ applies the NEQ predicate on the "is_composite" field.
 func IsCompositeNEQ(v bool) predicate.APIKey {
 	return predicate.APIKey(sql.FieldNEQ(FieldIsComposite, v))
-}
-
-// UseDefaultGroupsEQ applies the EQ predicate on the "use_default_groups" field.
-func UseDefaultGroupsEQ(v bool) predicate.APIKey {
-	return predicate.APIKey(sql.FieldEQ(FieldUseDefaultGroups, v))
-}
-
-// UseDefaultGroupsNEQ applies the NEQ predicate on the "use_default_groups" field.
-func UseDefaultGroupsNEQ(v bool) predicate.APIKey {
-	return predicate.APIKey(sql.FieldNEQ(FieldUseDefaultGroups, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

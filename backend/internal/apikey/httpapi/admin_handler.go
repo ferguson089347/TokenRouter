@@ -30,7 +30,6 @@ type KeyAdministration interface {
 // AdminAPIKeyHandler maps one administrative Key operation into its configured
 // group response.
 type AdminAPIKeyHandler[G any] struct {
-	routing      *apikey.APIKeyService   // ordered channel default use cases
 	adminService KeyAdministration       // configured administrative Key use case
 	group        func(*routing.Group) *G // configured group presentation mapper
 }
@@ -51,7 +50,7 @@ type AdminUpdateAPIKeyGroupRequest struct {
 // administrator middleware on the route group; the mapper accepts absent group
 // input.
 func NewAdminAPIKeyHandler[G any](a KeyAdministration, g func(*routing.Group) *G) *AdminAPIKeyHandler[G] {
-	return &AdminAPIKeyHandler[G]{adminService: a, group: g}
+	return &AdminAPIKeyHandler[G]{a, g}
 }
 
 // UpdateGroup decodes the administrator's optional binding and reset choices
@@ -91,49 +90,4 @@ func (h *AdminAPIKeyHandler[G]) UpdateGroup(c *gin.Context) {
 		GrantedGroupName:       result.GrantedGroupName,
 	}
 	response.Success(c, resp)
-}
-
-// SetRoutingService binds administrator channel defaults before requests begin.
-// Application assembly calls this unsynchronized setter before serving traffic;
-// the supplied Key service remains owned by the application's lifecycle.
-func (h *AdminAPIKeyHandler[G]) SetRoutingService(keys *apikey.APIKeyService) { h.routing = keys }
-
-// RoutingDefaults reads the complete administrator channel order for editing.
-func (h *AdminAPIKeyHandler[G]) RoutingDefaults(c *gin.Context) {
-	ids, err := h.routing.RoutingDefaults(c.Request.Context())
-	if response.ErrorFrom(c, err) {
-		return
-	}
-	cooldown, err := h.routing.RoutingCooldown(c.Request.Context())
-	if response.ErrorFrom(c, err) {
-		return
-	}
-	response.Success(c, gin.H{"group_ids": ids, "cooldown_seconds": int(cooldown.Seconds())})
-}
-
-// SaveRoutingDefaults replaces defaults after validating all selected active groups.
-// Existing inherited Keys observe the saved order on their next request, while
-// single-group credentials retain their separately selected fixed target.
-func (h *AdminAPIKeyHandler[G]) SaveRoutingDefaults(c *gin.Context) {
-	var input struct {
-		CooldownSeconds *int     `json:"cooldown_seconds"` // Optional shared provider cooldown duration.
-		GroupIDs        *[]int64 `json:"group_ids"`        /* complete ordered channel identifiers */
-	}
-	if err := response.BindJSONStrict(c, &input); err != nil {
-		response.BadRequest(c, "Invalid API key defaults")
-		return
-	}
-	if input.GroupIDs == nil {
-		response.BadRequest(c, "group_ids is required")
-		return
-	}
-	if input.CooldownSeconds != nil && (*input.CooldownSeconds < 0 || *input.CooldownSeconds > 3600) {
-		response.BadRequest(c, "Routing cooldown must be between 0 and 3600 seconds")
-		return
-	}
-	if response.ErrorFrom(c, h.routing.SaveRoutingConfiguration(c.Request.Context(), *input.GroupIDs, input.CooldownSeconds)) {
-		return
-	}
-
-	response.Success(c, gin.H{"group_ids": input.GroupIDs})
 }
