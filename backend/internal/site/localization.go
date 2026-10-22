@@ -19,6 +19,8 @@ import (
 // keys, while prepared writes retain omitted fields and validate changes
 // against each field's current content revision. Public reads resolve saved
 // blocks and leave source settings available in an independently owned map.
+// Contact records include uploaded image data, so their serialized bytes have
+// a separate budget from the character limit applied to ordinary display copy.
 //
 // Legal documents match previous localization by document ID and treat title
 // and Markdown as one copy. An omitted localization block retains the previous
@@ -31,6 +33,10 @@ import (
 const (
 	SettingKeySiteTexts     = "site_texts"
 	SettingKeyDefaultLocale = "default_locale"
+
+	// maxContactInfoBytes bounds each localized contact list, including the base64
+	// image payloads accepted by the support editor's individual upload controls.
+	maxContactInfoBytes = 4 << 20
 )
 
 // siteTextKeys lists the source fields initialized for the editor when saved
@@ -69,9 +75,12 @@ func ParseLocalizedTexts(values map[string]string) LocalizedTexts {
 // including editor defaults generated for fields that were never configured.
 //
 // Changed copies pass through locale.Prepare using their current revisions.
-// Link fields accept relative, HTTP, and HTTPS destinations; homepage HTML uses
-// a separate larger text limit. Saved empty optional text remains distinguishable
-// from absence, while a changed site_name must contain a nonblank name.
+// Link fields accept relative, HTTP, and HTTPS destinations. Homepage HTML uses
+// a larger character limit, and contact records permit at most four mebibytes
+// per source or translation to accommodate embedded support images. Saved empty
+// optional text remains distinguishable from absence, while a changed site_name
+// must contain a nonblank name.
+// @project-doc docs/interfaces/user_localization.md#content_owners
 func PrepareLocalizedTexts(values map[string]string, input LocalizedTexts) (LocalizedTexts, error) {
 	previous := ParseLocalizedTexts(values)
 	result := ConfiguredSiteTexts(values)
@@ -92,11 +101,18 @@ func PrepareLocalizedTexts(values map[string]string, input LocalizedTexts) (Loca
 			}
 			// Ordinary display copy is bounded in Unicode characters.
 			limit := 2000
-			if key == "home_content" {
+			length := utf8.RuneCountInString(value)
+			switch key {
+			case "home_content":
 				// Homepage content permits larger HTML or link source text.
 				limit = 1 << 20
+			case SettingKeyContactInfo:
+				// Contact records embed images accepted by the uploader. Bound their
+				// serialized bytes independently from ordinary short display copy.
+				limit = maxContactInfoBytes
+				length = len(value)
 			}
-			if utf8.RuneCountInString(value) > limit {
+			if length > limit {
 				return apperror.BadRequest("LOCALIZED_TEXT_TOO_LONG", "Text exceeds the allowed length.").WithMetadata(map[string]string{"field": key})
 			}
 			if key == "site_name" && strings.TrimSpace(value) == "" {

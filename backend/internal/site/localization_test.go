@@ -2,18 +2,90 @@ package site
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/TokenFlux/TokenRouter/internal/pkg/apperror"
 	"github.com/TokenFlux/TokenRouter/internal/pkg/locale"
 	"github.com/TokenFlux/TokenRouter/internal/pkg/timezone"
 )
 
 // homeTextSource supplies the same site settings to the public API and HTML injection.
 type homeTextSource map[string]string
+
+// TestContactImagesRoundTrip prepares localized contacts containing two maximum-size
+// uploads per language. Saving and resolving both copies must retain their complete
+// encoded images after the content passes through its stored JSON representation.
+func TestContactImagesRoundTrip(t *testing.T) {
+	image := "data:image/png;base64," + base64.StdEncoding.EncodeToString(make([]byte, 500*1024))
+	contacts := map[string]any{
+		"format": "support-contacts-v1",
+		"entries": []map[string]string{
+			{"label": "Support", "value": "123456", "image": image},
+			{"label": "Community", "value": "https://example.test/group", "image": image},
+		},
+	}
+	rawContacts, err := json.Marshal(contacts)
+	require.NoError(t, err)
+	en := "en"
+	update := locale.Update[string]{Content: locale.Original(string(rawContacts))}
+	update.SourceLocale = &en
+	update.Translations["zh-Hans"] = locale.Translation[string]{Value: string(rawContacts)}
+	update.ReviewedLocales = []string{"zh-Hans"}
+	prepared, err := PrepareLocalizedTexts(nil, LocalizedTexts{SettingKeyContactInfo: update})
+	require.NoError(t, err)
+	rawSaved, err := json.Marshal(prepared)
+	require.NoError(t, err)
+	values := map[string]string{SettingKeySiteTexts: string(rawSaved)}
+	for _, language := range []string{"en", "zh-Hans"} {
+		resolved := ResolveSiteTexts(values, language)
+		require.Equal(t, string(rawContacts), resolved[SettingKeyContactInfo])
+	}
+}
+
+// TestSiteTextSizeLimits checks contact payload bytes and ordinary Unicode copy
+// independently. Exact limits remain accepted, and oversized source or translated
+// values retain the field-specific error used by the settings form.
+func TestSiteTextSizeLimits(t *testing.T) {
+	for _, tc := range []struct {
+		name        string // Named validation scenario.
+		field       string // Submitted site text key.
+		value       string // Source or translated copy.
+		translation bool   // Place oversized content in translation.
+		tooLong     bool   // Expected field limit rejection.
+	}{
+		{name: "contact byte limit", field: SettingKeyContactInfo, value: strings.Repeat("a", 4<<20)},
+		{name: "contact source too large", field: SettingKeyContactInfo, value: strings.Repeat("a", (4<<20)+1), tooLong: true},
+		{name: "contact translation too large", field: SettingKeyContactInfo, value: strings.Repeat("a", (4<<20)+1), translation: true, tooLong: true},
+		{name: "contact multibyte too large", field: SettingKeyContactInfo, value: strings.Repeat("界", (4<<20)/3+1), tooLong: true},
+		{name: "ordinary Unicode limit", field: "site_subtitle", value: strings.Repeat("界", 2000)},
+		{name: "ordinary source too large", field: "site_subtitle", value: strings.Repeat("界", 2001), tooLong: true},
+		{name: "ordinary translation too large", field: "site_subtitle", value: strings.Repeat("界", 2001), translation: true, tooLong: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			en := "en"
+			update := locale.Update[string]{Content: locale.Original(tc.value)}
+			update.SourceLocale = &en
+			if tc.translation {
+				update.Source = "Source"
+				update.Translations["zh-Hans"] = locale.Translation[string]{Value: tc.value}
+				update.ReviewedLocales = []string{"zh-Hans"}
+			}
+			_, err := PrepareLocalizedTexts(nil, LocalizedTexts{tc.field: update})
+			if tc.tooLong {
+				require.Equal(t, "LOCALIZED_TEXT_TOO_LONG", apperror.Reason(err))
+				require.Equal(t, tc.field, apperror.FromError(err).Metadata["field"])
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
 
 // TestLegalTranslationKeepsConsent prepares a reviewed translation and then edits source Markdown.
 // It verifies that consent revisions track source changes, and that the
