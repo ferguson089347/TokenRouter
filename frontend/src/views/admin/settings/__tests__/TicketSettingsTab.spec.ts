@@ -1,22 +1,59 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
-const { config, save, showSuccess, syncTicketModuleEnabled } = vi.hoisted(() => ({ config: vi.fn(), save: vi.fn(), showSuccess: vi.fn(), syncTicketModuleEnabled: vi.fn() }))
+const { config, save, showSuccess, syncTicketModuleEnabled } = vi.hoisted(() => ({
+  config: vi.fn(),
+  save: vi.fn(),
+  showSuccess: vi.fn(),
+  syncTicketModuleEnabled: vi.fn(),
+}))
 vi.mock('@/api/tickets', () => ({ ticketAPI: () => ({ config }), saveTicketSettings: save }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess, syncTicketModuleEnabled }) }))
 vi.mock('vue-i18n', async () => {
   const { default: zh } = await import('@/i18n/locales/zh/tickets')
   const labels: Record<string, string> = zh.tickets.settings
-  return { useI18n: () => ({ t: (key: string) => key.startsWith('tickets.settings.') ? labels[key.slice('tickets.settings.'.length)] ?? key : key }) }
+  return {
+    useI18n: () => ({
+      t: (key: string) =>
+        key.startsWith('tickets.settings.')
+          ? (labels[key.slice('tickets.settings.'.length)] ?? key)
+          : key,
+    }),
+  }
 })
 import TicketSettingsTab from '../TicketSettingsTab.vue'
-import { createSettingsSaveRegistry, settingsSaveRegistryKey } from '@/composables/useSettingsSaveRegistry'
-let registry: ReturnType<typeof createSettingsSaveRegistry>
-function render() { registry = createSettingsSaveRegistry(); return mount(TicketSettingsTab, { global: { provide: { [settingsSaveRegistryKey as symbol]: registry.registry } } }) }
+import {
+  createSettingsSaveRegistry,
+  settingsSaveRegistryKey,
+} from '@/composables/useSettingsSaveRegistry'
 
-const defaults = { enabled: true, max_open_tickets: 3, max_attachments: 5, max_attachment_size_mb: 10, notify_on_staff_reply: false, auto_expire_hours: 72 }
+// TicketSettingsTab.spec.ts exercises support settings through the shared save registry and
+// mocked configuration API. It verifies disabled attachments, expiry limits, failed loads,
+// confirmed module visibility, and notification descriptions while keeping unsaved drafts
+// separate from published settings.
+
+let registry: ReturnType<typeof createSettingsSaveRegistry>
+function render() {
+  registry = createSettingsSaveRegistry()
+  return mount(TicketSettingsTab, {
+    global: { provide: { [settingsSaveRegistryKey as symbol]: registry.registry } },
+  })
+}
+
+const defaults = {
+  enabled: true,
+  max_open_tickets: 3,
+  max_attachments: 5,
+  max_attachment_size_mb: 10,
+  notify_on_staff_reply: false,
+  auto_expire_hours: 72,
+}
 describe('工单设置', () => {
-  beforeEach(() => { vi.clearAllMocks(); config.mockResolvedValue({ ...defaults }); save.mockImplementation(async value => value) })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    config.mockResolvedValue({ ...defaults })
+    save.mockImplementation(async (value) => value)
+  })
 
   it('允许关闭附件及自动过期，通过系统设置保存条提交', async () => {
     const wrapper = render()
@@ -36,7 +73,7 @@ describe('工单设置', () => {
     const wrapper = render()
     await flushPromises()
     expect(wrapper.find('input').exists()).toBe(false)
-    expect(wrapper.findAll('button').some(item => item.text() === 'common.save')).toBe(false)
+    expect(wrapper.findAll('button').some((item) => item.text() === 'common.save')).toBe(false)
     expect(save).not.toHaveBeenCalled()
   })
 

@@ -3,6 +3,11 @@ import { flushPromises } from '@vue/test-utils'
 import { createIntelligenceResultsLoader } from '../useIntelligenceResults'
 import { runFixture } from './fixtures'
 
+// useIntelligenceResults.spec.ts checks detail loading with controlled API responses and
+// synthetic run records. It verifies shared requests, terminal result caching, expired
+// preview renewal, and queue admission while keeping administrator and user results in
+// separate scopes.
+
 const { detail, preview } = vi.hoisted(() => ({
   detail: vi.fn(),
   preview: vi.fn(),
@@ -49,9 +54,7 @@ describe('检测产物按需加载', () => {
 
   it('多个可见卡片最多两个并发请求，完成后推进队列', async () => {
     const resolvers: Array<(value: unknown) => void> = []
-    preview.mockImplementation(
-      () => new Promise((resolve) => resolvers.push(resolve)),
-    )
+    preview.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)))
     const loader = createIntelligenceResultsLoader()
     const jobs = [loader.preview('a'), loader.preview('b'), loader.preview('c')]
     expect(preview).toHaveBeenCalledTimes(2)

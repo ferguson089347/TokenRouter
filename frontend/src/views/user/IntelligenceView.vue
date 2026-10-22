@@ -6,20 +6,11 @@
           <h1 class="page-title">{{ t('intelligence.title') }}</h1>
           <p class="page-description">{{ t('intelligence.description') }}</p>
         </div>
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          :disabled="loading"
-          @click="load"
-        >
+        <button type="button" class="btn btn-secondary btn-sm" :disabled="loading" @click="load">
           {{ t('common.refresh') }}
         </button>
       </div>
-      <div
-        v-if="loading && !tests.length"
-        role="status"
-        class="py-16 text-center text-gray-500"
-      >
+      <div v-if="loading && !tests.length" role="status" class="py-16 text-center text-gray-500">
         {{ t('common.loading') }}
       </div>
       <p
@@ -29,10 +20,7 @@
       >
         {{ error }}
       </p>
-      <section
-        v-if="!loading && !error && !groups.length"
-        class="card px-6 py-16 text-center"
-      >
+      <section v-if="!loading && !error && !groups.length" class="card px-6 py-16 text-center">
         <h2 class="font-semibold">{{ t('intelligence.empty') }}</h2>
         <p class="mt-2 text-sm text-gray-500">
           {{ t('intelligence.emptyHint') }}
@@ -44,9 +32,7 @@
         class="card min-w-0 p-4 sm:p-6"
         :data-group-id="group.id"
       >
-        <h2
-          class="break-words text-xl font-semibold text-gray-900 dark:text-white"
-        >
+        <h2 class="break-words text-xl font-semibold text-gray-900 dark:text-white">
           {{ group.name }}
         </h2>
         <div
@@ -54,9 +40,7 @@
           :key="model.name"
           class="mt-6 min-w-0 border-t border-gray-100 pt-5 dark:border-dark-700"
         >
-          <h3
-            class="mb-4 break-all text-base font-semibold text-gray-800 dark:text-gray-100"
-          >
+          <h3 class="mb-4 break-all text-base font-semibold text-gray-800 dark:text-gray-100">
             {{ model.name }}
           </h3>
           <div
@@ -65,17 +49,12 @@
             class="mb-6 min-w-0 last:mb-0"
             :data-test-id="test.id"
           >
-            <h4
-              class="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400"
-            >
+            <h4 class="mb-2 text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ t(`intelligence.${test.benchmark}`) }}
             </h4>
             <IntelligenceResultBar :runs="test.runs || []" @select="openRun" />
             <template
-              v-if="
-                test.benchmark === 'drawing' &&
-                recentArtifacts(test.artifacts || []).length
-              "
+              v-if="test.benchmark === 'drawing' && recentArtifacts(test.artifacts || []).length"
             >
               <p class="mb-3 mt-5 text-xs text-gray-500">
                 {{ t('intelligence.artworksHint') }}
@@ -108,11 +87,7 @@ import IntelligenceResultBar from '@/components/intelligence/IntelligenceResultB
 import IntelligenceDrawingGallery from '@/components/intelligence/IntelligenceDrawingGallery.vue'
 import IntelligenceRunDialog from '@/components/intelligence/IntelligenceRunDialog.vue'
 import { groupTests, recentArtifacts } from '@/components/intelligence/results'
-import {
-  intelligenceAPI,
-  type IntelligenceRun,
-  type IntelligenceTest,
-} from '@/api/intelligence'
+import { intelligenceAPI, type IntelligenceRun, type IntelligenceTest } from '@/api/intelligence'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { provideIntelligenceResults } from '@/components/intelligence/useIntelligenceResults'
 
@@ -178,10 +153,7 @@ async function openRun(run: IntelligenceRun) {
     if (!controller.signal.aborted) selectedRun.value = result
   } catch (err) {
     if (!controller.signal.aborted)
-      detailError.value = extractApiErrorMessage(
-        err,
-        t('intelligence.loadFailed'),
-      )
+      detailError.value = extractApiErrorMessage(err, t('intelligence.loadFailed'))
   } finally {
     if (!controller.signal.aborted) detailLoading.value = false
   }

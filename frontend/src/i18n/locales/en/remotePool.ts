@@ -40,14 +40,14 @@ export default {
       groups: 'Groups',
       rate_multiplier: 'Multiplier',
       usage_windows: 'Usage windows',
-      last_used_at: 'Last used'
+      last_used_at: 'Last used',
     },
     status: {
       active: 'Available',
       rate_limited: 'Rate limited',
       temporarily_unavailable: 'Temporarily unavailable',
       paused: 'Paused',
-      error: 'Error'
+      error: 'Error',
     },
     bindings: 'Group bindings',
     loadSourceGroups: 'Load remote groups',
@@ -61,6 +61,6 @@ export default {
     staleHint:
       'Remote data could not be updated. Showing the last successful snapshot. Contact an administrator to check the connection or update RT.',
     snapshotAt: 'Data updated',
-    sourceGroup: 'Remote group'
-  }
+    sourceGroup: 'Remote group',
+  },
 }

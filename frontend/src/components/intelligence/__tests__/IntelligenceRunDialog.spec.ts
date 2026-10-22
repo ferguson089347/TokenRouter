@@ -3,6 +3,10 @@ import { mount } from '@vue/test-utils'
 import IntelligenceRunDialog from '../IntelligenceRunDialog.vue'
 import { runFixture } from './fixtures'
 
+// IntelligenceRunDialog.spec.ts checks detail rendering with synthetic model observations and
+// shared dialog substitutes. It verifies that absent answers and metrics stay absent or
+// unknown, measured zero remains visible, and execution errors retain their own status.
+
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({ t: (key: string) => key }),
@@ -41,9 +45,7 @@ describe('检测详情保留真实观测', () => {
         duration_ms: 0,
       }),
     )
-    expect(wrapper.findAll('h4').map((item) => item.text())).toEqual([
-      'intelligence.answer',
-    ])
+    expect(wrapper.findAll('h4').map((item) => item.text())).toEqual(['intelligence.answer'])
     expect(wrapper.get('strong').text()).toBe('answer only')
     expect(wrapper.text()).not.toContain('intelligence.noAnswer')
     expect(wrapper.findAll('dd').map((item) => item.text())).toEqual([
@@ -55,14 +57,11 @@ describe('检测详情保留真实观测', () => {
     ])
     wrapper.unmount()
   })
-  it.each(['error', 'unknown'] as const)(
-    '状态%s使用独立文案，不能误报未通过',
-    (status) => {
-      const wrapper = mountDialog(runFixture({ status, verdict: status }))
-      expect(wrapper.text()).toContain(`intelligence.statuses.${status}`)
-      expect(wrapper.text()).not.toContain('intelligence.statuses.incorrect')
-      expect(wrapper.find('.bg-amber-400').exists()).toBe(true)
-      wrapper.unmount()
-    },
-  )
+  it.each(['error', 'unknown'] as const)('状态%s使用独立文案，不能误报未通过', (status) => {
+    const wrapper = mountDialog(runFixture({ status, verdict: status }))
+    expect(wrapper.text()).toContain(`intelligence.statuses.${status}`)
+    expect(wrapper.text()).not.toContain('intelligence.statuses.incorrect')
+    expect(wrapper.find('.bg-amber-400').exists()).toBe(true)
+    wrapper.unmount()
+  })
 })

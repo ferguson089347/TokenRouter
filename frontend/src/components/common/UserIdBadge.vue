@@ -8,7 +8,10 @@
     @click.stop="copyToClipboard(displayedUserId)"
   >
     <span class="shrink-0 text-xs">{{ t('profile.userId') }}</span>
-    <span class="min-w-0 truncate font-mono text-sm tabular-nums text-gray-900 dark:text-dark-100">{{ displayedUserId }}</span>
+    <span
+      class="min-w-0 truncate font-mono text-sm tabular-nums text-gray-900 dark:text-dark-100"
+      >{{ displayedUserId }}</span
+    >
     <Icon :name="copied ? 'check' : 'copy'" size="xs" class="shrink-0" />
   </button>
 </template>

@@ -4,7 +4,9 @@
     :class="isAuthenticated ? '' : 'ba-theme-shell relative min-h-screen overflow-hidden'"
   >
     <template v-if="isAuthenticated" #page-heading-actions>
-      <div class="model-marketplace-toolbar flex w-[calc(100vw-2rem)] max-w-full min-w-0 items-center gap-2 sm:w-auto">
+      <div
+        class="model-marketplace-toolbar flex w-[calc(100vw-2rem)] max-w-full min-w-0 items-center gap-2 sm:w-auto"
+      >
         <div class="min-w-0 flex-1 sm:w-80 sm:flex-none lg:w-[min(24rem,32vw)]">
           <SearchInput
             v-model="search"
@@ -13,7 +15,12 @@
           />
         </div>
 
-        <FilterDropdown :active-count="activeFilterCount" :columns="3" keep-mounted @reset="resetPanelFilters">
+        <FilterDropdown
+          :active-count="activeFilterCount"
+          :columns="3"
+          keep-mounted
+          @reset="resetPanelFilters"
+        >
           <FilterField :label="t('marketplace.filterBrand')">
             <Select v-model="selectedBrand" :options="brandSelectOptions" />
           </FilterField>
@@ -36,12 +43,19 @@
             <span class="h-8 w-8 shrink-0 overflow-hidden rounded-control shadow-sm">
               <img :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
             </span>
-            <span class="truncate text-base font-semibold text-gray-950 dark:text-white">{{ siteName }}</span>
+            <span class="truncate text-base font-semibold text-gray-950 dark:text-white">{{
+              siteName
+            }}</span>
           </router-link>
 
           <div class="flex items-center gap-2 sm:gap-3">
-            <div class="hidden items-center gap-5 text-sm font-medium text-gray-600 dark:text-dark-300 md:flex">
-              <router-link to="/models" class="transition hover:text-gray-950 dark:hover:text-white">
+            <div
+              class="hidden items-center gap-5 text-sm font-medium text-gray-600 dark:text-dark-300 md:flex"
+            >
+              <router-link
+                to="/models"
+                class="transition hover:text-gray-950 dark:hover:text-white"
+              >
                 {{ t('home.nav.models') }}
               </router-link>
               <a
@@ -78,10 +92,9 @@
       </header>
     </template>
 
-    <section v-content-reveal="!isAuthenticated && motionRoute?.path"
-      :class="isAuthenticated
-        ? 'space-y-4'
-        : 'relative z-10 px-4 pb-12 pt-6 sm:px-6 lg:px-8'"
+    <section
+      v-content-reveal="!isAuthenticated && motionRoute?.path"
+      :class="isAuthenticated ? 'space-y-4' : 'relative z-10 px-4 pb-12 pt-6 sm:px-6 lg:px-8'"
     >
       <div :class="isAuthenticated ? 'space-y-4' : 'relative mx-auto max-w-[1400px] space-y-5'">
         <div v-if="!isAuthenticated" class="page-heading mb-4">
@@ -97,7 +110,12 @@
             />
           </div>
 
-          <FilterDropdown :active-count="activeFilterCount" :columns="3" keep-mounted @reset="resetPanelFilters">
+          <FilterDropdown
+            :active-count="activeFilterCount"
+            :columns="3"
+            keep-mounted
+            @reset="resetPanelFilters"
+          >
             <FilterField :label="t('marketplace.filterBrand')">
               <Select v-model="selectedBrand" :options="brandSelectOptions" />
             </FilterField>
@@ -115,8 +133,12 @@
         <div v-else-if="errorMessage" class="card border-red-200 p-6 dark:border-red-500/30">
           <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('common.error') }}</h2>
-              <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">{{ errorMessage }}</p>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{
+                t('common.error')
+              }}</h2>
+              <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">{{
+                errorMessage
+              }}</p>
             </div>
             <button class="btn btn-primary" type="button" @click="fetchMarketplace">
               {{ t('common.refresh') }}
@@ -125,11 +147,17 @@
         </div>
 
         <div v-else-if="!hasMarketplaceResults" class="card px-6 py-14">
-          <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-surface bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-300">
+          <div
+            class="mx-auto flex h-16 w-16 items-center justify-center rounded-surface bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-300"
+          >
             <Icon name="inbox" size="xl" />
           </div>
-          <h2 class="mt-6 text-center text-2xl font-semibold text-gray-950 dark:text-white">{{ t('marketplace.emptyTitle') }}</h2>
-          <p class="mx-auto mt-3 max-w-xl text-center text-sm leading-7 text-gray-600 dark:text-dark-300">
+          <h2 class="mt-6 text-center text-2xl font-semibold text-gray-950 dark:text-white">{{
+            t('marketplace.emptyTitle')
+          }}</h2>
+          <p
+            class="mx-auto mt-3 max-w-xl text-center text-sm leading-7 text-gray-600 dark:text-dark-300"
+          >
             {{ t('marketplace.emptyDescription') }}
           </p>
           <div class="mt-6 text-center">
@@ -146,14 +174,16 @@
             class="card overflow-hidden"
             data-testid="marketplace-group-section"
           >
-            <div class="card-header flex flex-col gap-4 px-4 py-4 md:px-5 xl:flex-row xl:items-center xl:justify-between">
+            <div
+              class="card-header flex flex-col gap-4 px-4 py-4 md:px-5 xl:flex-row xl:items-center xl:justify-between"
+            >
               <div class="min-w-0 flex-1 space-y-3">
                 <div class="flex flex-wrap items-center gap-2">
                   <span :class="brandBadgeClass(group)">
                     <ProviderIcon :brand="groupBrandSource(group)" size="14px" />
                     {{ groupBrandLabel(group) }}
                   </span>
-                  <!-- 分组头部展示相对官方价的最高优惠，无有效折扣数据时不渲染该标签；点击/悬停查看说明。 -->
+                  <!-- A valid group discount appears beside its heading, with hover and click access to its explanation. -->
                   <HelpTooltip
                     v-if="formatMaxDiscountOff(group.official_price_ratio)"
                     trigger="both"
@@ -177,7 +207,7 @@
                     :content="t('marketplace.rateMultiplierHint')"
                   >
                     <template #trigger>
-                      <!-- 倍率使用中性填充，深色底与卡片拉开层次。 -->
+                      <!-- Neutral multiplier surfaces remain distinct from the surrounding dark card. -->
                       <span
                         data-testid="group-rate-multiplier-tag"
                         class="rounded-full border border-gray-200/80 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-600 dark:border-dark-600 dark:bg-dark-700/60 dark:text-dark-200"
@@ -189,12 +219,19 @@
                 </div>
 
                 <div class="flex items-start gap-3">
-                  <span class="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-surface border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-950">
+                  <span
+                    class="mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-surface border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-950"
+                  >
                     <ProviderIcon :brand="groupBrandSource(group)" size="28px" />
                   </span>
                   <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-gray-950 dark:text-white">{{ group.name }}</h2>
-                    <p v-if="group.description" class="mt-1 text-sm leading-6 text-gray-600 dark:text-dark-300">
+                    <h2 class="text-lg font-semibold text-gray-950 dark:text-white">{{
+                      group.name
+                    }}</h2>
+                    <p
+                      v-if="group.description"
+                      class="mt-1 text-sm leading-6 text-gray-600 dark:text-dark-300"
+                    >
                       {{ group.description }}
                     </p>
                   </div>
@@ -205,15 +242,14 @@
                 class="w-full xl:ml-6 xl:w-[560px] xl:shrink-0"
                 data-testid="marketplace-group-availability"
               >
-                <!-- 用户侧只展示可用率，并利用释放出的空间将状态条靠右放置。 -->
-                <GroupAvailabilityBar
-                  :availability="group.availability"
-                  class="min-w-0"
-                />
+                <!-- The public availability summary aligns its status bar with the right side of the group heading. -->
+                <GroupAvailabilityBar :availability="group.availability" class="min-w-0" />
               </div>
             </div>
 
-            <div class="border-t border-gray-100 bg-primary-50/40 p-3 dark:border-dark-700 dark:bg-primary-500/5">
+            <div
+              class="border-t border-gray-100 bg-primary-50/40 p-3 dark:border-dark-700 dark:bg-primary-500/5"
+            >
               <!-- Page navigation scrolls here with room for the fixed header and its content spacing. -->
               <button
                 :id="`marketplace-group-toggle-${group.id}`"
@@ -225,8 +261,16 @@
                 @click="toggleGroupModels(group.id)"
               >
                 <span class="flex min-w-0 flex-wrap items-center gap-2">
-                  <span class="font-semibold">{{ t(groupExpansion.get(group.id) === true ? 'marketplace.collapseModels' : 'marketplace.expandModels') }}</span>
-                  <span class="rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium tabular-nums">
+                  <span class="font-semibold">{{
+                    t(
+                      groupExpansion.get(group.id) === true
+                        ? 'marketplace.collapseModels'
+                        : 'marketplace.expandModels',
+                    )
+                  }}</span>
+                  <span
+                    class="rounded-full bg-white/20 px-2 py-0.5 text-xs font-medium tabular-nums"
+                  >
                     {{ t('marketplace.groupModelCount', { count: group.model_count }) }}
                   </span>
                 </span>
@@ -246,7 +290,9 @@
               :aria-labelledby="`marketplace-group-toggle-${group.id}`"
             >
               <div v-if="groupExpansion.has(group.id)">
-                <div class="grid min-w-0 grid-cols-1 items-start gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 md:p-5">
+                <div
+                  class="grid min-w-0 grid-cols-1 items-start gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 md:p-5"
+                >
                   <!-- Narrow layouts keep cards in one column; the grid grows to three columns when space permits. -->
                   <article
                     v-for="model in group.pageModels"
@@ -255,10 +301,15 @@
                   >
                     <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
                       <div class="flex min-w-0 flex-1 basis-32 items-center">
-                        <h3 class="min-w-0 truncate text-base font-semibold text-gray-950 dark:text-white">{{ model.display_name }}</h3>
+                        <h3
+                          class="min-w-0 truncate text-base font-semibold text-gray-950 dark:text-white"
+                          >{{ model.display_name }}</h3
+                        >
                         <!-- The information button groups attributes and protocols beside the model name, leaving card space for prices. -->
                         <ModelAttributeDetails
-                          v-if="model.attributes || marketplaceProtocols(model.protocols).length > 0"
+                          v-if="
+                            model.attributes || marketplaceProtocols(model.protocols).length > 0
+                          "
                           :model="model"
                           class="shrink-0"
                         />
@@ -277,8 +328,13 @@
                             :key="row.key"
                             class="flex items-baseline justify-between gap-3 text-sm"
                           >
-                            <dt class="shrink-0 text-gray-500 dark:text-dark-400">{{ row.label }}</dt>
-                            <dd class="min-w-0 break-words text-right font-medium tabular-nums [overflow-wrap:anywhere] text-gray-900 dark:text-white">{{ row.value }}</dd>
+                            <dt class="shrink-0 text-gray-500 dark:text-dark-400">{{
+                              row.label
+                            }}</dt>
+                            <dd
+                              class="min-w-0 break-words text-right font-medium tabular-nums [overflow-wrap:anywhere] text-gray-900 dark:text-white"
+                              >{{ row.value }}</dd
+                            >
                           </div>
                         </dl>
                       </template>
@@ -336,12 +392,20 @@ import Pagination from '@/components/common/Pagination.vue'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 import { initTheme, useTheme } from '@/composables/useTheme'
 import { getMarketplaceModels } from '@/api/marketplace'
-import { providerBrandDisplayName, providerBrandFilterKey, resolveProviderBrand } from '@/utils/providerBrand'
+import {
+  providerBrandDisplayName,
+  providerBrandFilterKey,
+  resolveProviderBrand,
+} from '@/utils/providerBrand'
 import { formatCompactTokenRange } from '@/utils/formatters'
 import { formatPriceNumber, pricingKind, videoPricingEntries } from '@/utils/marketplacePricing'
 import { marketplaceProtocols } from '@/utils/marketplaceProtocols'
 import { sanitizeUrl } from '@/utils/url'
-import type { MarketplaceGroup, MarketplaceModelPricing, MarketplacePricingInterval } from '@/types'
+import type {
+  MarketplaceGroup,
+  MarketplaceModelPricing,
+  MarketplacePricingInterval,
+} from '@/api/marketplace.types'
 
 import { useAppStore, useAuthStore } from '@/stores'
 
@@ -401,19 +465,29 @@ const groupPages = ref<Record<number, number>>({})
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 const siteName = computed(() => appStore.siteName || 'TokenRouter')
-const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
-const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
+const siteLogo = computed(() =>
+  sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', {
+    allowRelative: true,
+    allowDataUrl: true,
+  }),
+)
+const docUrl = computed(() =>
+  sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''),
+)
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
 watch([normalizedSearch, selectedBrand, selectedPricingMode, selectedGroupId], () => {
   groupPages.value = {}
 })
 
-const activeFilterCount = computed(() => [
-  selectedBrand.value !== 'all' ? selectedBrand.value : '',
-  selectedPricingMode.value !== 'all' ? selectedPricingMode.value : '',
-  selectedGroupId.value !== 'all' ? selectedGroupId.value : '',
-].filter(Boolean).length)
+const activeFilterCount = computed(
+  () =>
+    [
+      selectedBrand.value !== 'all' ? selectedBrand.value : '',
+      selectedPricingMode.value !== 'all' ? selectedPricingMode.value : '',
+      selectedGroupId.value !== 'all' ? selectedGroupId.value : '',
+    ].filter(Boolean).length,
+)
 
 const sortedGroups = computed(() =>
   [...groups.value].sort((left, right) => {
@@ -422,7 +496,7 @@ const sortedGroups = computed(() =>
       return sortDiff
     }
     return left.id - right.id
-  })
+  }),
 )
 
 const availableBrands = computed(() => {
@@ -474,7 +548,10 @@ const filteredGroups = computed<VisibleMarketplaceGroup[]>(() => {
   const keyword = normalizedSearch.value
 
   return sortedGroups.value.flatMap((group) => {
-    if (selectedBrand.value !== 'all' && brandKey(groupBrandLabel(group)) !== brandKey(selectedBrand.value)) {
+    if (
+      selectedBrand.value !== 'all' &&
+      brandKey(groupBrandLabel(group)) !== brandKey(selectedBrand.value)
+    ) {
       return []
     }
 
@@ -482,12 +559,23 @@ const filteredGroups = computed<VisibleMarketplaceGroup[]>(() => {
       return []
     }
 
-    const groupMatchesKeyword = !keyword || [group.name, group.description, groupBrandSource(group), groupBrandLabel(group), ...(group.search_terms || [])]
-      .filter(Boolean)
-      .some((value) => value.toLowerCase().includes(keyword))
+    const groupMatchesKeyword =
+      !keyword ||
+      [
+        group.name,
+        group.description,
+        groupBrandSource(group),
+        groupBrandLabel(group),
+        ...(group.search_terms || []),
+      ]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(keyword))
 
     const models = group.models.filter((model) => {
-      if (selectedPricingMode.value !== 'all' && pricingKind(model.pricing) !== selectedPricingMode.value) {
+      if (
+        selectedPricingMode.value !== 'all' &&
+        pricingKind(model.pricing) !== selectedPricingMode.value
+      ) {
         return false
       }
 
@@ -495,22 +583,29 @@ const filteredGroups = computed<VisibleMarketplaceGroup[]>(() => {
         return true
       }
 
-      return [model.id, model.display_name, ...(model.attributes?.search_terms || [])].some((value) => value.toLowerCase().includes(keyword))
+      return [model.id, model.display_name, ...(model.attributes?.search_terms || [])].some(
+        (value) => value.toLowerCase().includes(keyword),
+      )
     })
 
     if (models.length === 0) {
       return []
     }
 
-    const page = Math.min(groupPages.value[group.id] ?? 1, Math.ceil(models.length / MODEL_PAGE_SIZE))
+    const page = Math.min(
+      groupPages.value[group.id] ?? 1,
+      Math.ceil(models.length / MODEL_PAGE_SIZE),
+    )
     const start = (page - 1) * MODEL_PAGE_SIZE
-    return [{
-      ...group,
-      model_count: models.length,
-      models,
-      page,
-      pageModels: models.slice(start, start + MODEL_PAGE_SIZE),
-    }]
+    return [
+      {
+        ...group,
+        model_count: models.length,
+        models,
+        page,
+        pageModels: models.slice(start, start + MODEL_PAGE_SIZE),
+      },
+    ]
   })
 })
 
@@ -536,11 +631,11 @@ function hasPositiveValue(value?: number | null): value is number {
 }
 
 function hasContextIntervalPricing(pricing: MarketplaceModelPricing): boolean {
-  // 缺价范围由后端排除，已返回的零价区间仍需展示范围标签。
+  // The backend omits unpriced ranges; returned zero-price intervals still need their range labels for interpretation.
   return (pricing.context_intervals?.length ?? 0) > 0
 }
 
-// 面板内重置只清空下拉条件；空结果页的重置还会一并清空搜索词。
+// Panel reset clears dropdown filters, while empty-state reset also clears the search term so catalog results can return.
 function resetPanelFilters() {
   selectedBrand.value = 'all'
   selectedPricingMode.value = 'all'
@@ -556,13 +651,12 @@ function formatMultiplier(multiplier: number): string {
   return `x${multiplier.toFixed(multiplier % 1 === 0 ? 0 : 2)}`
 }
 
-// 分组倍率文案由 i18n 按各语言的空格规则拼接。
+// Group multiplier labels use localized spacing rules alongside their formatted numeric values.
 function formatRateMultiplierLabel(multiplier: number): string {
   return t('marketplace.rateMultiplierValue', { multiplier: formatMultiplier(multiplier) })
 }
 
-
-// 生成分组相对官方价的最高优惠文案，与首页精选卡片使用相同算法。比例缺失、非法或不低于 1（无折扣）时返回 null。
+// groupDiscountText formats the greatest official-price discount using the home-page ratio calculation. Missing, invalid, or undiscounted ratios return null so callers omit the badge.
 function formatMaxDiscountOff(ratio?: number): string | null {
   if (typeof ratio !== 'number' || !Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) {
     return null
@@ -572,7 +666,6 @@ function formatMaxDiscountOff(ratio?: number): string | null {
   }).format((1 - ratio) * 100)
   return t('marketplace.maxDiscountOff', { percent })
 }
-
 
 function formatPrice(value: number): string {
   return `${formatPriceNumber(value)} ${balanceUnitName.value}`
@@ -603,66 +696,135 @@ function brandKey(label: string): string {
 }
 
 function brandBadgeClass(group: MarketplaceGroup): string {
-  const base = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset'
+  const base =
+    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset'
   return `${base} ${resolveProviderBrand(groupBrandSource(group)).badgeClass}`
 }
 
-function tokenPricingRowsFromValues(pricing: MarketplaceModelPricing | MarketplacePricingInterval): PricingRow[] {
+function tokenPricingRowsFromValues(
+  pricing: MarketplaceModelPricing | MarketplacePricingInterval,
+): PricingRow[] {
   const rows: PricingRow[] = []
 
   if (hasPositiveValue(pricing.input_price_per_token)) {
-    rows.push({ key: 'input', label: t('marketplace.input'), value: formatPerMillion(pricing.input_price_per_token) })
+    rows.push({
+      key: 'input',
+      label: t('marketplace.input'),
+      value: formatPerMillion(pricing.input_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.image_input_price_per_token)) {
-    rows.push({ key: 'image_input', label: t('marketplace.imageInput'), value: formatPerMillion(pricing.image_input_price_per_token) })
+    rows.push({
+      key: 'image_input',
+      label: t('marketplace.imageInput'),
+      value: formatPerMillion(pricing.image_input_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.output_price_per_token)) {
-    rows.push({ key: 'output', label: t('marketplace.output'), value: formatPerMillion(pricing.output_price_per_token) })
+    rows.push({
+      key: 'output',
+      label: t('marketplace.output'),
+      value: formatPerMillion(pricing.output_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.cache_write_price_per_token)) {
-    rows.push({ key: 'cache_write', label: t('marketplace.cacheWrite'), value: formatPerMillion(pricing.cache_write_price_per_token) })
+    rows.push({
+      key: 'cache_write',
+      label: t('marketplace.cacheWrite'),
+      value: formatPerMillion(pricing.cache_write_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.cache_write_1h_price_per_token)) {
-    rows.push({ key: 'cache_write_1h', label: t('marketplace.cacheWrite1h'), value: formatPerMillion(pricing.cache_write_1h_price_per_token) })
+    rows.push({
+      key: 'cache_write_1h',
+      label: t('marketplace.cacheWrite1h'),
+      value: formatPerMillion(pricing.cache_write_1h_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.cache_read_price_per_token)) {
-    rows.push({ key: 'cache_read', label: t('marketplace.cacheRead'), value: formatPerMillion(pricing.cache_read_price_per_token) })
+    rows.push({
+      key: 'cache_read',
+      label: t('marketplace.cacheRead'),
+      value: formatPerMillion(pricing.cache_read_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.image_output_price_per_token)) {
-    rows.push({ key: 'image_output', label: t('marketplace.imageOutput'), value: formatPerMillion(pricing.image_output_price_per_token) })
+    rows.push({
+      key: 'image_output',
+      label: t('marketplace.imageOutput'),
+      value: formatPerMillion(pricing.image_output_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.fast_input_price_per_token)) {
-    rows.push({ key: 'fast_input', label: t('marketplace.fastInput'), value: formatPerMillion(pricing.fast_input_price_per_token) })
+    rows.push({
+      key: 'fast_input',
+      label: t('marketplace.fastInput'),
+      value: formatPerMillion(pricing.fast_input_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.fast_image_input_price_per_token)) {
-    rows.push({ key: 'fast_image_input', label: t('marketplace.fastImageInput'), value: formatPerMillion(pricing.fast_image_input_price_per_token) })
+    rows.push({
+      key: 'fast_image_input',
+      label: t('marketplace.fastImageInput'),
+      value: formatPerMillion(pricing.fast_image_input_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.fast_output_price_per_token)) {
-    rows.push({ key: 'fast_output', label: t('marketplace.fastOutput'), value: formatPerMillion(pricing.fast_output_price_per_token) })
+    rows.push({
+      key: 'fast_output',
+      label: t('marketplace.fastOutput'),
+      value: formatPerMillion(pricing.fast_output_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.fast_cache_write_price_per_token)) {
-    rows.push({ key: 'fast_cache_write', label: t('marketplace.fastCacheWrite'), value: formatPerMillion(pricing.fast_cache_write_price_per_token) })
+    rows.push({
+      key: 'fast_cache_write',
+      label: t('marketplace.fastCacheWrite'),
+      value: formatPerMillion(pricing.fast_cache_write_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.fast_cache_write_1h_price_per_token)) {
-    rows.push({ key: 'fast_cache_write_1h', label: t('marketplace.fastCacheWrite1h'), value: formatPerMillion(pricing.fast_cache_write_1h_price_per_token) })
+    rows.push({
+      key: 'fast_cache_write_1h',
+      label: t('marketplace.fastCacheWrite1h'),
+      value: formatPerMillion(pricing.fast_cache_write_1h_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.fast_cache_read_price_per_token)) {
-    rows.push({ key: 'fast_cache_read', label: t('marketplace.fastCacheRead'), value: formatPerMillion(pricing.fast_cache_read_price_per_token) })
+    rows.push({
+      key: 'fast_cache_read',
+      label: t('marketplace.fastCacheRead'),
+      value: formatPerMillion(pricing.fast_cache_read_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.fast_image_output_price_per_token)) {
-    rows.push({ key: 'fast_image_output', label: t('marketplace.fastImageOutput'), value: formatPerMillion(pricing.fast_image_output_price_per_token) })
+    rows.push({
+      key: 'fast_image_output',
+      label: t('marketplace.fastImageOutput'),
+      value: formatPerMillion(pricing.fast_image_output_price_per_token),
+    })
   }
 
   return rows
 }
 
-function compactTokenPricingRows(pricing: MarketplaceModelPricing | MarketplacePricingInterval): PricingRow[] {
+function compactTokenPricingRows(
+  pricing: MarketplaceModelPricing | MarketplacePricingInterval,
+): PricingRow[] {
   const primaryRows: PricingRow[] = []
   if (hasPositiveValue(pricing.input_price_per_token)) {
-    primaryRows.push({ key: 'input', label: t('marketplace.input'), value: formatPerMillion(pricing.input_price_per_token) })
+    primaryRows.push({
+      key: 'input',
+      label: t('marketplace.input'),
+      value: formatPerMillion(pricing.input_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.output_price_per_token)) {
-    primaryRows.push({ key: 'output', label: t('marketplace.output'), value: formatPerMillion(pricing.output_price_per_token) })
+    primaryRows.push({
+      key: 'output',
+      label: t('marketplace.output'),
+      value: formatPerMillion(pricing.output_price_per_token),
+    })
   }
   if (primaryRows.length > 0) {
     return primaryRows
@@ -673,9 +835,7 @@ function compactTokenPricingRows(pricing: MarketplaceModelPricing | MarketplaceP
     return zeroTokenPricingRows()
   }
 
-  return rows
-    .filter((row) => !row.key.startsWith('fast_'))
-    .slice(0, 2)
+  return rows.filter((row) => !row.key.startsWith('fast_')).slice(0, 2)
 }
 
 function zeroTokenPricingRows(): PricingRow[] {
@@ -686,24 +846,36 @@ function zeroTokenPricingRows(): PricingRow[] {
 }
 
 function compactContextIntervalRows(pricing: MarketplaceModelPricing): PricingRow[] {
-  return pricing.context_intervals?.flatMap((interval, index) => {
-    const pricedRows = compactIntervalTokenPricingRows(interval)
-    const rows = pricedRows.length > 0 ? pricedRows : zeroTokenPricingRows()
-    return [{
-      key: `compact-${interval.min_tokens}-${interval.max_tokens ?? 'up'}-${index}`,
-      label: formatCompactTokenRange(interval.min_tokens, interval.max_tokens),
-      value: rows.map((row) => `${row.label} ${row.value}`).join(' / '),
-    }]
-  }) ?? []
+  return (
+    pricing.context_intervals?.flatMap((interval, index) => {
+      const pricedRows = compactIntervalTokenPricingRows(interval)
+      const rows = pricedRows.length > 0 ? pricedRows : zeroTokenPricingRows()
+      return [
+        {
+          key: `compact-${interval.min_tokens}-${interval.max_tokens ?? 'up'}-${index}`,
+          label: formatCompactTokenRange(interval.min_tokens, interval.max_tokens),
+          value: rows.map((row) => `${row.label} ${row.value}`).join(' / '),
+        },
+      ]
+    }) ?? []
+  )
 }
 
 function compactIntervalTokenPricingRows(pricing: MarketplacePricingInterval): PricingRow[] {
   const rows: PricingRow[] = []
   if (hasPositiveValue(pricing.input_price_per_token)) {
-    rows.push({ key: 'input', label: t('marketplace.input'), value: formatCompactPerMillion(pricing.input_price_per_token) })
+    rows.push({
+      key: 'input',
+      label: t('marketplace.input'),
+      value: formatCompactPerMillion(pricing.input_price_per_token),
+    })
   }
   if (hasPositiveValue(pricing.output_price_per_token)) {
-    rows.push({ key: 'output', label: t('marketplace.output'), value: formatCompactPerMillion(pricing.output_price_per_token) })
+    rows.push({
+      key: 'output',
+      label: t('marketplace.output'),
+      value: formatCompactPerMillion(pricing.output_price_per_token),
+    })
   }
   if (rows.length > 0) {
     return rows
@@ -742,7 +914,7 @@ function compactPricingRows(pricing: MarketplaceModelPricing): PricingRow[] {
  * translated label, and every row retains the per-second billing unit.
  */
 function videoPricingRows(pricing: MarketplaceModelPricing): PricingRow[] {
-  return videoPricingEntries(pricing).map(item => ({
+  return videoPricingEntries(pricing).map((item) => ({
     key: item.key,
     label: item.resolution ?? t('marketplace.defaultVideoPrice'),
     value: `${formatPrice(item.price)} ${t('marketplace.perSecond')}`,
@@ -761,11 +933,13 @@ function imagePricingRows(pricing: MarketplaceModelPricing): PricingRow[] {
       return []
     }
 
-    return [{
-      key: item.key,
-      label: item.label,
-      value: formatPerImage(item.price),
-    }]
+    return [
+      {
+        key: item.key,
+        label: item.label,
+        value: formatPerImage(item.price),
+      },
+    ]
   })
 }
 

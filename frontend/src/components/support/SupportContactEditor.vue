@@ -63,7 +63,7 @@ import ImageUpload from '@/components/common/ImageUpload.vue'
 import {
   parseSupportContacts,
   serializeSupportContacts,
-  type SupportContact
+  type SupportContact,
 } from '@/utils/supportContacts'
 
 // SupportContactEditor.vue edits labeled support addresses and optional QR images
@@ -90,7 +90,7 @@ watch(
     if (value === lastPublished) return
     lastPublished = value
     entries.value = parseSupportContacts(value)
-  }
+  },
 )
 
 /** publish emits the current editable rows through the localized string field. */

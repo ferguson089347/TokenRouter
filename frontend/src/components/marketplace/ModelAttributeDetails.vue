@@ -47,7 +47,8 @@ import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import ModelAttributesSummary from '@/components/common/ModelAttributesSummary.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ModelProtocolChips from './ModelProtocolChips.vue'
-import type { MarketplaceModel, ProtocolID } from '@/types'
+import type { MarketplaceModel } from '@/api/marketplace.types'
+import type { ProtocolID } from '@/api/protocols.types'
 
 // ModelAttributeDetails.vue owns one marketplace model's protocol selection and
 // attribute panel. Cards retain their overall modality summary while this panel
@@ -61,6 +62,8 @@ import type { MarketplaceModel, ProtocolID } from '@/types'
 // detail children close, keeping the trigger and its accessibility relationship
 // available for the next inspection.
 
+// The supplied model and localization service provide content for this panel;
+// selection stays local and does not alter the parent's marketplace record.
 const props = defineProps<{
   model: MarketplaceModel // Public model and protocol display attributes.
 }>()
@@ -71,11 +74,20 @@ const selected = ref<ProtocolID | null>(null)
 // panelOpen defers protocol selectors and attribute rows until the visitor opens
 // this model's tooltip; the HelpTooltip wrapper retains its anchor and focus handling.
 const panelOpen = ref(false)
-const selectable = computed(() => !!props.model.attributes && !!props.model.protocols?.length && !!props.model.protocol_attributes &&
-  (props.model.protocols ?? []).every(protocol => !!props.model.protocol_attributes?.[protocol]))
-const activeAttributes = computed(() => selected.value && selectable.value
-  ? props.model.protocol_attributes?.[selected.value]
-  : props.model.attributes)
+const selectable = computed(
+  () =>
+    !!props.model.attributes &&
+    !!props.model.protocols?.length &&
+    !!props.model.protocol_attributes &&
+    (props.model.protocols ?? []).every(
+      (protocol) => !!props.model.protocol_attributes?.[protocol],
+    ),
+)
+const activeAttributes = computed(() =>
+  selected.value && selectable.value
+    ? props.model.protocol_attributes?.[selected.value]
+    : props.model.attributes,
+)
 
 // onOpenChange mounts detail content when the tooltip reports an opening.
 // Dismissal clears the selected protocol so the next inspection starts with all
@@ -85,5 +97,12 @@ function onOpenChange(open: boolean) {
   if (!open) selected.value = null
 }
 
-watch(() => props.model, () => { selected.value = null })
+// A replacement model reference starts a fresh inspection; nested mutations of
+// the same record do not trigger this shallow selection-reset watcher.
+watch(
+  () => props.model,
+  () => {
+    selected.value = null
+  },
+)
 </script>

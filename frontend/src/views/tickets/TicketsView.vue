@@ -19,17 +19,10 @@
     <!-- The shared table shows field cards on narrow screens and a scrollable table on desktop. -->
     <TablePageLayout v-else class="ticket-list">
       <template #filters>
-        <div
-          class="flex flex-col-reverse gap-2 lg:flex-row lg:items-start lg:justify-between"
-        >
-          <form
-            class="flex min-w-0 flex-1 items-center gap-2"
-            @submit.prevent="search"
-          >
+        <div class="flex flex-col-reverse gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <form class="flex min-w-0 flex-1 items-center gap-2" @submit.prevent="search">
             <div class="min-w-0 flex-1">
-              <label class="sr-only" for="filter-ticket-query">{{
-                t('tickets.search')
-              }}</label>
+              <label class="sr-only" for="filter-ticket-query">{{ t('tickets.search') }}</label>
               <input
                 id="filter-ticket-query"
                 v-model="filters.q"
@@ -45,28 +38,18 @@
             <FilterDropdown
               keep-mounted
               :active-count="
-                [filters.type, filters.status, filters.priority].filter(Boolean)
-                  .length
+                [filters.type, filters.status, filters.priority].filter(Boolean).length
               "
               @reset="resetFilters"
             >
               <FilterField :label="t('tickets.type')"
-                ><Select
-                  v-model="filters.type"
-                  :options="typeOptions"
-                  @change="search"
+                ><Select v-model="filters.type" :options="typeOptions" @change="search"
               /></FilterField>
               <FilterField :label="t('tickets.status')"
-                ><Select
-                  v-model="filters.status"
-                  :options="statusOptions"
-                  @change="search"
+                ><Select v-model="filters.status" :options="statusOptions" @change="search"
               /></FilterField>
               <FilterField :label="t('tickets.priority')"
-                ><Select
-                  v-model="filters.priority"
-                  :options="priorityOptions"
-                  @change="search"
+                ><Select v-model="filters.priority" :options="priorityOptions" @change="search"
               /></FilterField>
             </FilterDropdown>
           </form>
@@ -90,11 +73,7 @@
             </button>
           </div>
         </div>
-        <p
-          v-if="error"
-          role="alert"
-          class="mt-3 break-words text-sm text-red-600"
-        >
+        <p v-if="error" role="alert" class="mt-3 break-words text-sm text-red-600">
           {{ error }}
         </p>
       </template>
@@ -122,9 +101,7 @@
               class="block max-w-full truncate font-medium text-primary-600 hover:underline dark:text-primary-400 lg:max-w-sm"
               >{{ ticket.title }}</RouterLink
             >
-            <span class="mt-1 block text-xs text-gray-400"
-              >#{{ ticket.id }}</span
-            >
+            <span class="mt-1 block text-xs text-gray-400">#{{ ticket.id }}</span>
           </template>
           <template #cell-user="{ row: ticket }">
             <p class="truncate lg:max-w-56" :title="ticket.user_name">
@@ -137,9 +114,7 @@
               {{ ticket.user_email }}
             </p>
           </template>
-          <template #cell-type="{ row: ticket }">{{
-            t(`tickets.types.${ticket.type}`)
-          }}</template>
+          <template #cell-type="{ row: ticket }">{{ t(`tickets.types.${ticket.type}`) }}</template>
           <template #cell-priority="{ row: ticket }"
             ><TicketBadge kind="priority" :value="ticket.priority"
           /></template>
@@ -155,10 +130,7 @@
             }}</span></template
           >
           <template #cell-actions="{ row: ticket }">
-            <div
-              v-if="isOpen(ticket)"
-              class="flex justify-end gap-2 lg:justify-start"
-            >
+            <div v-if="isOpen(ticket)" class="flex justify-end gap-2 lg:justify-start">
               <button
                 type="button"
                 class="btn btn-secondary min- flex-1 lg:flex-none"
@@ -201,19 +173,9 @@
     />
     <ConfirmDialog
       :show="!!closeTarget"
-      :title="
-        t(
-          closeTarget?.action === 'cancel'
-            ? 'tickets.cancel'
-            : 'tickets.complete',
-        )
-      "
+      :title="t(closeTarget?.action === 'cancel' ? 'tickets.cancel' : 'tickets.complete')"
       :message="
-        t(
-          closeTarget?.action === 'cancel'
-            ? 'tickets.cancelConfirm'
-            : 'tickets.completeConfirm',
-        )
+        t(closeTarget?.action === 'cancel' ? 'tickets.cancelConfirm' : 'tickets.completeConfirm')
       "
       :danger="closeTarget?.action === 'cancel'"
       :loading="closing"
@@ -232,10 +194,10 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-import DataTable from '@/components/common/DataTable.vue'
+import DataTable from '@/components/common/table/DataTable.vue'
 import FilterDropdown from '@/components/common/FilterDropdown.vue'
 import FilterField from '@/components/common/FilterField.vue'
-import type { Column } from '@/components/common/types'
+import type { Column } from '@/components/common/table/types'
 import Select from '@/components/common/Select.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -345,8 +307,7 @@ function markDisabled() {
 // unrecognized server responses out of the visible conversation state.
 function handleError(err: unknown, fallback: string) {
   if (extractApiErrorCode(err) === 'TICKET_DISABLED') markDisabled()
-  else
-    error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t(fallback))
+  else error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t(fallback))
 }
 
 // load reads current ticket configuration and the requested visible list page.
@@ -420,14 +381,12 @@ function created(ticket: Ticket) {
   showCreate.value = false
   void router.push(`${base.value}/${ticket.id}`)
 }
-const isOpen = (ticket: Ticket) =>
-  ['pending', 'waiting_user'].includes(ticket.status)
+const isOpen = (ticket: Ticket) => ['pending', 'waiting_user'].includes(ticket.status)
 // requestClose opens confirmation for an open ticket when support is available.
 // Busy closure requests and terminal tickets leave the dialog unchanged,
 // matching the server lifecycle restrictions.
 function requestClose(ticket: Ticket, action: 'cancel' | 'complete') {
-  if (!closing.value && !disabled.value && isOpen(ticket))
-    closeTarget.value = { ticket, action }
+  if (!closing.value && !disabled.value && isOpen(ticket)) closeTarget.value = { ticket, action }
 }
 // closeTicket submits the confirmed terminal action and reloads the support
 // list. It invalidates pending list reads before mutation so a late response

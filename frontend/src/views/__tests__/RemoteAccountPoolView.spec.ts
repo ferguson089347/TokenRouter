@@ -99,10 +99,7 @@ describe('RemoteAccountPoolView', () => {
     expect(api.getSettings).not.toHaveBeenCalled()
     expect(api.sourceGroups).not.toHaveBeenCalled()
     expect(api.options).toHaveBeenCalledWith(expect.any(AbortSignal))
-    expect(api.list).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.any(AbortSignal),
-    )
+    expect(api.list).toHaveBeenCalledWith(expect.any(Object), expect.any(AbortSignal))
     expect(wrapper.text()).toContain('remotePool.staleHint')
     expect(wrapper.text()).toContain('Cached account')
     expect(wrapper.text()).toContain('Local group')
@@ -110,13 +107,9 @@ describe('RemoteAccountPoolView', () => {
     expect(wrapper.find('input[type="password"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('AC-LOCALREFERENCE')
     const windows = wrapper.findAllComponents(UsageProgressBar)
-    expect(windows.map((window) => window.props('utilization'))).toEqual([
-      4, 92,
-    ])
+    expect(windows.map((window) => window.props('utilization'))).toEqual([4, 92])
     expect(
-      wrapper
-        .findAll('[role="progressbar"]')
-        .map((window) => window.attributes('aria-valuenow')),
+      wrapper.findAll('[role="progressbar"]').map((window) => window.attributes('aria-valuenow')),
     ).toEqual(['4', '92'])
   })
   // Source measurements can be missing or exceed the displayed progress range.
@@ -140,9 +133,7 @@ describe('RemoteAccountPoolView', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('remotePool.usageUnknown')
     const windows = wrapper.findAll('[role="progressbar"]')
-    expect(windows.map((window) => window.attributes('aria-valuenow'))).toEqual(
-      ['0', '100'],
-    )
+    expect(windows.map((window) => window.attributes('aria-valuenow'))).toEqual(['0', '100'])
     expect(windows[1].attributes('aria-valuetext')).toBe('140%')
   })
   // Two list requests complete in reverse order. The older aborted response cannot replace rows belonging to the latest selected filters.

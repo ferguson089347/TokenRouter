@@ -12,6 +12,10 @@ import {
 } from '../results'
 import { runFixture, testFixture } from './fixtures'
 
+// results.spec.ts checks model quality result ordering, grouping, and display through
+// synthetic observations. It verifies status colors, bounded history, run selection, Markdown
+// sanitization, and permitted signed preview paths without executing generated model output.
+
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({ t: (key: string) => key }),
@@ -21,12 +25,8 @@ describe('检测结果展示契约', () => {
   it('明确未通过为红，执行异常与未知为黄，运行中保持灰色', () => {
     expect(resultColor(runFixture())).toContain('emerald')
     expect(resultColor(runFixture({ verdict: 'failed' }))).toContain('rose')
-    expect(
-      resultColor(runFixture({ status: 'error', verdict: 'failed' })),
-    ).toContain('amber')
-    expect(
-      resultStatus(runFixture({ status: 'running', verdict: 'failed' })),
-    ).toBe('running')
+    expect(resultColor(runFixture({ status: 'error', verdict: 'failed' }))).toContain('amber')
+    expect(resultStatus(runFixture({ status: 'running', verdict: 'failed' }))).toBe('running')
     expect(resultStatus(runFixture({ verdict: 'pending' }))).toBe('unknown')
   })
 
@@ -66,9 +66,7 @@ describe('检测结果展示契约', () => {
     })
     await wrapper.get('[data-run-id="run-1"]').trigger('click')
     expect(wrapper.emitted('select')?.[0]).toEqual([first])
-    expect(
-      wrapper.get('[data-run-id="run-2"]').attributes('disabled'),
-    ).toBeDefined()
+    expect(wrapper.get('[data-run-id="run-2"]').attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
 

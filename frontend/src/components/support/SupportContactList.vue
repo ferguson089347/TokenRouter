@@ -30,7 +30,7 @@
         class="block rounded-control border border-gray-200 bg-white p-2 dark:border-dark-600"
         :aria-label="
           t('common.supportContacts.previewLabel', {
-            label: entry.label || t('common.contactSupport')
+            label: entry.label || t('common.contactSupport'),
           })
         "
         @click="showImage(entry)"
@@ -87,9 +87,9 @@ const entries = computed(() =>
     .map((entry) => ({
       ...entry,
       url: safeContactUrl(entry.value),
-      image: safeContactUrl(entry.image, true)
+      image: safeContactUrl(entry.image, true),
     }))
-    .filter((entry) => entry.value || entry.image)
+    .filter((entry) => entry.value || entry.image),
 )
 
 /** copyValue copies a contact number and closes the owning navigation menu.

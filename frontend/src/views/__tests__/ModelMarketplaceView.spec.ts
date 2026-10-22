@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ModelMarketplaceView from '../ModelMarketplaceView.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { modelIconData } from '@/utils/modelIconData'
-import type { MarketplaceGroup, MarketplaceModelPricing } from '@/types'
+import type { MarketplaceGroup, MarketplaceModelPricing } from '@/api/marketplace.types'
+
+// ModelMarketplaceView.spec.ts exercises public model cards, filters, group disclosures, and
+// bounded pagination with catalog fixtures. It checks copied identifiers, capability
+// metadata, discount explanations, and pricing selection through mounted components while
+// replacing layout and network collaborators.
 
 const getMarketplaceModels = vi.hoisted(() => vi.fn())
 const checkAuth = vi.hoisted(() => vi.fn())
@@ -136,23 +141,21 @@ const unpricedPricing: MarketplaceModelPricing = {
 
 function marketplaceFixture(): MarketplaceGroup[] {
   return [
-	marketplaceGroup(1, 'Plus', [
+    marketplaceGroup(1, 'Plus', [
       marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing),
       marketplaceModel('legacy-unpriced', 'Legacy Unpriced', unpricedPricing),
     ]),
-	marketplaceGroup(2, 'Pro', [
-      marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing),
-    ]),
-	marketplaceGroup(3, 'Plus 2', [
-      marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing),
-    ]),
-	marketplaceGroup(4, 'Pro 2', [
-      marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing),
-    ]),
+    marketplaceGroup(2, 'Pro', [marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing)]),
+    marketplaceGroup(3, 'Plus 2', [marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing)]),
+    marketplaceGroup(4, 'Pro 2', [marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing)]),
   ]
 }
 
-function marketplaceGroup(id: number, name: string, models: MarketplaceGroup['models']): MarketplaceGroup {
+function marketplaceGroup(
+  id: number,
+  name: string,
+  models: MarketplaceGroup['models'],
+): MarketplaceGroup {
   return {
     id,
     name,
@@ -177,7 +180,11 @@ function marketplaceGroup(id: number, name: string, models: MarketplaceGroup['mo
   }
 }
 
-function marketplaceModel(id: string, displayName: string, pricing: MarketplaceModelPricing): MarketplaceGroup['models'][number] {
+function marketplaceModel(
+  id: string,
+  displayName: string,
+  pricing: MarketplaceModelPricing,
+): MarketplaceGroup['models'][number] {
   return {
     id,
     display_name: displayName,
@@ -213,10 +220,11 @@ async function mountMarketplace(expandGroups = true) {
   return wrapper
 }
 
-// HelpTooltip 通过 Teleport 挂到 body，隐藏时用 v-show（display:none）控制。
+// visibleTooltips selects body-mounted tooltip panels whose inline display permits interaction. Hidden teleported panels stay mounted, so assertions inspect their visibility before reading their content.
 function visibleTooltips() {
-  return Array.from(document.body.querySelectorAll<HTMLElement>('[role="tooltip"]'))
-    .filter((el) => el.style.display !== 'none')
+  return Array.from(document.body.querySelectorAll<HTMLElement>('[role="tooltip"]')).filter(
+    (el) => el.style.display !== 'none',
+  )
 }
 
 describe('ModelMarketplaceView', () => {
@@ -230,7 +238,12 @@ describe('ModelMarketplaceView', () => {
 
   it('取数期间保留模型卡片占位，不提前显示空状态', async () => {
     let resolveModels!: (value: MarketplaceGroup[]) => void
-    getMarketplaceModels.mockImplementationOnce(() => new Promise(resolve => { resolveModels = resolve }))
+    getMarketplaceModels.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveModels = resolve
+        }),
+    )
     const wrapper = await mountMarketplace()
     expect(wrapper.find('[data-testid="marketplace-skeleton"]').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('marketplace.emptyTitle')
@@ -249,7 +262,7 @@ describe('ModelMarketplaceView', () => {
     const toggles = wrapper.findAll('[data-testid="marketplace-group-toggle"]')
     const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
     expect(toggles).toHaveLength(4)
-    expect(toggles.every(toggle => toggle.attributes('aria-expanded') === 'false')).toBe(true)
+    expect(toggles.every((toggle) => toggle.attributes('aria-expanded') === 'false')).toBe(true)
     expect(wrapper.findAll('article')).toHaveLength(0)
     expect(toggles[0].text()).toContain('marketplace.expandModels')
     await toggles[0].trigger('click')
@@ -268,7 +281,9 @@ describe('ModelMarketplaceView', () => {
   // Large groups render a bounded page, and folding keeps those card instances.
   // Searching still inspects models beyond that page and returns to its first result.
   it('pages large groups, retains folded cards, and searches all models', async () => {
-    const models = Array.from({ length: 25 }, (_, index) => marketplaceModel(`model-${index}`, `Model ${index}`, tokenPricing))
+    const models = Array.from({ length: 25 }, (_, index) =>
+      marketplaceModel(`model-${index}`, `Model ${index}`, tokenPricing),
+    )
     getMarketplaceModels.mockResolvedValueOnce([marketplaceGroup(1, 'Large', models)])
     const wrapper = await mountMarketplace(false)
     const toggle = wrapper.get('[data-testid="marketplace-group-toggle"]')
@@ -320,12 +335,14 @@ describe('ModelMarketplaceView', () => {
     const wrapper = await mountMarketplace()
 
     expect(wrapper.findAll('[data-testid="group-capacity"]')).toHaveLength(0)
-    expect(wrapper.get('[data-testid="marketplace-group-availability"]').classes()).toContain('xl:w-[560px]')
+    expect(wrapper.get('[data-testid="marketplace-group-availability"]').classes()).toContain(
+      'xl:w-[560px]',
+    )
   })
 
   it('分组头部用最高优惠标签替换模型数标签，无有效折扣的分组不渲染', async () => {
     const fixture = marketplaceFixture()
-    // ratio >= 1 表示无折扣；undefined 表示后端未下发官方价比例。
+    // Ratios at or above one represent ordinary pricing; missing ratios mean the backend supplied no official-price comparison.
     fixture[1] = { ...fixture[1], official_price_ratio: 1.2 }
     fixture[2] = { ...fixture[2], official_price_ratio: undefined }
     getMarketplaceModels.mockResolvedValue(fixture)
@@ -333,28 +350,36 @@ describe('ModelMarketplaceView', () => {
     const wrapper = await mountMarketplace()
     const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
 
-    // fixture 中 group 1 的 official_price_ratio 为 0.1，即最高优惠 90%。
+    // Group one has an official-price ratio of one tenth, so its displayed maximum discount is ninety percent.
     expect(sections[0].text()).toContain('marketplace.maxDiscountOff 90')
     expect(sections[0].text()).not.toContain('marketplace.modelsStat')
     expect(sections[1].text()).not.toContain('marketplace.maxDiscountOff')
     expect(sections[2].text()).not.toContain('marketplace.maxDiscountOff')
     expect(sections[3].text()).toContain('marketplace.maxDiscountOff 60')
 
-    // 移动端点击 tag 也能查看说明：点击后弹出提示气泡。
+    // A mobile click opens the discount explanation through the same tooltip used for pointer hover.
     await sections[0].get('[data-testid="group-max-discount-tag"]').trigger('click')
     await nextTick()
-    expect(visibleTooltips().some((el) => el.textContent?.includes('marketplace.maxDiscountHint'))).toBe(true)
+    expect(
+      visibleTooltips().some((el) => el.textContent?.includes('marketplace.maxDiscountHint')),
+    ).toBe(true)
     await sections[0].get('[data-testid="group-rate-multiplier-tag"]').trigger('click')
     await nextTick()
-    expect(visibleTooltips().some((el) => el.textContent?.includes('marketplace.rateMultiplierHint'))).toBe(true)
+    expect(
+      visibleTooltips().some((el) => el.textContent?.includes('marketplace.rateMultiplierHint')),
+    ).toBe(true)
   })
 
   it('模型卡片摘要保留免费默认区间', async () => {
     const fixture = marketplaceFixture()
-    fixture[0].models[0].pricing = { pricing_mode: 'token', price_status: 'priced', context_intervals: [
-      { min_tokens: 0, max_tokens: 100 },
-      { min_tokens: 100, max_tokens: null, input_price_per_token: 0.000002 },
-    ] }
+    fixture[0].models[0].pricing = {
+      pricing_mode: 'token',
+      price_status: 'priced',
+      context_intervals: [
+        { min_tokens: 0, max_tokens: 100 },
+        { min_tokens: 100, max_tokens: null, input_price_per_token: 0.000002 },
+      ],
+    }
     getMarketplaceModels.mockResolvedValue(fixture)
     const wrapper = await mountMarketplace()
     const section = wrapper.findAll('[data-testid="marketplace-group-section"]')[0]
@@ -366,7 +391,7 @@ describe('ModelMarketplaceView', () => {
   it('模型卡片中的模型 ID 支持一键复制', async () => {
     const wrapper = await mountMarketplace()
 
-    // 卡片 ID 行的复制按钮直接复制模型 ID。
+    // The card identifier action sends its model ID directly to the clipboard helper.
     const cardCopyButtons = wrapper.findAll('[data-testid="model-id-copy"]')
     expect(cardCopyButtons.length).toBeGreaterThan(0)
     await cardCopyButtons[0].trigger('click')
@@ -378,12 +403,20 @@ describe('ModelMarketplaceView', () => {
 
     const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
     const gptCards = sections[0].findAll('article')
-    // fixture 中 gpt-5.5 定价数据带图片输入价，应展示 文字·图片 -> 文字。
-    expect(gptCards[0].get('[data-testid="model-capability-tags"]').findAll('[data-modality]').map((tag) => tag.attributes('data-modality')))
-      .toEqual(['input-text', 'input-image', 'output-text'])
-    // 无定价数据的模型回退为纯文本能力。
-    expect(gptCards[1].get('[data-testid="model-capability-tags"]').findAll('[data-modality]').map((tag) => tag.attributes('data-modality')))
-      .toEqual(['input-text', 'output-text'])
+    // The fixture includes image input pricing, so its capabilities include text and image input with text output.
+    expect(
+      gptCards[0]
+        .get('[data-testid="model-capability-tags"]')
+        .findAll('[data-modality]')
+        .map((tag) => tag.attributes('data-modality')),
+    ).toEqual(['input-text', 'input-image', 'output-text'])
+    // A model without pricing observations uses the default text input and output capability labels.
+    expect(
+      gptCards[1]
+        .get('[data-testid="model-capability-tags"]')
+        .findAll('[data-modality]')
+        .map((tag) => tag.attributes('data-modality')),
+    ).toEqual(['input-text', 'output-text'])
   })
 
   it('能力标签优先使用接口下发的模态元数据', async () => {
@@ -391,8 +424,12 @@ describe('ModelMarketplaceView', () => {
     fixture[0] = {
       ...fixture[0],
       models: [
-        // 本地规则会把 gpt-image-2 识别为 text+image 输入，接口数据应覆盖为纯文字输入。
-        { ...marketplaceModel('gpt-image-2', 'GPT Image 2', imagePricing), input_modalities: ['text'], output_modalities: ['image'] },
+        // Server capability metadata takes precedence over model-name inference, which would otherwise classify this fixture as image input.
+        {
+          ...marketplaceModel('gpt-image-2', 'GPT Image 2', imagePricing),
+          input_modalities: ['text'],
+          output_modalities: ['image'],
+        },
       ],
     }
     getMarketplaceModels.mockResolvedValue(fixture)
@@ -400,13 +437,17 @@ describe('ModelMarketplaceView', () => {
     const wrapper = await mountMarketplace()
     const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
 
-    expect(sections[0].get('[data-testid="model-capability-tags"]').findAll('[data-modality]').map((tag) => tag.attributes('data-modality')))
-      .toEqual(['input-text', 'output-image'])
+    expect(
+      sections[0]
+        .get('[data-testid="model-capability-tags"]')
+        .findAll('[data-modality]')
+        .map((tag) => tag.attributes('data-modality')),
+    ).toEqual(['input-text', 'output-image'])
   })
 
   it('Gemini Flash 档位展示接口下发的完整音视频输入能力', async () => {
     const fixture = marketplaceFixture()
-    // 档位 ID 保持不变，图标完全采用后端解析的能力元数据。
+    // Tier identifiers remain stable while capability icons follow the metadata supplied by the backend.
     fixture[0].models = ['gemini-3.7-flash-tiered', 'gemini-3.8-flash-tiered'].map((id) => ({
       ...marketplaceModel(id, id, imagePricing),
       input_modalities: ['text', 'image', 'audio', 'video'],
@@ -417,15 +458,23 @@ describe('ModelMarketplaceView', () => {
     const cards = wrapper.findAll('[data-testid="marketplace-group-section"]')[0].findAll('article')
     expect(cards).toHaveLength(2)
     for (const card of cards) {
-      expect(card.get('[data-testid="model-capability-tags"]').findAll('[data-modality]').map((tag) => tag.attributes('data-modality')))
-        .toEqual(['input-text', 'input-image', 'input-audio', 'input-video', 'output-text'])
+      expect(
+        card
+          .get('[data-testid="model-capability-tags"]')
+          .findAll('[data-modality]')
+          .map((tag) => tag.attributes('data-modality')),
+      ).toEqual(['input-text', 'input-image', 'input-audio', 'input-video', 'output-text'])
     }
   })
 
   it('模型信息浮层按目录顺序列出可用协议并标出原生协议，没有属性时也显示入口', async () => {
     getMarketplaceModels.mockResolvedValueOnce([
       marketplaceGroup(1, 'Plus', [
-        { ...marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing), protocols: ['openai_chat_completions', 'anthropic_messages'], native_protocols: ['openai_chat_completions'] },
+        {
+          ...marketplaceModel('gpt-5.5', 'GPT 5.5', tokenPricing),
+          protocols: ['openai_chat_completions', 'anthropic_messages'],
+          native_protocols: ['openai_chat_completions'],
+        },
         marketplaceModel('legacy-unpriced', 'Legacy Unpriced', unpricedPricing),
       ]),
     ])
@@ -435,10 +484,15 @@ describe('ModelMarketplaceView', () => {
 
     await triggers[0].trigger('click')
     await nextTick()
-    const tooltip = visibleTooltips().find((el) => el.querySelector('[data-testid="model-protocols"]'))
+    const tooltip = visibleTooltips().find((el) =>
+      el.querySelector('[data-testid="model-protocols"]'),
+    )
     expect(tooltip).toBeDefined()
     const chips = Array.from(tooltip!.querySelectorAll<HTMLElement>('[data-protocol]'))
-    expect(chips.map((chip) => chip.dataset.protocol)).toEqual(['anthropic_messages', 'openai_chat_completions'])
+    expect(chips.map((chip) => chip.dataset.protocol)).toEqual([
+      'anthropic_messages',
+      'openai_chat_completions',
+    ])
     expect(chips.map((chip) => chip.title)).toEqual([
       'POST /v1/messages · marketplace.protocolConvertedHint',
       'POST /v1/chat/completions · marketplace.protocolNativeHint',
@@ -460,14 +514,15 @@ describe('ModelMarketplaceView', () => {
 
     const wrapper = await mountMarketplace()
 
-    // 品牌名 xAI 应映射到现有 Grok SVG，不能退回紫色字母 X。
-    const grokGroup = wrapper.findAll('[data-testid="marketplace-group-section"]')
+    // The xAI brand resolves to the shared Grok icon rather than a generated initial.
+    const grokGroup = wrapper
+      .findAll('[data-testid="marketplace-group-section"]')
       .find((section) => section.get('h2').text() === 'Grok')
     expect(grokGroup?.find('.provider-icon[width="28px"]').exists()).toBe(true)
     expect(grokGroup?.find('.provider-icon-fallback').exists()).toBe(false)
   })
 
-  // 分组名和展示品牌都可以提供智谱名称，两个尺寸的图标共用品牌映射。
+  // Group names and display brands both resolve Zhipu through the shared mapping used for both icon sizes.
   it.each([
     ['GLM', ''],
     ['zai', ''],
@@ -477,17 +532,21 @@ describe('ModelMarketplaceView', () => {
     ['自定义分组', 'zai'],
     ['自定义分组', 'z.ai'],
   ])('分组 %s、展示品牌 %s 显示智谱图标', async (name, displayBrand) => {
-    getMarketplaceModels.mockResolvedValue([{
-      ...marketplaceGroup(1, name, [marketplaceModel('glm-5', 'GLM 5', tokenPricing)]),
-      display_brand: displayBrand,
-    }])
+    getMarketplaceModels.mockResolvedValue([
+      {
+        ...marketplaceGroup(1, name, [marketplaceModel('glm-5', 'GLM 5', tokenPricing)]),
+        display_brand: displayBrand,
+      },
+    ])
 
     const wrapper = await mountMarketplace()
     const group = wrapper.get('[data-testid="marketplace-group-section"]')
 
     for (const size of ['14px', '28px']) {
       const icon = group.get(`svg.provider-icon[width="${size}"]`)
-      expect(icon.findAll('path').map((path) => path.attributes('d'))).toEqual(modelIconData.zhipu.paths)
+      expect(icon.findAll('path').map((path) => path.attributes('d'))).toEqual(
+        modelIconData.zhipu.paths,
+      )
     }
     expect(group.find('.provider-icon-fallback').exists()).toBe(false)
     expect(group.text()).toContain('智谱')
@@ -499,15 +558,18 @@ describe('ModelMarketplaceView', () => {
     fixture[0] = {
       ...fixture[0],
 
-      models: [
-        marketplaceModel('gpt-image-1', 'GPT Image', imagePricing),
-      ],
+      models: [marketplaceModel('gpt-image-1', 'GPT Image', imagePricing)],
     }
     getMarketplaceModels.mockResolvedValue(fixture)
 
     const wrapper = await mountMarketplace()
 
-    expect(wrapper.findAll('[data-testid="marketplace-group-section"]').map((section) => section.text()).join('\n')).not.toContain('marketplace.imageRateMultiplierValue')
+    expect(
+      wrapper
+        .findAll('[data-testid="marketplace-group-section"]')
+        .map((section) => section.text())
+        .join('\n'),
+    ).not.toContain('marketplace.imageRateMultiplierValue')
   })
 
   it('模型卡片可展开抽屉式定价面板并切换 fast mode', async () => {
@@ -519,7 +581,7 @@ describe('ModelMarketplaceView', () => {
     await toggle.trigger('click')
     await nextTick()
 
-    // 面板原地展开，展示完整定价（标准计费行），且 fast mode 切换可用。
+    // Expanding the model panel reveals its ordinary pricing rows and the speed selection control inside the same card.
     const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
     const firstCard = sections[0].findAll('article')[0]
     expect(firstCard.text()).toContain('marketplace.input')
@@ -530,23 +592,31 @@ describe('ModelMarketplaceView', () => {
     await fastSwitch.findAll('button')[1].trigger('click')
     await nextTick()
 
-    // fast mode 下展示 fast 加价行，标准行隐藏。
+    // Fast selection reveals the corresponding surcharge rows and hides the ordinary pricing rows.
     expect(firstCard.text()).toContain('marketplace.fastImageInput')
     expect(firstCard.text()).not.toContain('marketplace.imageInput')
 
     await wrapper.get('[data-testid="model-pricing-toggle"]').trigger('click')
     await nextTick()
-    expect(wrapper.get('[data-testid="model-pricing-toggle"]').attributes('aria-expanded')).toBe('false')
+    expect(wrapper.get('[data-testid="model-pricing-toggle"]').attributes('aria-expanded')).toBe(
+      'false',
+    )
   })
 })
 
 // Public model cards display the quoted video unit and expose its filter.
 // Selecting video pricing removes token models while retaining free video tiers.
 it('shows and filters custom video prices', async () => {
-  getMarketplaceModels.mockResolvedValueOnce([marketplaceGroup(1, 'Videos', [
-    marketplaceModel('custom-video', 'Custom Video', { pricing_mode: 'video', price_status: 'priced', video_prices: { '768p': 0.12, '2k': 0 } }),
-    marketplaceModel('text-model', 'Text Model', tokenPricing),
-  ])])
+  getMarketplaceModels.mockResolvedValueOnce([
+    marketplaceGroup(1, 'Videos', [
+      marketplaceModel('custom-video', 'Custom Video', {
+        pricing_mode: 'video',
+        price_status: 'priced',
+        video_prices: { '768p': 0.12, '2k': 0 },
+      }),
+      marketplaceModel('text-model', 'Text Model', tokenPricing),
+    ]),
+  ])
   const wrapper = await mountMarketplace()
   expect(wrapper.text()).toContain('768p')
   expect(wrapper.text()).toContain('marketplace.perSecond')

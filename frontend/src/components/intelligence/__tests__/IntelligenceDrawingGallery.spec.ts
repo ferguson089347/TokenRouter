@@ -3,6 +3,11 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import IntelligenceDrawingGallery from '../IntelligenceDrawingGallery.vue'
 import { runFixture } from './fixtures'
 
+// IntelligenceDrawingGallery.spec.ts exercises drawing gallery scrolling with controlled
+// geometry and pointer events. It checks wheel direction, drag ownership, edge behavior,
+// cancellation, and keyboard access while keeping separate galleries independent within the
+// same document.
+
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({ t: (key: string) => key }),
@@ -29,8 +34,7 @@ function mountGallery() {
     },
   })
   wrappers.push(wrapper)
-  const element = wrapper.get('[data-testid="drawing-gallery"]')
-    .element as HTMLElement
+  const element = wrapper.get('[data-testid="drawing-gallery"]').element as HTMLElement
   // Provide layout and capture fixtures because jsdom does not compute overflow or implement the browser's pointer-capture behavior used by dragging.
   Object.defineProperties(element, {
     clientWidth: { configurable: true, value: 360 },
@@ -47,11 +51,7 @@ function mountGallery() {
   return { wrapper, element }
 }
 
-function pointer(
-  target: Element,
-  type: string,
-  overrides: Record<string, unknown> = {},
-) {
+function pointer(target: Element, type: string, overrides: Record<string, unknown> = {}) {
   const event = new MouseEvent(type, {
     bubbles: true,
     cancelable: true,
@@ -103,13 +103,9 @@ describe('画图作品横向浏览', () => {
 
   it('保留横向触控板方向及 Ctrl 滚轮缩放，支持行和页单位', () => {
     const { element } = mountGallery()
-    expect(wheel(element, { deltaX: 80, deltaY: 10 }).defaultPrevented).toBe(
-      true,
-    )
+    expect(wheel(element, { deltaX: 80, deltaY: 10 }).defaultPrevented).toBe(true)
     expect(element.scrollLeft).toBe(80)
-    expect(
-      wheel(element, { deltaY: 120, ctrlKey: true }).defaultPrevented,
-    ).toBe(false)
+    expect(wheel(element, { deltaY: 120, ctrlKey: true }).defaultPrevented).toBe(false)
     expect(element.scrollLeft).toBe(80)
     wheel(element, { deltaY: 2, deltaMode: 1 })
     expect(element.scrollLeft).toBeGreaterThan(82)
@@ -147,9 +143,7 @@ describe('画图作品横向浏览', () => {
     pointer(element, 'pointermove', { clientX: 100 })
     pointer(element, 'pointerup')
     expect(element.scrollLeft).toBe(0)
-    button.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }),
-    )
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }))
     expect(wrapper.emitted('select')).toEqual([[artwork]])
   })
 
@@ -161,15 +155,11 @@ describe('画图作品横向浏览', () => {
     expect(element.setPointerCapture).toHaveBeenCalledWith(1)
     pointer(element, 'pointerup')
     // Target the captured gallery for the synthetic click so the fixture matches browser dispatch while mouse capture owns the pointer.
-    element.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }),
-    )
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }))
     expect(wrapper.emitted('select')).toBeUndefined()
     pointer(button, 'pointerdown')
     pointer(button, 'pointerup')
-    button.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }),
-    )
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }))
     expect(wrapper.emitted('select')).toEqual([[artwork]])
   })
 
@@ -224,9 +214,7 @@ describe('画图作品横向浏览', () => {
     expect(element.scrollLeft).toBe(360)
     key(element, 'PageUp')
     expect(element.scrollLeft).toBe(0)
-    expect(
-      key(wrapper.get('button').element, 'ArrowRight').defaultPrevented,
-    ).toBe(false)
+    expect(key(wrapper.get('button').element, 'ArrowRight').defaultPrevented).toBe(false)
     expect(element.scrollLeft).toBe(0)
   })
 })

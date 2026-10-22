@@ -12,8 +12,7 @@ import { apiClient } from './client'
 export type IntelligenceBenchmark = 'candy' | 'drawing'
 // IntelligenceVerdict distinguishes pending execution, recognized quality
 // outcomes, failure, and unknown assessment.
-export type IntelligenceVerdict =
-  'pending' | 'passed' | 'failed' | 'error' | 'unknown'
+export type IntelligenceVerdict = 'pending' | 'passed' | 'failed' | 'error' | 'unknown'
 // IntelligenceRun is a credential-free observation returned by panel result
 // endpoints.
 export interface IntelligenceRun {
@@ -107,18 +106,12 @@ export const intelligenceAPI = {
   // list reads the current user's authorized quality-check histories and
   // artifact summaries.
   async list(signal?: AbortSignal): Promise<IntelligenceTest[]> {
-    return (
-      await apiClient.get<IntelligenceTest[]>('/intelligence-tests', { signal })
-    ).data
+    return (await apiClient.get<IntelligenceTest[]>('/intelligence-tests', { signal })).data
   },
   // detail reads a complete saved observation using user scope by default.
   // Administrator scope selects the protected administrator endpoint, and an
   // optional signal cancels the outstanding HTTP read.
-  async detail(
-    id: string,
-    admin = false,
-    signal?: AbortSignal,
-  ): Promise<IntelligenceRun> {
+  async detail(id: string, admin = false, signal?: AbortSignal): Promise<IntelligenceRun> {
     return (
       await apiClient.get<IntelligenceRun>(
         `${admin ? '/admin' : ''}/intelligence-tests/runs/${encodeURIComponent(id)}`,
@@ -129,11 +122,7 @@ export const intelligenceAPI = {
   // preview requests a short-lived signed artifact URL using user scope by
   // default. Administrator mode selects the protected route; the content
   // endpoint rechecks current permissions when the frame navigates.
-  async preview(
-    id: string,
-    admin = false,
-    signal?: AbortSignal,
-  ): Promise<IntelligencePreview> {
+  async preview(id: string, admin = false, signal?: AbortSignal): Promise<IntelligencePreview> {
     return (
       await apiClient.get<IntelligencePreview>(
         `${admin ? '/admin' : ''}/intelligence-tests/runs/${encodeURIComponent(id)}/preview`,
@@ -153,23 +142,10 @@ export const intelligenceAPI = {
   // save creates a configuration when id is absent and edits the identified
   // record otherwise. The supplied gateway secret is write-only, and empty edit
   // input retains the saved credential reference.
-  async save(
-    input: IntelligenceConfigInput,
-    id?: number,
-  ): Promise<IntelligenceConfig> {
+  async save(input: IntelligenceConfigInput, id?: number): Promise<IntelligenceConfig> {
     return id
-      ? (
-          await apiClient.put<IntelligenceConfig>(
-            `/admin/intelligence-tests/${id}`,
-            input,
-          )
-        ).data
-      : (
-          await apiClient.post<IntelligenceConfig>(
-            '/admin/intelligence-tests',
-            input,
-          )
-        ).data
+      ? (await apiClient.put<IntelligenceConfig>(`/admin/intelligence-tests/${id}`, input)).data
+      : (await apiClient.post<IntelligenceConfig>('/admin/intelligence-tests', input)).data
   },
   // remove deletes the administrator-selected idle configuration and its
   // dependent observation history.
@@ -180,20 +156,13 @@ export const intelligenceAPI = {
   // endpoint. The server validates current feature and Key eligibility and
   // rejects concurrent work for the same configuration.
   async run(id: number): Promise<IntelligenceRun> {
-    return (
-      await apiClient.post<IntelligenceRun>(
-        `/admin/intelligence-tests/${id}/run`,
-      )
-    ).data
+    return (await apiClient.post<IntelligenceRun>(`/admin/intelligence-tests/${id}/run`)).data
   },
   // history reads the newest lightweight administrator observations for one
   // saved configuration.
   async history(id: number, signal?: AbortSignal): Promise<IntelligenceRun[]> {
     return (
-      await apiClient.get<IntelligenceRun[]>(
-        `/admin/intelligence-tests/${id}/runs`,
-        { signal },
-      )
+      await apiClient.get<IntelligenceRun[]>(`/admin/intelligence-tests/${id}/runs`, { signal })
     ).data
   },
 }

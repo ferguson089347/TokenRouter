@@ -30,9 +30,7 @@
       >
         <span class="min-w-0 truncate"
           >{{ file.name }}
-          <span class="text-gray-500"
-            >({{ formatAttachmentSize(file.size) }})</span
-          ></span
+          <span class="text-gray-500">({{ formatAttachmentSize(file.size) }})</span></span
         >
         <button
           type="button"
@@ -58,11 +56,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { TicketSettings } from '@/api/tickets'
-import {
-  attachmentAccept,
-  formatAttachmentSize,
-  validateTicketFiles,
-} from './attachments'
+import { attachmentAccept, formatAttachmentSize, validateTicketFiles } from './attachments'
 
 // TicketAttachments.vue collects private files and shows immediate count,
 // extension, and size feedback. The existing selections remain visible when

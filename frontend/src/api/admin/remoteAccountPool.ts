@@ -113,7 +113,7 @@ export const remoteAccountPoolAPI = {
     return (
       await apiClient.get<Array<{ id: number; name: string }>>(`${path}/source-groups`, {
         signal,
-        timeout
+        timeout,
       })
     ).data
   },
@@ -122,7 +122,7 @@ export const remoteAccountPoolAPI = {
     return (
       await apiClient.get<RemotePoolOptions>('/account-pool/options', {
         signal,
-        timeout
+        timeout,
       })
     ).data
   },
@@ -132,8 +132,8 @@ export const remoteAccountPoolAPI = {
       await apiClient.get<RemotePoolPage>('/account-pool', {
         params,
         signal,
-        timeout
+        timeout,
       })
     ).data
-  }
+  },
 }

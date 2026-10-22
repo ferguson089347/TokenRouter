@@ -23,11 +23,7 @@
         {{ t(downloading ? 'common.processing' : 'tickets.preview.download') }}
       </button>
     </header>
-    <div
-      v-if="loading"
-      role="status"
-      class="card p-12 text-center text-gray-500"
-    >
+    <div v-if="loading" role="status" class="card p-12 text-center text-gray-500">
       {{ t('tickets.preview.loading') }}
     </div>
     <div
@@ -36,12 +32,7 @@
       class="rounded-surface bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"
     >
       <p>{{ error }}</p>
-      <button
-        type="button"
-        class="btn btn-secondary btn-sm mt-3"
-        :disabled="loading"
-        @click="load"
-      >
+      <button type="button" class="btn btn-secondary btn-sm mt-3" :disabled="loading" @click="load">
         {{ t('tickets.retry') }}
       </button>
     </div>
@@ -67,8 +58,7 @@
         <pre
           v-if="textContent"
           class="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-gray-800 dark:text-dark-200"
-          >{{ textContent }}</pre
-        >
+          >{{ textContent }}</pre>
         <p v-else class="text-sm text-gray-500">
           {{ t('tickets.preview.wordEmpty') }}
         </p>
@@ -87,13 +77,9 @@
           >
             {{ t('tickets.preview.previous') }}
           </button>
-          <span
-            class="text-sm text-gray-600 dark:text-dark-300"
-            aria-live="polite"
-            >{{
-              t('tickets.preview.page', { page: pageNumber, total: pageCount })
-            }}</span
-          >
+          <span class="text-sm text-gray-600 dark:text-dark-300" aria-live="polite">{{
+            t('tickets.preview.page', { page: pageNumber, total: pageCount })
+          }}</span>
           <button
             type="button"
             class="btn btn-secondary btn-sm"
@@ -103,20 +89,14 @@
             {{ t('tickets.preview.next') }}
           </button>
         </div>
-        <p
-          v-if="rendering"
-          role="status"
-          class="mb-3 text-center text-sm text-gray-500"
-        >
+        <p v-if="rendering" role="status" class="mb-3 text-center text-sm text-gray-500">
           {{ t('tickets.preview.rendering') }}
         </p>
         <canvas
           ref="canvasElement"
           class="mx-auto h-auto max-w-full bg-white"
           role="img"
-          :aria-label="
-            t('tickets.preview.page', { page: pageNumber, total: pageCount })
-          "
+          :aria-label="t('tickets.preview.page', { page: pageNumber, total: pageCount })"
         />
       </section>
     </template>
@@ -127,12 +107,7 @@
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
-import type {
-  PDFDocumentLoadingTask,
-  PDFDocumentProxy,
-  PDFPageProxy,
-  RenderTask,
-} from 'pdfjs-dist'
+import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
 import { formatAttachmentSize } from '@/components/tickets/attachments'
 import { ticketAPI, type TicketAttachment } from '@/api/tickets'
 import { useAppStore } from '@/stores/app'
@@ -217,9 +192,7 @@ function handleError(err: unknown, fallback: string) {
     void appStore.syncTicketModuleEnabled(false)
     emit('disabled')
   }
-  error.value =
-    extractI18nErrorMessage(err, t, 'tickets.errors', t(fallback)) ||
-    t(fallback)
+  error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t(fallback)) || t(fallback)
 }
 
 // load authorizes one attachment through conversation metadata and fetches its
@@ -325,11 +298,7 @@ async function renderPage(current = generation) {
     const canvas = canvasElement.value
     if (!canvas) return
     const viewport = page.getViewport({ scale: 1 })
-    if (
-      ![viewport.width, viewport.height].every(
-        (value) => Number.isFinite(value) && value > 0,
-      )
-    )
+    if (![viewport.width, viewport.height].every((value) => Number.isFinite(value) && value > 0))
       throw new Error()
     // Bound both canvas sides and total pixels for the selected page so unusual page
     // dimensions cannot request an unbounded bitmap allocation.
@@ -337,9 +306,7 @@ async function renderPage(current = generation) {
       1.5 * Math.min(window.devicePixelRatio || 1, 2),
       4096 / viewport.width,
       4096 / viewport.height,
-      Math.sqrt(
-        pdfModule.pdfMaxCanvasPixels / (viewport.width * viewport.height),
-      ),
+      Math.sqrt(pdfModule.pdfMaxCanvasPixels / (viewport.width * viewport.height)),
     )
     const bounded = page.getViewport({ scale })
     canvas.width = Math.max(1, Math.floor(bounded.width))
@@ -366,11 +333,7 @@ async function renderPage(current = generation) {
 // idle. It waits for the selected page draw before allowing another navigation
 // request through the same controls.
 async function changePage(delta: number) {
-  if (
-    rendering.value ||
-    pageNumber.value + delta < 1 ||
-    pageNumber.value + delta > pageCount.value
-  )
+  if (rendering.value || pageNumber.value + delta < 1 || pageNumber.value + delta > pageCount.value)
     return
   pageNumber.value += delta
   await renderPage()
@@ -402,12 +365,7 @@ async function download() {
     if (current !== generation) return
     // A forbidden original download can arrive as a Blob error, so reread
     // availability before deciding whether the whole preview must close.
-    if (
-      err &&
-      typeof err === 'object' &&
-      'status' in err &&
-      err.status === 403
-    ) {
+    if (err && typeof err === 'object' && 'status' in err && err.status === 403) {
       try {
         const config = await api.config()
         if (current !== generation) return
@@ -416,7 +374,7 @@ async function download() {
           return
         }
       } catch {
-        /* 开关读取失败时显示原始下载失败，不静默吞掉错误。 */
+        /* When settings cannot be refreshed, retain the original download failure so the user still receives feedback about the unsuccessful operation. */
       }
     }
     downloadError.value = extractI18nErrorMessage(

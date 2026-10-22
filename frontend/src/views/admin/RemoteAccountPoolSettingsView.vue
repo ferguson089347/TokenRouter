@@ -49,7 +49,7 @@
                 {{
                   t('remotePool.sessionStatus', {
                     at: settings?.access_token_configured ? t('remotePool.configured') : '—',
-                    rt: settings?.refresh_token_configured ? t('remotePool.configured') : '—'
+                    rt: settings?.refresh_token_configured ? t('remotePool.configured') : '—',
                   })
                 }}
               </p>
@@ -135,7 +135,7 @@ import { getAllIncludingInactive } from '@/api/admin/groups'
 import {
   remoteAccountPoolAPI,
   type RemotePoolSettings,
-  type RemotePoolSettingsInput
+  type RemotePoolSettingsInput,
 } from '@/api/admin/remoteAccountPool'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SettingsSection from '@/components/common/settings/SettingsSection.vue'
@@ -165,7 +165,7 @@ const form = reactive<RemotePoolSettingsInput>({
   enabled: false,
   base_url: 'https://aishenji.top',
   refresh_token: '',
-  bindings: []
+  bindings: [],
 })
 const settings = ref<RemotePoolSettings>()
 const localGroups = ref<Array<{ id: number; name: string; rate_multiplier: number }>>([])
@@ -185,18 +185,18 @@ const localGroupOptions = computed(() => [
   { value: '', label: t('remotePool.notBound') },
   ...localGroups.value.map((group) => ({
     value: String(group.id),
-    label: `${group.name} · ${group.rate_multiplier}x`
-  }))
+    label: `${group.name} · ${group.rate_multiplier}x`,
+  })),
 ])
 const bindingRows = computed(() => {
   const rows = new Map(
-    sourceGroups.value.map((group) => [group.id, { remoteID: group.id, remoteName: group.name }])
+    sourceGroups.value.map((group) => [group.id, { remoteID: group.id, remoteName: group.name }]),
   )
   for (const binding of form.bindings) {
     if (!rows.has(binding.remote_group_id))
       rows.set(binding.remote_group_id, {
         remoteID: binding.remote_group_id,
-        remoteName: t('remotePool.sourceGroup')
+        remoteName: t('remotePool.sourceGroup'),
       })
   }
   return [...rows.values()]
@@ -240,7 +240,7 @@ async function initialize() {
   try {
     const [value, groups] = await Promise.all([
       remoteAccountPoolAPI.getSettings(),
-      getAllIncludingInactive()
+      getAllIncludingInactive(),
     ])
     if (disposed) return
     localGroups.value = groups
@@ -293,7 +293,7 @@ async function saveSettings(): Promise<boolean> {
   try {
     const value = await remoteAccountPoolAPI.saveSettings({
       ...form,
-      bindings: form.bindings.map((binding) => ({ ...binding }))
+      bindings: form.bindings.map((binding) => ({ ...binding })),
     })
     if (disposed) return false
     applySettings(value)
@@ -327,7 +327,7 @@ async function discardSettings() {
 /** localBinding returns the selected local group for one source directory row. */
 function localBinding(remoteID: number) {
   return String(
-    form.bindings.find((binding) => binding.remote_group_id === remoteID)?.local_group_id ?? ''
+    form.bindings.find((binding) => binding.remote_group_id === remoteID)?.local_group_id ?? '',
   )
 }
 

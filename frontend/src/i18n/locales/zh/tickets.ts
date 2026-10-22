@@ -24,8 +24,7 @@ export default {
     allStatuses: '全部状态',
     allPriorities: '全部优先级',
     empty: '暂无工单',
-    emptyHint:
-      '遇到问题时，可以新建工单获取帮助；也可以调整筛选条件查看历史工单。',
+    emptyHint: '遇到问题时，可以新建工单获取帮助；也可以调整筛选条件查看历史工单。',
     emptyAdminHint: '当前筛选条件下没有工单。',
     titleLimit: '标题最多 {max} 个字，首尾空格不计入。',
     subjectPlaceholder: '简要说明遇到的问题',
@@ -41,8 +40,7 @@ export default {
     noOrders: '当前账户暂无订单，可直接提交财务工单。',
     moreOrders: '加载更早的订单',
     retry: '重试',
-    openLimit:
-      '同一时间最多保留 {count} 个未关闭工单。已有相同问题时，请在原工单中继续回复。',
+    openLimit: '同一时间最多保留 {count} 个未关闭工单。已有相同问题时，请在原工单中继续回复。',
     disabled: '工单功能已关闭，暂时无法查看或处理工单。',
     back: '返回工单列表',
     conversation: '工单对话',
@@ -55,8 +53,7 @@ export default {
     complete: '完成工单',
     cancelConfirm: '确定撤销此工单？撤销后将关闭对话，无法继续回复。',
     completeConfirm: '确认问题已解决并完成工单？完成后将关闭对话。',
-    closedHint:
-      '此工单已关闭，可查看对话、预览或下载附件。如有新的问题，请新建工单。',
+    closedHint: '此工单已关闭，可查看对话、预览或下载附件。如有新的问题，请新建工单。',
     expiryHint: '客服回复后，若您超过 {hours} 小时未回复，工单将自动过期。',
     loadFailed: '工单加载失败，请重试。',
     loadOrdersFailed: '订单加载失败，请重试。',
@@ -86,25 +83,19 @@ export default {
       total: '本次附件总大小不能超过 50 MB。',
     },
     errors: {
-      TICKET_ATTACHMENT_PREVIEW_UNAVAILABLE:
-        '该 Word 文档暂时无法预览，可下载原件查看。',
-      TICKET_ATTACHMENT_PREVIEW_UNSUPPORTED:
-        '此附件暂不支持在线预览，可以下载原件查看。',
+      TICKET_ATTACHMENT_PREVIEW_UNAVAILABLE: '该 Word 文档暂时无法预览，可下载原件查看。',
+      TICKET_ATTACHMENT_PREVIEW_UNSUPPORTED: '此附件暂不支持在线预览，可以下载原件查看。',
       TICKET_TITLE_TOO_LONG: '工单标题最多50个字，请缩短后提交。',
-      TICKET_ATTACHMENT_INVALID:
-        '附件格式不受支持、文件已损坏或含不安全内容，请重新选择有效文件。',
+      TICKET_ATTACHMENT_INVALID: '附件格式不受支持、文件已损坏或含不安全内容，请重新选择有效文件。',
       TICKET_ATTACHMENT_BUSY: '附件检查繁忙，请稍后重试，您选择的文件已保留。',
       TICKET_CONFIG_INVALID: '工单设置超出允许范围，请检查各项限制后重试。',
       TICKET_ORDER_INVALID: '关联订单不存在或不属于当前账户，请重新选择。',
       TICKET_INPUT_INVALID: '请检查工单内容与附件，修正后重试。',
       TICKET_ATTACHMENT_LIMIT: '附件数量超过当前限制，请移除部分附件后重试。',
-      TICKET_ATTACHMENT_TOO_LARGE:
-        '附件大小超过当前限制，请压缩或移除附件后重试。',
+      TICKET_ATTACHMENT_TOO_LARGE: '附件大小超过当前限制，请压缩或移除附件后重试。',
       TICKET_OPEN_LIMIT: '您还有未处理的工单，请先完成或撤销现有工单后再新建。',
-      TICKET_OPEN_LIMIT_REACHED:
-        '您还有未处理的工单，请先完成或撤销现有工单后再新建。',
-      TICKET_LIMIT_REACHED:
-        '您还有未处理的工单，请先完成或撤销现有工单后再新建。',
+      TICKET_OPEN_LIMIT_REACHED: '您还有未处理的工单，请先完成或撤销现有工单后再新建。',
+      TICKET_LIMIT_REACHED: '您还有未处理的工单，请先完成或撤销现有工单后再新建。',
       TICKET_DISABLED: '工单功能已关闭，暂时无法查看或处理工单。',
       TICKET_CLOSED: '此工单已关闭，请刷新查看最新状态。',
       TICKET_NOT_FOUND: '工单不存在或您无权查看。',
@@ -119,8 +110,7 @@ export default {
       download: '下载原件',
       loading: '正在加载附件…',
       failed: '附件预览失败，请重试或下载原件查看。',
-      wordHint:
-        'Word 预览显示文档正文，保留换行和表格文字；图片及复杂排版请下载原件查看。',
+      wordHint: 'Word 预览显示文档正文，保留换行和表格文字；图片及复杂排版请下载原件查看。',
       wordEmpty: '文档没有可提取的正文，请下载原件查看。',
       pdf: 'PDF 预览',
       previous: '上一页',
@@ -138,11 +128,9 @@ export default {
       max_open_ticketsHint:
         '可设 1 至 100。待客服回复和待用户回复均计入限制，已完成、已撤销、已过期不计入。',
       max_attachments: '每次提交最多附件数',
-      max_attachmentsHint:
-        '可设 0 至 10，0 表示禁止上传；同时适用于新建工单和每次回复。',
+      max_attachmentsHint: '可设 0 至 10，0 表示禁止上传；同时适用于新建工单和每次回复。',
       max_attachment_size_mb: '单个附件最大大小（MB）',
-      max_attachment_size_mbHint:
-        '可设 1 至 20 MB，每次提交的附件总大小最多 50 MB。',
+      max_attachment_size_mbHint: '可设 1 至 20 MB，每次提交的附件总大小最多 50 MB。',
       auto_expire_hours: '用户未回复自动过期时间（小时）',
       auto_expire_hoursHint:
         '可设 0 至 8760，0 表示关闭；从最近一次客服回复起计算，等待客服处理时不会过期。',

@@ -36,15 +36,9 @@ export function resultColor(run: IntelligenceRun): string {
 // recentRuns copies and sorts observations oldest first, then keeps the
 // requested newest count. Creation timestamp and local ID determine order,
 // leaving the caller's original slice available unchanged.
-export function recentRuns(
-  runs: IntelligenceRun[],
-  count = 60,
-): IntelligenceRun[] {
+export function recentRuns(runs: IntelligenceRun[], count = 60): IntelligenceRun[] {
   return [...runs]
-    .sort(
-      (a, b) =>
-        a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id),
-    )
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
     .slice(-count)
 }
 
@@ -93,16 +87,7 @@ export function resultMarkdown(content?: string): string {
   return DOMPurify.sanitize(
     marked.parse(content, { async: false, gfm: true, breaks: true }) as string,
     {
-      FORBID_TAGS: [
-        'img',
-        'svg',
-        'math',
-        'iframe',
-        'form',
-        'input',
-        'button',
-        'style',
-      ],
+      FORBID_TAGS: ['img', 'svg', 'math', 'iframe', 'form', 'input', 'button', 'style'],
       FORBID_ATTR: ['style'],
     },
   )

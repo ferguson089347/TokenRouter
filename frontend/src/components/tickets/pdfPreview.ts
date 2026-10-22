@@ -19,10 +19,7 @@ import jbigFallbackUrl from 'pdfjs-dist/wasm/jbig2_nowasm_fallback.js?url'
 
 // character-map or font requests to an external destination.
 const resources = import.meta.glob<string>(
-  [
-    '/node_modules/pdfjs-dist/cmaps/*.bcmap',
-    '/node_modules/pdfjs-dist/standard_fonts/*.{pfb,ttf}',
-  ],
+  ['/node_modules/pdfjs-dist/cmaps/*.bcmap', '/node_modules/pdfjs-dist/standard_fonts/*.{pfb,ttf}'],
   { eager: true, query: '?url', import: 'default' },
 )
 
@@ -36,16 +33,9 @@ export const pdfMaxCanvasPixels = 8_000_000
 export function loadTicketPDF(data: Uint8Array, signal: AbortSignal) {
   // Bundled JavaScript decoders share one application directory; the worker loads
   // their fixed filenames when WASM decoding is disabled for previews.
-  const jpegDirectory = new URL(
-    '.',
-    new URL(jpegFallbackUrl, window.location.href),
-  ).href
-  const jbigDirectory = new URL(
-    '.',
-    new URL(jbigFallbackUrl, window.location.href),
-  ).href
-  if (jpegDirectory !== jbigDirectory)
-    throw new Error('PDF decoder resources unavailable')
+  const jpegDirectory = new URL('.', new URL(jpegFallbackUrl, window.location.href)).href
+  const jbigDirectory = new URL('.', new URL(jbigFallbackUrl, window.location.href)).href
+  if (jpegDirectory !== jbigDirectory) throw new Error('PDF decoder resources unavailable')
   // LocalBinaryDataFactory resolves document resource requests through the bundled asset map.
   class LocalBinaryDataFactory {
     // fetch returns bundled character-map or font bytes for a recognized resource
@@ -57,28 +47,15 @@ export function loadTicketPDF(data: Uint8Array, signal: AbortSignal) {
     // build-time map, preserving resource identity through bundler output choices.
     // Data URLs are decoded locally and successful network responses return their
     // bytes to the PDF parser without adopting document-provided addresses.
-    async fetch({
-      kind,
-      filename,
-    }: {
-      kind: string
-      filename: string
-    }): Promise<Uint8Array> {
+    async fetch({ kind, filename }: { kind: string; filename: string }): Promise<Uint8Array> {
       const folder =
-        kind === 'cMapUrl'
-          ? 'cmaps'
-          : kind === 'standardFontDataUrl'
-            ? 'standard_fonts'
-            : ''
-      const url =
-        folder && resources[`/node_modules/pdfjs-dist/${folder}/${filename}`]
+        kind === 'cMapUrl' ? 'cmaps' : kind === 'standardFontDataUrl' ? 'standard_fonts' : ''
+      const url = folder && resources[`/node_modules/pdfjs-dist/${folder}/${filename}`]
       if (!url) throw new Error('Unsupported PDF resource')
       // Small bundled resources may be data URLs, so local decoding avoids a network
       // request and retains the existing connection policy.
       if (url.startsWith('data:')) {
-        return Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (char) =>
-          char.charCodeAt(0),
-        )
+        return Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (char) => char.charCodeAt(0))
       }
       const response = await fetch(url, { signal, credentials: 'same-origin' })
       if (!response.ok) throw new Error('PDF resource unavailable')

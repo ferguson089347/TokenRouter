@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { BasePaginationResponse } from '@/types'
+import type { BasePaginationResponse } from '@/api/common.types'
 
 // tickets.ts defines the ticket protocol and authenticated user and support API
 // requests. Multipart submissions send structured payload fields beside private
@@ -121,10 +121,7 @@ export interface TicketFilters {
 // multipart packages a ticket payload and ordered file objects for authenticated
 // submission. The JSON field excludes binary data, and repeated file fields
 // retain the same order used by server request hashing.
-function multipart(
-  payload: CreateTicketRequest | { content: string },
-  files: File[],
-): FormData {
+function multipart(payload: CreateTicketRequest | { content: string }, files: File[]): FormData {
   const data = new FormData()
   data.append('payload', JSON.stringify(payload))
   files.forEach((file) => data.append('files', file))
@@ -141,9 +138,7 @@ export function ticketAPI(admin = false) {
     // pass current filters and pagination; the server validates their bounds and
     // computes totals using the same owner restriction.
     async list(params: TicketFilters) {
-      return (
-        await apiClient.get<BasePaginationResponse<Ticket>>(base, { params })
-      ).data
+      return (await apiClient.get<BasePaginationResponse<Ticket>>(base, { params })).data
     },
     // get retrieves one authorized conversation and its private attachment
     // metadata. The optional abort signal belongs to the caller, allowing
@@ -155,11 +150,7 @@ export function ticketAPI(admin = false) {
     // create submits a personal ticket and ordered files with the supplied retry
     // key. Callers retain the same key for an unchanged draft so uncertain
     // network responses can reuse the committed result.
-    async create(
-      payload: CreateTicketRequest,
-      files: File[],
-      idempotencyKey: string,
-    ) {
+    async create(payload: CreateTicketRequest, files: File[], idempotencyKey: string) {
       return (
         await apiClient.post<Ticket>('/tickets', multipart(payload, files), {
           headers: {
@@ -172,23 +163,14 @@ export function ticketAPI(admin = false) {
     // reply appends draft text and ordered files with a stable retry identity.
     // The selected access scope determines staff handling, while the server
     // independently checks ownership, role, and open conversation state.
-    async reply(
-      id: number,
-      content: string,
-      files: File[],
-      idempotencyKey: string,
-    ) {
+    async reply(id: number, content: string, files: File[], idempotencyKey: string) {
       return (
-        await apiClient.post<Ticket>(
-          `${base}/${id}/replies`,
-          multipart({ content }, files),
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-              'Idempotency-Key': idempotencyKey,
-            },
+        await apiClient.post<Ticket>(`${base}/${id}/replies`, multipart({ content }, files), {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Idempotency-Key': idempotencyKey,
           },
-        )
+        })
       ).data
     },
     // close submits one supported terminal action for the selected ticket scope.
@@ -200,8 +182,7 @@ export function ticketAPI(admin = false) {
     // update changes ticket priority through the administrator endpoint after
     // server permission checks.
     async update(id: number, payload: { priority: TicketPriority }) {
-      return (await apiClient.patch<Ticket>(`/admin/tickets/${id}`, payload))
-        .data
+      return (await apiClient.patch<Ticket>(`/admin/tickets/${id}`, payload)).data
     },
     // download retrieves original private attachment bytes through the
     // authenticated API client.
@@ -225,16 +206,13 @@ export function ticketAPI(admin = false) {
       )
       if (response.status >= 200 && response.status < 300) return response.data
       let details: Record<string, unknown> = {}
-      if (
-        response.data.size <= 64 * 1024 &&
-        response.data.type.includes('json')
-      ) {
+      if (response.data.size <= 64 * 1024 && response.data.type.includes('json')) {
         try {
           const parsed: unknown = JSON.parse(await response.data.text())
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
             details = parsed as Record<string, unknown>
         } catch {
-          /* 非 JSON 错误页使用通用提示，不把 HTML 当正文或错误文案渲染。 */
+          /* Malformed error data uses the generic failure message; HTML remains unrendered so upstream error pages cannot become preview content. */
         }
       }
       throw {
@@ -248,21 +226,14 @@ export function ticketAPI(admin = false) {
     // administrators to restore availability through its separate settings
     // writer.
     async config() {
-      return (
-        await apiClient.get<TicketSettings>(
-          admin ? `${base}/settings` : `${base}/config`,
-        )
-      ).data
+      return (await apiClient.get<TicketSettings>(admin ? `${base}/settings` : `${base}/config`))
+        .data
     },
   }
 }
 
 // saveTicketSettings persists the administrator support configuration and
 // returns its confirmed values.
-export async function saveTicketSettings(
-  settings: TicketSettings,
-): Promise<TicketSettings> {
-  return (
-    await apiClient.put<TicketSettings>('/admin/tickets/settings', settings)
-  ).data
+export async function saveTicketSettings(settings: TicketSettings): Promise<TicketSettings> {
+  return (await apiClient.put<TicketSettings>('/admin/tickets/settings', settings)).data
 }

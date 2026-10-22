@@ -2,18 +2,9 @@
   <AppLayout>
     <TablePageLayout>
       <template #filters>
-        <form
-          class="flex flex-wrap items-center gap-2"
-          @submit.prevent="applyFilters"
-        >
-          <div
-            class="input-icon-wrap min-w-0 grow basis-full sm:basis-48 sm:max-w-64"
-          >
-            <Icon
-              name="search"
-              size="md"
-              class="input-icon text-gray-400 dark:text-dark-400"
-            />
+        <form class="flex flex-wrap items-center gap-2" @submit.prevent="applyFilters">
+          <div class="input-icon-wrap min-w-0 grow basis-full sm:basis-48 sm:max-w-64">
+            <Icon name="search" size="md" class="input-icon text-gray-400 dark:text-dark-400" />
             <input
               v-model="search"
               type="search"
@@ -35,14 +26,10 @@
               <span
                 v-if="option?.value"
                 class="badge gap-1"
-                :class="
-                  planBadge(String(option.value), String(option.label)).classes
-                "
+                :class="planBadge(String(option.value), String(option.label)).classes"
               >
                 <Icon
-                  :name="
-                    planBadge(String(option.value), String(option.label)).icon
-                  "
+                  :name="planBadge(String(option.value), String(option.label)).icon"
                   size="xs"
                   :animate-on-hover="false"
                 />{{ option.label }}
@@ -53,14 +40,10 @@
               <span
                 v-if="option.value"
                 class="badge gap-1"
-                :class="
-                  planBadge(String(option.value), String(option.label)).classes
-                "
+                :class="planBadge(String(option.value), String(option.label)).classes"
               >
                 <Icon
-                  :name="
-                    planBadge(String(option.value), String(option.label)).icon
-                  "
+                  :name="planBadge(String(option.value), String(option.label)).icon"
                   size="xs"
                   :animate-on-hover="false"
                 />{{ option.label }}
@@ -106,17 +89,10 @@
             :disabled="loading"
             @click="refresh"
           >
-            <Icon
-              name="refresh"
-              size="sm"
-              :class="{ 'animate-spin': loading }"
-            />
+            <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" />
           </button>
         </form>
-        <p
-          v-if="snapshotStatus.snapshot_at"
-          class="mt-2 text-xs text-gray-500 dark:text-dark-400"
-        >
+        <p v-if="snapshotStatus.snapshot_at" class="mt-2 text-xs text-gray-500 dark:text-dark-400">
           {{ t('remotePool.snapshotAt') }}:
           {{ formatTime(snapshotStatus.snapshot_at) }}
         </p>
@@ -156,9 +132,7 @@
                 >
                   {{ row.id }}
                 </div>
-                <div
-                  class="mt-1 truncate text-xs text-gray-500 dark:text-dark-400"
-                >
+                <div class="mt-1 truncate text-xs text-gray-500 dark:text-dark-400">
                   {{ row.display_name || t('remotePool.accountNode') }}
                 </div>
               </div>
@@ -189,9 +163,7 @@
               <div
                 class="h-full rounded-full"
                 :class="
-                  row.current_concurrency >= row.concurrency
-                    ? 'bg-red-500'
-                    : 'bg-primary-500'
+                  row.current_concurrency >= row.concurrency ? 'bg-red-500' : 'bg-primary-500'
                 "
                 :style="{
                   width: `${Math.max(0, Math.min(100, (row.current_concurrency / row.concurrency) * 100))}%`,
@@ -208,12 +180,9 @@
           >
           <template #cell-groups="{ row }">
             <div class="flex max-w-xs flex-wrap gap-1">
-              <span
-                v-for="group in row.groups"
-                :key="group.id"
-                class="badge badge-gray"
-                >{{ group.name }}</span
-              >
+              <span v-for="group in row.groups" :key="group.id" class="badge badge-gray">{{
+                group.name
+              }}</span>
             </div>
           </template>
           <template #cell-rate_multiplier="{ row }">
@@ -253,20 +222,14 @@
               v-if="row.usage_windows?.length"
               class="inline-flex flex-col gap-2 rounded-control border border-gray-100 bg-gray-50/70 px-3 py-2 dark:border-dark-600 dark:bg-dark-800/60"
             >
-              <div
-                v-for="(window, index) in row.usage_windows"
-                :key="window.key"
-              >
+              <div v-for="(window, index) in row.usage_windows" :key="window.key">
                 <div
                   v-if="
-                    typeof window.utilization === 'number' &&
-                    Number.isFinite(window.utilization)
+                    typeof window.utilization === 'number' && Number.isFinite(window.utilization)
                   "
                   role="progressbar"
                   :aria-label="window.label || window.key"
-                  :aria-valuenow="
-                    Math.max(0, Math.min(100, window.utilization))
-                  "
+                  :aria-valuenow="Math.max(0, Math.min(100, window.utilization))"
                   :aria-valuetext="`${window.utilization}%`"
                   :aria-valuemin="0"
                   :aria-valuemax="100"
@@ -282,10 +245,9 @@
                   v-else
                   class="flex items-center gap-2 text-xs text-gray-400 dark:text-dark-400"
                 >
-                  <span
-                    class="rounded-compact bg-gray-100 px-1 font-medium dark:bg-dark-700"
-                    >{{ window.label || window.key }}</span
-                  >
+                  <span class="rounded-compact bg-gray-100 px-1 font-medium dark:bg-dark-700">{{
+                    window.label || window.key
+                  }}</span>
                   <span>{{ t('remotePool.usageUnknown') }}</span>
                 </div>
               </div>
@@ -294,9 +256,7 @@
               t('remotePool.usageUnknown')
             }}</span>
           </template>
-          <template #cell-last_used_at="{ row }">{{
-            formatTime(row.last_used_at)
-          }}</template>
+          <template #cell-last_used_at="{ row }">{{ formatTime(row.last_used_at) }}</template>
         </DataTable>
       </template>
       <template #pagination>
@@ -319,7 +279,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-import DataTable from '@/components/common/DataTable.vue'
+import DataTable from '@/components/common/table/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -354,13 +314,11 @@ interface PlanBadge {
 // planBadges assigns distinct colors and symbols to source tiers while retaining the source's displayed labels and filter values.
 const planBadges: Record<string, PlanBadge> = {
   promax: {
-    classes:
-      'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+    classes: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
     icon: 'sparkles',
   },
   pro: {
-    classes:
-      'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+    classes: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
     icon: 'sparkles',
   },
   plus: {
@@ -368,8 +326,7 @@ const planBadges: Record<string, PlanBadge> = {
     icon: 'plus',
   },
   team: {
-    classes:
-      'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+    classes: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
     icon: 'users',
   },
   free: {
@@ -377,8 +334,7 @@ const planBadges: Record<string, PlanBadge> = {
     icon: 'user',
   },
   go: {
-    classes:
-      'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    classes: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
     icon: 'bolt',
   },
   supergrok: {
@@ -386,8 +342,7 @@ const planBadges: Record<string, PlanBadge> = {
     icon: 'bolt',
   },
   max: {
-    classes:
-      'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
+    classes: 'bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300',
     icon: 'sparkles',
   },
   enterprise: {
@@ -418,13 +373,7 @@ const search = ref('')
 const groupID = ref('')
 const planType = ref('')
 const status = ref('')
-const statuses = [
-  'active',
-  'rate_limited',
-  'temporarily_unavailable',
-  'paused',
-  'error',
-]
+const statuses = ['active', 'rate_limited', 'temporarily_unavailable', 'paused', 'error']
 let controller: AbortController | undefined
 let disposed = false
 let refreshTimer: ReturnType<typeof setInterval> | undefined
@@ -472,10 +421,7 @@ function planBadge(value: string, label = ''): PlanBadge {
   const key = (value || '').toLowerCase().replace(/[\s_-]/g, '')
   const labelKey = label.toLowerCase().replace(/[\s_-]/g, '')
   // Source-specific identifiers can accompany a recognized display label. Use that label's visual treatment before assigning the neutral unknown-tier style.
-  return (
-    planBadges[key] ||
-    planBadges[labelKey] || { classes: 'badge-gray', icon: 'userCircle' }
-  )
+  return planBadges[key] || planBadges[labelKey] || { classes: 'badge-gray', icon: 'userCircle' }
 }
 
 /** statusLabel translates known states and displays unknown source states verbatim. */
@@ -490,9 +436,7 @@ function statusLabel(value: string) {
 function formatMultiplier(value: number): string {
   // Group rates use four decimal places in persisted pricing configuration.
   return Number.isFinite(value)
-    ? new Intl.NumberFormat(locale.value, { maximumFractionDigits: 4 }).format(
-        value,
-      )
+    ? new Intl.NumberFormat(locale.value, { maximumFractionDigits: 4 }).format(value)
     : '—'
 }
 

@@ -51,8 +51,8 @@ const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const hasContacts = computed(() =>
   parseSupportContacts(appStore.contactInfo || '').some(
-    (entry) => entry.value || safeContactUrl(entry.image, true)
-  )
+    (entry) => entry.value || safeContactUrl(entry.image, true),
+  ),
 )
 
 /** toggleDropdown changes visibility for the header's support contact panel. */

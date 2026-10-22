@@ -1,9 +1,5 @@
 import { inject, onBeforeUnmount, provide, type InjectionKey } from 'vue'
-import {
-  intelligenceAPI,
-  type IntelligencePreview,
-  type IntelligenceRun,
-} from '@/api/intelligence'
+import { intelligenceAPI, type IntelligencePreview, type IntelligenceRun } from '@/api/intelligence'
 
 // useIntelligenceResults.ts shares detail and signed-preview loading within
 // one mounted page. Pending reads with the same key share a promise, and at
@@ -43,9 +39,7 @@ export const intelligenceResultsKey: InjectionKey<IntelligenceResultsLoader> =
 // At most two active reads share the page's abort signal; queued reads settle
 // after disposal observes cancellation. Call dispose when leaving the page so
 // cached observations and credentials cannot outlive the owning page instance.
-export function createIntelligenceResultsLoader(
-  admin = false,
-): IntelligenceResultsLoader {
+export function createIntelligenceResultsLoader(admin = false): IntelligenceResultsLoader {
   const controller = new AbortController()
   const details = new Map<string, IntelligenceRun>()
   const previews = new Map<string, IntelligencePreview>()
@@ -101,11 +95,7 @@ export function createIntelligenceResultsLoader(
     detail(id) {
       if (details.has(id)) return Promise.resolve(details.get(id)!)
       return schedule(`detail:${id}`, async () => {
-        const result = await intelligenceAPI.detail(
-          id,
-          admin,
-          controller.signal,
-        )
+        const result = await intelligenceAPI.detail(id, admin, controller.signal)
         // Keep active observations refreshable because subsequent polls may supply
         // completed assessment, diagnostics or generated content for the same run.
         return ['queued', 'submitting', 'running'].includes(result.status)
@@ -122,11 +112,7 @@ export function createIntelligenceResultsLoader(
       if (cached && Date.parse(cached.expires_at) > Date.now() + 30000)
         return Promise.resolve(cached)
       return schedule(`preview:${id}`, async () =>
-        remember(
-          previews,
-          id,
-          await intelligenceAPI.preview(id, admin, controller.signal),
-        ),
+        remember(previews, id, await intelligenceAPI.preview(id, admin, controller.signal)),
       )
     },
     // dispose aborts running reads before clearing completed values and
@@ -144,9 +130,7 @@ export function createIntelligenceResultsLoader(
 // provideIntelligenceResults creates and provides a loader for the mounted
 // page. Administrator mode chooses the protected administrator routes, and
 // automatic unmount cleanup cancels pending reads and clears the page cache.
-export function provideIntelligenceResults(
-  admin = false,
-): IntelligenceResultsLoader {
+export function provideIntelligenceResults(admin = false): IntelligenceResultsLoader {
   const loader = createIntelligenceResultsLoader(admin)
   provide(intelligenceResultsKey, loader)
   onBeforeUnmount(loader.dispose)

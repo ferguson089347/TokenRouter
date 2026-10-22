@@ -14,20 +14,20 @@ const { api, groups, success } = vi.hoisted(() => ({
     saveSettings: vi.fn(),
     sourceGroups: vi.fn(),
     options: vi.fn(),
-    list: vi.fn()
+    list: vi.fn(),
   },
   groups: vi.fn(),
-  success: vi.fn()
+  success: vi.fn(),
 }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({
-  default: { template: '<main><slot /></main>' }
+  default: { template: '<main><slot /></main>' },
 }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess: success }) }))
 vi.mock('@/api/admin/remoteAccountPool', () => ({ remoteAccountPoolAPI: api }))
 vi.mock('@/api/admin/groups', () => ({ default: {}, getAllIncludingInactive: groups }))
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
-  useI18n: () => ({ t: (key: string) => key })
+  useI18n: () => ({ t: (key: string) => key }),
 }))
 
 // Saved settings contain an expired session and one group binding; the fixture's token is represented exclusively by its configured flag.
@@ -37,7 +37,7 @@ const settings = {
   refresh_token_configured: true,
   access_token_configured: false,
   auth_invalid: true,
-  bindings: [{ remote_group_id: 25, local_group_id: 100 }]
+  bindings: [{ remote_group_id: 25, local_group_id: 100 }],
 }
 let wrapper: ReturnType<typeof render> | undefined
 
@@ -51,9 +51,9 @@ function render() {
         Icon: true,
         ContentSkeleton: true,
         Toggle: true,
-        Select: true
-      }
-    }
+        Select: true,
+      },
+    },
   })
 }
 beforeEach(() => {
@@ -89,7 +89,7 @@ describe('RemoteAccountPoolSettingsView', () => {
       enabled: true,
       base_url: 'https://pool.example',
       refresh_token: 'replacement-rt',
-      bindings: [{ remote_group_id: 25, local_group_id: 100 }]
+      bindings: [{ remote_group_id: 25, local_group_id: 100 }],
     })
     expect((wrapper.find('#remote-pool-token').element as HTMLInputElement).value).toBe('')
     expect(success).toHaveBeenCalledWith('remotePool.saved')

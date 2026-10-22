@@ -82,8 +82,7 @@ async function load() {
     url.value = intelligencePreviewURL(result.url)
     if (!url.value) error.value = t('intelligence.noArtwork')
   } catch {
-    if (current === revision && !disposed)
-      error.value = t('intelligence.noArtwork')
+    if (current === revision && !disposed) error.value = t('intelligence.noArtwork')
   }
 }
 // visibilityChanged removes hidden-page iframe content and reloads visible

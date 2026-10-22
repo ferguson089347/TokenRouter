@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import IntelligenceView from '../IntelligenceView.vue'
-import {
-  runFixture,
-  testFixture,
-} from '@/components/intelligence/__tests__/fixtures'
+import { runFixture, testFixture } from '@/components/intelligence/__tests__/fixtures'
+
+// IntelligenceView.spec.ts checks the user model quality page with synthetic observations and
+// controlled result APIs. It verifies grouping, drawing order, detail loading, and removal of
+// stale results when refreshed permissions deny access to a group.
 
 const { list, detail, preview } = vi.hoisted(() => ({
   list: vi.fn(),
@@ -30,8 +31,7 @@ const mountPage = () =>
         },
         IntelligenceRunDialog: {
           props: ['show', 'run', 'loading', 'error'],
-          template:
-            '<div v-if="show" data-testid="detail">{{ run?.id }} {{ error }}</div>',
+          template: '<div v-if="show" data-testid="detail">{{ run?.id }} {{ error }}</div>',
         },
       },
     },
@@ -59,13 +59,8 @@ describe('用户降智检测页面', () => {
     ])
     const wrapper = mountPage()
     await flushPromises()
-    expect(wrapper.findAll('h2').map((item) => item.text())).toEqual([
-      'Group A',
-    ])
-    expect(wrapper.findAll('h3').map((item) => item.text())).toEqual([
-      'model-a',
-      'model-b',
-    ])
+    expect(wrapper.findAll('h2').map((item) => item.text())).toEqual(['Group A'])
+    expect(wrapper.findAll('h3').map((item) => item.text())).toEqual(['model-a', 'model-b'])
     const drawings = wrapper.findAll('.drawing')
     expect(drawings).toHaveLength(10)
     expect(drawings[0].attributes('data-id')).toBe('art-11')
@@ -81,14 +76,8 @@ describe('用户降智检测页面', () => {
     await flushPromises()
     await wrapper.get('[data-run-id="specific-run"]').trigger('click')
     await flushPromises()
-    expect(detail).toHaveBeenCalledWith(
-      'specific-run',
-      false,
-      expect.any(AbortSignal),
-    )
-    expect(wrapper.get('[data-testid="detail"]').text()).toContain(
-      'specific-run',
-    )
+    expect(detail).toHaveBeenCalledWith('specific-run', false, expect.any(AbortSignal))
+    expect(wrapper.get('[data-testid="detail"]').text()).toContain('specific-run')
     wrapper.unmount()
   })
   it('重新读取403时清理旧结果，避免展示已撤销访问的分组', async () => {

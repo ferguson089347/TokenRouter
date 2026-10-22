@@ -7,8 +7,7 @@ export default {
   tickets: {
     title: 'My Tickets',
     adminTitle: 'Ticket Management',
-    description:
-      'Get help, share details, and keep in touch with our support team.',
+    description: 'Get help, share details, and keep in touch with our support team.',
     adminDescription:
       'Tickets are sorted by priority, highest first. Filter by type, status, or priority.',
     create: 'New ticket',
@@ -26,11 +25,9 @@ export default {
     allStatuses: 'All statuses',
     allPriorities: 'All priorities',
     empty: 'No tickets yet',
-    emptyHint:
-      'Create a ticket to get help, or adjust the filters to find an existing ticket.',
+    emptyHint: 'Create a ticket to get help, or adjust the filters to find an existing ticket.',
     emptyAdminHint: 'No tickets match these filters.',
-    titleLimit:
-      'Up to {max} characters, excluding leading and trailing spaces.',
+    titleLimit: 'Up to {max} characters, excluding leading and trailing spaces.',
     subjectPlaceholder: 'Briefly describe your issue',
     contentPlaceholder:
       'Describe the issue, when it occurred, and what you were doing so we can help.',
@@ -41,16 +38,13 @@ export default {
     removeAttachment: 'Remove attachment {name}',
     order: 'Related order',
     selectOrder: 'Select an order from your account (optional)',
-    orderHint:
-      'Financial tickets may reference one of your own orders. This is optional.',
-    noOrders:
-      'Your account has no orders. You can still submit a financial ticket.',
+    orderHint: 'Financial tickets may reference one of your own orders. This is optional.',
+    noOrders: 'Your account has no orders. You can still submit a financial ticket.',
     moreOrders: 'Load older orders',
     retry: 'Retry',
     openLimit:
       'You can have up to {count} open tickets at a time. Reply to an existing ticket if it covers the same issue.',
-    disabled:
-      'Tickets are disabled. Viewing and handling tickets is temporarily unavailable.',
+    disabled: 'Tickets are disabled. Viewing and handling tickets is temporarily unavailable.',
     back: 'Back to tickets',
     conversation: 'Conversation',
     latest: 'Jump to latest message',
@@ -62,8 +56,7 @@ export default {
     complete: 'Complete ticket',
     cancelConfirm:
       'Withdraw this ticket? This will close the conversation and prevent further replies.',
-    completeConfirm:
-      'Is the issue resolved? Completing the ticket will close this conversation.',
+    completeConfirm: 'Is the issue resolved? Completing the ticket will close this conversation.',
     closedHint:
       'This ticket is closed. You can still read the conversation, preview attachments, or download them. Create a new ticket for another issue.',
     expiryHint:
@@ -114,10 +107,8 @@ export default {
         'Ticket settings are outside the allowed ranges. Check each limit and retry.',
       TICKET_ORDER_INVALID:
         'The order does not exist or belongs to another account. Select another order.',
-      TICKET_INPUT_INVALID:
-        'Check the ticket content and attachments, then retry.',
-      TICKET_ATTACHMENT_LIMIT:
-        'Too many attachments. Remove some files and retry.',
+      TICKET_INPUT_INVALID: 'Check the ticket content and attachments, then retry.',
+      TICKET_ATTACHMENT_LIMIT: 'Too many attachments. Remove some files and retry.',
       TICKET_ATTACHMENT_TOO_LARGE:
         'Attachments exceed the current size limit. Compress or remove files and retry.',
       TICKET_OPEN_LIMIT:
@@ -128,16 +119,11 @@ export default {
         'You still have open tickets. Complete or withdraw an existing ticket before creating another.',
       TICKET_DISABLED:
         'Tickets are disabled. Viewing and handling tickets is temporarily unavailable.',
-      TICKET_CLOSED:
-        'This ticket is closed. Refresh to see its current status.',
-      TICKET_NOT_FOUND:
-        'This ticket does not exist or is not accessible to you.',
-      TICKET_ATTACHMENT_NOT_FOUND:
-        'This attachment does not exist or is not accessible to you.',
-      TICKET_ORDER_NOT_FOUND:
-        'The order does not exist or belongs to another account.',
-      TICKET_IDEMPOTENCY_CONFLICT:
-        'The submission has changed. Refresh and submit again.',
+      TICKET_CLOSED: 'This ticket is closed. Refresh to see its current status.',
+      TICKET_NOT_FOUND: 'This ticket does not exist or is not accessible to you.',
+      TICKET_ATTACHMENT_NOT_FOUND: 'This attachment does not exist or is not accessible to you.',
+      TICKET_ORDER_NOT_FOUND: 'The order does not exist or belongs to another account.',
+      TICKET_IDEMPOTENCY_CONFLICT: 'The submission has changed. Refresh and submit again.',
     },
     preview: {
       title: 'Attachment preview',
@@ -145,12 +131,10 @@ export default {
       openNamed: 'Preview {name}',
       download: 'Download original',
       loading: 'Loading attachment…',
-      failed:
-        'Could not preview the attachment. Retry or download the original.',
+      failed: 'Could not preview the attachment. Retry or download the original.',
       wordHint:
         'Word preview shows document text, line breaks, and table text. Download the original to view images and complex formatting.',
-      wordEmpty:
-        'No document text could be extracted. Download the original to view it.',
+      wordEmpty: 'No document text could be extracted. Download the original to view it.',
       pdf: 'PDF preview',
       previous: 'Previous',
       next: 'Next',

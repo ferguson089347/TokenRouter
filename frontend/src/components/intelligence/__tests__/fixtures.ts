@@ -1,13 +1,12 @@
-import type {
-  IntelligenceConfig,
-  IntelligenceRun,
-  IntelligenceTest,
-} from '@/api/intelligence'
+import type { IntelligenceConfig, IntelligenceRun, IntelligenceTest } from '@/api/intelligence'
+
+// fixtures.ts builds synthetic intelligence configurations, tests, and run observations for
+// component suites. Each builder accepts field overrides so individual scenarios can model
+// status, detail availability, and generated artifacts without storing live provider
+// credentials.
 
 // Fixture observations reproduce result fields with synthetic identities, keeping component tests independent of live credentials and remote model endpoints.
-export const runFixture = (
-  overrides: Partial<IntelligenceRun> = {},
-): IntelligenceRun => ({
+export const runFixture = (overrides: Partial<IntelligenceRun> = {}): IntelligenceRun => ({
   id: 'run-1',
   config_id: 1,
   group_id: 1,
@@ -21,9 +20,7 @@ export const runFixture = (
   updated_at: '2026-10-03T01:01:00Z',
   ...overrides,
 })
-export const testFixture = (
-  overrides: Partial<IntelligenceTest> = {},
-): IntelligenceTest => ({
+export const testFixture = (overrides: Partial<IntelligenceTest> = {}): IntelligenceTest => ({
   id: 1,
   group_id: 1,
   group_name: 'Group A',
@@ -33,9 +30,7 @@ export const testFixture = (
   artifacts: [],
   ...overrides,
 })
-export const configFixture = (
-  overrides: Partial<IntelligenceConfig> = {},
-): IntelligenceConfig => ({
+export const configFixture = (overrides: Partial<IntelligenceConfig> = {}): IntelligenceConfig => ({
   id: 1,
   group_id: 1,
   group_name: 'Group A',

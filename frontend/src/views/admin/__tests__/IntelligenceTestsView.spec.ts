@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import IntelligenceTestsView from '../IntelligenceTestsView.vue'
-import {
-  configFixture,
-  runFixture,
-} from '@/components/intelligence/__tests__/fixtures'
-import type { ApiKey } from '@/types'
+import { configFixture, runFixture } from '@/components/intelligence/__tests__/fixtures'
+import type { ApiKey } from '@/api/keys.types'
+
+// IntelligenceTestsView.spec.ts checks administrator model checks through a mounted settings
+// page and mocked APIs. It covers key eligibility, protocol selection, protected runs, stored
+// configuration, and result visibility while using synthetic credentials and model
+// observations.
 
 const {
   configs,
@@ -75,17 +77,14 @@ const mountPage = () =>
       },
     },
   })
-const clickText = async (
-  wrapper: ReturnType<typeof mountPage>,
-  key: string,
-) => {
+const clickText = async (wrapper: ReturnType<typeof mountPage>, key: string) => {
   await wrapper
     .findAll('button')
     .find((button) => button.text() === key)!
     .trigger('click')
   await flushPromises()
 }
-// 使用不具备调用能力的本地夹具，并显式模拟普通 Key 默认开启自动降级的真实接口字段。
+// keyFixture builds a synthetic key record with ordinary automatic downgrade enabled. Tests override individual API fields while keeping credentials disconnected from any live provider.
 const keyFixture = (overrides: Partial<ApiKey> = {}) =>
   ({
     id: 1,
@@ -111,20 +110,12 @@ const keyPage = (items: ApiKey[], total = items.length, page = 1) => ({
   page_size: 100,
   pages: Math.ceil(total / 100),
 })
-const chooseGroup = async (
-  wrapper: ReturnType<typeof mountPage>,
-  id: number,
-) => {
+const chooseGroup = async (wrapper: ReturnType<typeof mountPage>, id: number) => {
   wrapper.getComponent('#intelligence-group').vm.$emit('update:modelValue', id)
   await flushPromises()
 }
-const chooseKey = async (
-  wrapper: ReturnType<typeof mountPage>,
-  id: number | null,
-) => {
-  wrapper
-    .getComponent('#intelligence-key-select')
-    .vm.$emit('update:modelValue', id)
+const chooseKey = async (wrapper: ReturnType<typeof mountPage>, id: number | null) => {
+  wrapper.getComponent('#intelligence-key-select').vm.$emit('update:modelValue', id)
   await flushPromises()
 }
 
@@ -164,14 +155,8 @@ describe('管理员降智检测', () => {
     const wrapper = mountPage()
     await flushPromises()
     await clickText(wrapper, 'common.edit')
-    expect(
-      (wrapper.get('#intelligence-api-key').element as HTMLInputElement).value,
-    ).toBe('')
-    for (const id of [
-      'intelligence-group',
-      'intelligence-model',
-      'intelligence-benchmark',
-    ])
+    expect((wrapper.get('#intelligence-api-key').element as HTMLInputElement).value).toBe('')
+    for (const id of ['intelligence-group', 'intelligence-model', 'intelligence-benchmark'])
       expect(wrapper.getComponent(`#${id}`).props('disabled')).toBe(true)
     await wrapper.get('#intelligence-config-form').trigger('submit')
     await flushPromises()
@@ -192,9 +177,9 @@ describe('管理员降智检测', () => {
     await flushPromises()
     await clickText(wrapper, 'intelligence.add')
     await clickText(wrapper, 'intelligence.useCurrentSite')
-    expect(
-      (wrapper.get('#intelligence-base-url').element as HTMLInputElement).value,
-    ).toBe(`${window.location.origin}/v1`)
+    expect((wrapper.get('#intelligence-base-url').element as HTMLInputElement).value).toBe(
+      `${window.location.origin}/v1`,
+    )
     expect(save).not.toHaveBeenCalled()
     expect(run).not.toHaveBeenCalled()
     wrapper.unmount()
@@ -221,11 +206,7 @@ describe('管理员降智检测', () => {
         ),
       )
       .mockResolvedValueOnce(
-        keyPage(
-          [keyFixture({ id: 101, name: 'Last key', key: 'last-test-secret' })],
-          101,
-          2,
-        ),
+        keyPage([keyFixture({ id: 101, name: 'Last key', key: 'last-test-secret' })], 101, 2),
       )
     const wrapper = mountPage()
     await flushPromises()
@@ -243,24 +224,18 @@ describe('管理员降智检测', () => {
       }),
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
-    expect(
-      wrapper.getComponent('#intelligence-key-select').props('options'),
-    ).toEqual([
+    expect(wrapper.getComponent('#intelligence-key-select').props('options')).toEqual([
       { value: 1, label: 'Personal key (#1)' },
       { value: 5, label: 'Personal key (#5)' },
       { value: 101, label: 'Last key (#101)' },
     ])
     await chooseKey(wrapper, 101)
-    expect(
-      (wrapper.get('#intelligence-api-key').element as HTMLInputElement).value,
-    ).toBe('last-test-secret')
+    expect((wrapper.get('#intelligence-api-key').element as HTMLInputElement).value).toBe(
+      'last-test-secret',
+    )
     expect(wrapper.text()).not.toContain('last-test-secret')
-    wrapper
-      .getComponent('#intelligence-model')
-      .vm.$emit('update:modelValue', 'model-b')
-    await wrapper
-      .get('#intelligence-base-url')
-      .setValue('https://gateway.example/v1')
+    wrapper.getComponent('#intelligence-model').vm.$emit('update:modelValue', 'model-b')
+    await wrapper.get('#intelligence-base-url').setValue('https://gateway.example/v1')
     await wrapper.get('#intelligence-config-form').trigger('submit')
     await flushPromises()
     expect(save).toHaveBeenCalledWith(
@@ -279,29 +254,23 @@ describe('管理员降智检测', () => {
             resolveOld = resolve
           }),
       )
-      .mockResolvedValueOnce(
-        keyPage([keyFixture({ id: 30, group_id: 3, name: 'Group 3' })]),
-      )
+      .mockResolvedValueOnce(keyPage([keyFixture({ id: 30, group_id: 3, name: 'Group 3' })]))
     const wrapper = mountPage()
     await flushPromises()
     await clickText(wrapper, 'intelligence.add')
     await chooseGroup(wrapper, 1)
     await chooseKey(wrapper, 1)
     await chooseGroup(wrapper, 2)
-    expect(
-      (wrapper.get('#intelligence-api-key').element as HTMLInputElement).value,
-    ).toBe('')
-    expect(
-      wrapper.getComponent('#intelligence-key-select').props('modelValue'),
-    ).toBeNull()
+    expect((wrapper.get('#intelligence-api-key').element as HTMLInputElement).value).toBe('')
+    expect(wrapper.getComponent('#intelligence-key-select').props('modelValue')).toBeNull()
     const oldSignal = listKeys.mock.calls[1][3].signal as AbortSignal
     await chooseGroup(wrapper, 3)
     expect(oldSignal.aborted).toBe(true)
     resolveOld(keyPage([keyFixture({ id: 20, group_id: 2 })]))
     await flushPromises()
-    expect(
-      wrapper.getComponent('#intelligence-key-select').props('options'),
-    ).toEqual([{ value: 30, label: 'Group 3 (#30)' }])
+    expect(wrapper.getComponent('#intelligence-key-select').props('options')).toEqual([
+      { value: 30, label: 'Group 3 (#30)' },
+    ])
     wrapper.unmount()
   })
   it('关闭并重新打开弹窗时忽略旧查询且不保留手填或选择的密钥', async () => {
@@ -313,9 +282,7 @@ describe('管理员降智检测', () => {
             resolveOld = resolve
           }),
       )
-      .mockResolvedValueOnce(
-        keyPage([keyFixture({ id: 2, name: 'Fresh key' })]),
-      )
+      .mockResolvedValueOnce(keyPage([keyFixture({ id: 2, name: 'Fresh key' })]))
     const wrapper = mountPage()
     await flushPromises()
     await clickText(wrapper, 'common.edit')
@@ -326,18 +293,14 @@ describe('管理员降智检测', () => {
     await clickText(wrapper, 'common.edit')
     resolveOld(keyPage([keyFixture()]))
     await flushPromises()
-    expect(
-      (wrapper.get('#intelligence-api-key').element as HTMLInputElement).value,
-    ).toBe('')
-    expect(
-      wrapper.getComponent('#intelligence-key-select').props('options'),
-    ).toEqual([{ value: 2, label: 'Fresh key (#2)' }])
+    expect((wrapper.get('#intelligence-api-key').element as HTMLInputElement).value).toBe('')
+    expect(wrapper.getComponent('#intelligence-key-select').props('options')).toEqual([
+      { value: 2, label: 'Fresh key (#2)' },
+    ])
     wrapper.unmount()
   })
   it('查询失败可重试，手动改写后解除选择关联且刷新不会覆盖手填 Key', async () => {
-    listKeys
-      .mockRejectedValueOnce(new Error())
-      .mockResolvedValue(keyPage([keyFixture()]))
+    listKeys.mockRejectedValueOnce(new Error()).mockResolvedValue(keyPage([keyFixture()]))
     const wrapper = mountPage()
     await flushPromises()
     await clickText(wrapper, 'common.edit')
@@ -351,37 +314,25 @@ describe('管理员降智检测', () => {
     await flushPromises()
     await chooseKey(wrapper, 1)
     await wrapper.get('#intelligence-api-key').setValue('manual-test-secret')
-    expect(
-      wrapper.getComponent('#intelligence-key-select').props('modelValue'),
-    ).toBeNull()
+    expect(wrapper.getComponent('#intelligence-key-select').props('modelValue')).toBeNull()
     await refreshKeys().trigger('click')
     await flushPromises()
-    expect(
-      (wrapper.get('#intelligence-api-key').element as HTMLInputElement).value,
-    ).toBe('manual-test-secret')
+    expect((wrapper.get('#intelligence-api-key').element as HTMLInputElement).value).toBe(
+      'manual-test-secret',
+    )
     wrapper.unmount()
   })
   it('新配置默认仅手动60分钟，糖果只允许Responses', async () => {
     const wrapper = mountPage()
     await flushPromises()
     await clickText(wrapper, 'intelligence.add')
-    expect(
-      wrapper.getComponent('#intelligence-schedule').props('modelValue'),
-    ).toBe(false)
-    expect(
-      wrapper.getComponent('#intelligence-protocol').props('modelValue'),
-    ).toBe('responses')
-    expect(
-      wrapper.getComponent('#intelligence-protocol').props('disabled'),
-    ).toBe(true)
+    expect(wrapper.getComponent('#intelligence-schedule').props('modelValue')).toBe(false)
+    expect(wrapper.getComponent('#intelligence-protocol').props('modelValue')).toBe('responses')
+    expect(wrapper.getComponent('#intelligence-protocol').props('disabled')).toBe(true)
     wrapper.getComponent('#intelligence-group').vm.$emit('update:modelValue', 1)
     await flushPromises()
-    wrapper
-      .getComponent('#intelligence-model')
-      .vm.$emit('update:modelValue', 'model-b')
-    await wrapper
-      .get('#intelligence-base-url')
-      .setValue('https://gateway.example/v1')
+    wrapper.getComponent('#intelligence-model').vm.$emit('update:modelValue', 'model-b')
+    await wrapper.get('#intelligence-base-url').setValue('https://gateway.example/v1')
     await wrapper.get('#intelligence-api-key').setValue('test-secret-not-real')
     await wrapper.get('#intelligence-config-form').trigger('submit')
     await flushPromises()
@@ -409,9 +360,7 @@ describe('管理员降智检测', () => {
     )
     const wrapper = mountPage()
     await flushPromises()
-    const button = wrapper
-      .findAll('button')
-      .find((button) => button.text() === 'intelligence.run')!
+    const button = wrapper.findAll('button').find((button) => button.text() === 'intelligence.run')!
     await button.trigger('click')
     await button.trigger('click')
     expect(run).toHaveBeenCalledTimes(1)

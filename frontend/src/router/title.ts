@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import type { CustomMenuItem } from '@/types'
+import type { CustomMenuItem } from '@/api/settings.types'
 
 // title.ts resolves route display keys and browser document titles from route
 // metadata, configured menu names, and subscription entry visibility. The shared
@@ -16,8 +16,13 @@ import type { CustomMenuItem } from '@/types'
 // resolveDocumentTitle formats a translated route title with the site name.
 // Unavailable translations use a supplied static title, and missing route titles
 // produce the normalized site name alone.
-export function resolveDocumentTitle(routeTitle: unknown, siteName?: string, titleKey?: string): string {
-  const normalizedSiteName = typeof siteName === 'string' && siteName.trim() ? siteName.trim() : 'TokenRouter'
+export function resolveDocumentTitle(
+  routeTitle: unknown,
+  siteName?: string,
+  titleKey?: string,
+): string {
+  const normalizedSiteName =
+    typeof siteName === 'string' && siteName.trim() ? siteName.trim() : 'TokenRouter'
 
   if (typeof titleKey === 'string' && titleKey.trim()) {
     const translated = i18n.global.t(titleKey)
@@ -26,6 +31,8 @@ export function resolveDocumentTitle(routeTitle: unknown, siteName?: string, tit
     }
   }
 
+  // A missing or untranslated title key leaves the literal route title eligible, so a
+  // translation lookup never replaces it with the key text.
   if (typeof routeTitle === 'string' && routeTitle.trim()) {
     return `${routeTitle.trim()} - ${normalizedSiteName}`
   }
@@ -62,11 +69,14 @@ export function resolveRouteDocumentTitle(
   subscriptionEntryEnabled = true,
 ): string {
   const id = typeof route.params.id === 'string' ? route.params.id : ''
-  const menuItem = route.name === 'CustomPage' && id
-    ? customMenuItems.find((item) => item.id === id)
-    : undefined
+  const menuItem =
+    route.name === 'CustomPage' && id ? customMenuItems.find((item) => item.id === id) : undefined
   const menuTitle = menuItem?.label.trim()
   const { titleKey } = resolveRouteDisplayKeys(route, subscriptionEntryEnabled)
 
-  return resolveDocumentTitle(menuTitle || route.meta.title, siteName, menuTitle ? undefined : titleKey)
+  return resolveDocumentTitle(
+    menuTitle || route.meta.title,
+    siteName,
+    menuTitle ? undefined : titleKey,
+  )
 }

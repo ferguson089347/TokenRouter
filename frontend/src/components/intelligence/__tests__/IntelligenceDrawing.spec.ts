@@ -3,6 +3,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import IntelligenceDrawing from '../IntelligenceDrawing.vue'
 import { intelligenceResultsKey } from '../useIntelligenceResults'
 
+// IntelligenceDrawing.spec.ts checks visibility-driven drawing previews through ticket and
+// observer substitutes. It verifies that generated documents use isolated frames, invalid
+// destinations remain blocked, and leaving the visible area removes the active preview frame.
+
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({ t: (key: string) => key }),
@@ -43,9 +47,7 @@ describe('画图预览隔离', () => {
     expect(frame.attributes('sandbox')).toBe('allow-scripts')
     expect(frame.attributes('referrerpolicy')).toBe('no-referrer')
     expect(frame.attributes('srcdoc')).toBeUndefined()
-    expect(frame.attributes('src')).toBe(
-      '/api/v1/intelligence-tests/preview-content/a.b',
-    )
+    expect(frame.attributes('src')).toBe('/api/v1/intelligence-tests/preview-content/a.b')
     expect(frame.attributes('scrolling')).not.toBe('no')
     expect(frame.attributes('tabindex')).not.toBe('-1')
     expect(frame.classes()).not.toContain('pointer-events-none')
@@ -74,9 +76,7 @@ describe('画图预览隔离', () => {
     expect(frame.attributes('sandbox')).toBe('allow-scripts')
     expect(frame.attributes('referrerpolicy')).toBe('no-referrer')
     expect(frame.attributes('srcdoc')).toBeUndefined()
-    expect(frame.attributes('src')).toBe(
-      '/api/v1/intelligence-tests/preview-content/a.b',
-    )
+    expect(frame.attributes('src')).toBe('/api/v1/intelligence-tests/preview-content/a.b')
     wrapper.unmount()
   })
   it('错误URL不会交给iframe执行', async () => {

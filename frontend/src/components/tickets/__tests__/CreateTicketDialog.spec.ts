@@ -4,34 +4,76 @@ import { defineComponent, h } from 'vue'
 import type { TicketSettings } from '@/api/tickets'
 
 const { create, getMyOrders } = vi.hoisted(() => ({ create: vi.fn(), getMyOrders: vi.fn() }))
-vi.mock('@/api/tickets', async (original) => ({ ...await original<typeof import('@/api/tickets')>(), ticketAPI: () => ({ create }) }))
+vi.mock('@/api/tickets', async (original) => ({
+  ...(await original<typeof import('@/api/tickets')>()),
+  ticketAPI: () => ({ create }),
+}))
 vi.mock('@/api/payment', () => ({ paymentAPI: { getMyOrders } }))
 vi.mock('@/api/client', () => ({ apiClient: {} }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 import CreateTicketDialog from '../CreateTicketDialog.vue'
 import Select from '@/components/common/Select.vue'
 
-const settings: TicketSettings = { enabled: true, max_open_tickets: 3, max_attachments: 5, max_attachment_size_mb: 10, notify_on_staff_reply: false, auto_expire_hours: 72 }
-const BaseDialog = defineComponent({ setup(_, { slots }) { return () => h('div', [slots.default?.(), slots.footer?.()]) } })
+// CreateTicketDialog.spec.ts checks ticket composition through the mounted dialog and mocked
+// account APIs. It verifies order association, stable retry identity, pending submission
+// controls, disabled-module responses, and Unicode title validation during ordinary input and
+// composition.
+
+const settings: TicketSettings = {
+  enabled: true,
+  max_open_tickets: 3,
+  max_attachments: 5,
+  max_attachment_size_mb: 10,
+  notify_on_staff_reply: false,
+  auto_expire_hours: 72,
+}
+const BaseDialog = defineComponent({
+  setup(_, { slots }) {
+    return () => h('div', [slots.default?.(), slots.footer?.()])
+  },
+})
 
 function render() {
-  return mount(CreateTicketDialog, { props: { show: true, settings }, global: { stubs: { BaseDialog, Select: true, TicketAttachments: true } } })
+  return mount(CreateTicketDialog, {
+    props: { show: true, settings },
+    global: { stubs: { BaseDialog, Select: true, TicketAttachments: true } },
+  })
 }
 
 describe('新建工单', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     create.mockResolvedValue({ id: 42 })
-    getMyOrders.mockResolvedValue({ data: { items: [{ id: 91, amount: 10, pay_amount: 72, currency: 'CNY', out_trade_no: 'ORDER91', created_at: '2026-09-13' }], total: 1 } })
+    getMyOrders.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: 91,
+            amount: 10,
+            pay_amount: 72,
+            currency: 'CNY',
+            out_trade_no: 'ORDER91',
+            created_at: '2026-09-13',
+          },
+        ],
+        total: 1,
+      },
+    })
   })
 
   it('默认咨询，创建和筛选使用相同的三种工单类型', async () => {
     const wrapper = render()
     const typeSelect = wrapper.findAllComponents(Select)[0]
-    expect(typeSelect.props('options').map((option: { value: string }) => option.value)).toEqual(['consultation', 'financial', 'technical'])
+    expect(typeSelect.props('options').map((option: { value: string }) => option.value)).toEqual([
+      'consultation',
+      'financial',
+      'technical',
+    ])
     expect(typeSelect.props('modelValue')).toBe('consultation')
     const prioritySelect = wrapper.findAllComponents(Select)[1]
-    expect(prioritySelect.props('options').map((option: { value: string }) => option.value)).toEqual(['low', 'normal', 'high'])
+    expect(
+      prioritySelect.props('options').map((option: { value: string }) => option.value),
+    ).toEqual(['low', 'normal', 'high'])
     expect(prioritySelect.props('modelValue')).toBe('normal')
     await wrapper.get('#ticket-title').setValue('使用咨询')
     await wrapper.get('#ticket-content').setValue('如何使用')
@@ -48,7 +90,9 @@ describe('新建工单', () => {
     wrapper.findAllComponents(Select)[0].vm.$emit('update:modelValue', 'financial')
     await flushPromises()
     expect(getMyOrders).toHaveBeenCalledWith({ page: 1, page_size: 50 })
-    const orderSelect = wrapper.findAllComponents(Select).find(component => component.attributes('id') === 'ticket-order')!
+    const orderSelect = wrapper
+      .findAllComponents(Select)
+      .find((component) => component.attributes('id') === 'ticket-order')!
     expect(orderSelect.props('options')[0].label).toContain('CNY 72.00')
     orderSelect.vm.$emit('update:modelValue', 91)
     await flushPromises()
@@ -78,7 +122,11 @@ describe('新建工单', () => {
 
   it('提交未完成期间禁止重复发送，保留输入直到收到成功结果', async () => {
     let resolve!: (value: { id: number }) => void
-    create.mockReturnValue(new Promise(done => { resolve = done }))
+    create.mockReturnValue(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
     const wrapper = render()
     await wrapper.get('#ticket-title').setValue('技术问题')
     await wrapper.get('#ticket-content').setValue('需要帮助')
@@ -104,7 +152,7 @@ describe('新建工单', () => {
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
 
-  it.each(['a', '中', '😀'])('按码点接收50字并排除首尾空格（%s）', async character => {
+  it.each(['a', '中', '😀'])('按码点接收50字并排除首尾空格（%s）', async (character) => {
     const wrapper = render()
     const title = character.repeat(50)
     await wrapper.get('#ticket-title').setValue(`  ${title}  `)
@@ -117,20 +165,23 @@ describe('新建工单', () => {
     expect(create.mock.calls[0][0].title).toBe(title)
   })
 
-  it.each(['a', '中', '😀'])('51字显示提示并阻止直接触发表单绕过禁用按钮（%s）', async character => {
-    const wrapper = render()
-    const title = character.repeat(51)
-    await wrapper.get('#ticket-title').setValue(title)
-    await wrapper.get('#ticket-content').setValue('问题内容')
-    expect(wrapper.get('#ticket-title-count').text()).toBe('51 / 50')
-    expect(wrapper.get('#ticket-title').attributes('aria-invalid')).toBe('true')
-    expect((wrapper.get('#ticket-title').element as HTMLInputElement).value).toBe(title)
-    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[role="alert"]').text()).toBe('tickets.errors.TICKET_TITLE_TOO_LONG')
-    await wrapper.get('form').trigger('submit')
-    await flushPromises()
-    expect(create).not.toHaveBeenCalled()
-  })
+  it.each(['a', '中', '😀'])(
+    '51字显示提示并阻止直接触发表单绕过禁用按钮（%s）',
+    async (character) => {
+      const wrapper = render()
+      const title = character.repeat(51)
+      await wrapper.get('#ticket-title').setValue(title)
+      await wrapper.get('#ticket-content').setValue('问题内容')
+      expect(wrapper.get('#ticket-title-count').text()).toBe('51 / 50')
+      expect(wrapper.get('#ticket-title').attributes('aria-invalid')).toBe('true')
+      expect((wrapper.get('#ticket-title').element as HTMLInputElement).value).toBe(title)
+      expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.get('[role="alert"]').text()).toBe('tickets.errors.TICKET_TITLE_TOO_LONG')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+      expect(create).not.toHaveBeenCalled()
+    },
+  )
 
   it('中文输入法的中间拼音不计数且不能提交，合成结束后按最终汉字验证', async () => {
     const wrapper = render()
@@ -151,5 +202,4 @@ describe('新建工单', () => {
     await flushPromises()
     expect(create.mock.calls[0][0].title).toBe('中'.repeat(49) + '文')
   })
-
 })

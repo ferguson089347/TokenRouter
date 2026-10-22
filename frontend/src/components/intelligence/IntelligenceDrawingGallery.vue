@@ -39,9 +39,7 @@
         class="flex w-full cursor-pointer items-center justify-between gap-3 border-t border-gray-100 px-3 py-3 text-left text-xs hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:hover:bg-dark-700"
         @click="emit('select', artifact)"
       >
-        <span class="text-gray-500">{{
-          formatDateTime(artifact.created_at)
-        }}</span
+        <span class="text-gray-500">{{ formatDateTime(artifact.created_at) }}</span
         ><span class="font-medium text-primary-600 dark:text-primary-400">{{
           t('intelligence.preview')
         }}</span>
@@ -79,8 +77,7 @@ const emit = defineEmits<{ select: [run: IntelligenceRun] }>()
 const { t } = useI18n()
 const gallery = ref<HTMLElement>()
 const dragging = ref(false)
-let drag: { pointerId: number; startX: number; scrollLeft: number } | null =
-  null
+let drag: { pointerId: number; startX: number; scrollLeft: number } | null = null
 
 // setScrollLeft clamps gallery position to its available horizontal range and
 // reports movement. Callers consume wheel and keyboard events only after
@@ -89,10 +86,7 @@ function setScrollLeft(left: number) {
   const element = gallery.value
   if (!element) return false
   const before = element.scrollLeft
-  element.scrollLeft = Math.max(
-    0,
-    Math.min(element.scrollWidth - element.clientWidth, left),
-  )
+  element.scrollLeft = Math.max(0, Math.min(element.scrollWidth - element.clientWidth, left))
   return element.scrollLeft !== before
 }
 
@@ -102,12 +96,8 @@ function setScrollLeft(left: number) {
 function onWheel(event: WheelEvent) {
   const element = gallery.value
   if (!element || event.ctrlKey) return
-  const delta =
-    Math.abs(event.deltaX) > Math.abs(event.deltaY)
-      ? event.deltaX
-      : event.deltaY
-  const unit =
-    event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientWidth : 1
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientWidth : 1
   // Consume wheel input after actual horizontal movement so reaching a gallery
   // edge allows the surrounding page to continue scrolling.
   if (setScrollLeft(element.scrollLeft + delta * unit)) event.preventDefault()
@@ -129,9 +119,7 @@ function startDrag(event: PointerEvent) {
   // capture so their click and keyboard activation can open drawing details.
   if (
     event.target instanceof Element &&
-    event.target.closest(
-      'button, a, input, textarea, select, [contenteditable="true"]',
-    )
+    event.target.closest('button, a, input, textarea, select, [contenteditable="true"]')
   )
     return
   drag = {
@@ -162,22 +150,12 @@ function moveDrag(event: PointerEvent) {
 // Events from other pointers leave it intact, while focus loss and teardown
 // can call without a pointer to finish cleanup.
 function endDrag(event?: PointerEvent | FocusEvent) {
-  if (
-    event &&
-    'pointerId' in event &&
-    drag &&
-    event.pointerId !== drag.pointerId
-  )
-    return
+  if (event && 'pointerId' in event && drag && event.pointerId !== drag.pointerId) return
   const pointerId = drag?.pointerId
   drag = null
   dragging.value = false
   const element = gallery.value
-  if (
-    element &&
-    pointerId !== undefined &&
-    element.hasPointerCapture(pointerId)
-  )
+  if (element && pointerId !== undefined && element.hasPointerCapture(pointerId))
     element.releasePointerCapture(pointerId)
 }
 
@@ -186,14 +164,7 @@ function endDrag(event?: PointerEvent | FocusEvent) {
 // handled keys are consumed only when scrolling moves.
 function onKeydown(event: KeyboardEvent) {
   const element = gallery.value
-  if (
-    !element ||
-    event.target !== element ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey
-  )
-    return
+  if (!element || event.target !== element || event.ctrlKey || event.metaKey || event.altKey) return
   const offsets: Record<string, number> = {
     ArrowLeft: element.scrollLeft - 320,
     ArrowRight: element.scrollLeft + 320,
@@ -203,8 +174,7 @@ function onKeydown(event: KeyboardEvent) {
     End: element.scrollWidth,
   }
   const offset = offsets[event.key]
-  if (typeof offset === 'number' && setScrollLeft(offset))
-    event.preventDefault()
+  if (typeof offset === 'number' && setScrollLeft(offset)) event.preventDefault()
 }
 
 // Clear capture on focus loss and teardown as well as pointer completion,

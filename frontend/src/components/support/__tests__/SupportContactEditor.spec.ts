@@ -50,9 +50,7 @@ describe('SupportContactEditor', () => {
     )
     await wrapper.get('[data-add]').trigger('click')
     expect(
-      parseSupportContacts(
-        wrapper.emitted('update:modelValue')!.at(-1)![0] as string,
-      ),
+      parseSupportContacts(wrapper.emitted('update:modelValue')!.at(-1)![0] as string),
     ).toHaveLength(2)
     wrapper.unmount()
   })
@@ -81,18 +79,12 @@ describe('SupportContactEditor', () => {
       value: [accepted],
     })
     await input.trigger('change')
-    await vi.waitFor(() =>
-      expect(wrapper.emitted('update:modelValue')).toHaveLength(1),
-    )
+    await vi.waitFor(() => expect(wrapper.emitted('update:modelValue')).toHaveLength(1))
     const saved = wrapper.emitted('update:modelValue')![0][0] as string
-    expect(parseSupportContacts(saved)[0].image).toMatch(
-      /^data:image\/png;base64,/,
-    )
-    const oversized = new File(
-      [new Uint8Array(500 * 1024 + 1)],
-      'oversized.png',
-      { type: 'image/png' },
-    )
+    expect(parseSupportContacts(saved)[0].image).toMatch(/^data:image\/png;base64,/)
+    const oversized = new File([new Uint8Array(500 * 1024 + 1)], 'oversized.png', {
+      type: 'image/png',
+    })
     Object.defineProperty(input.element, 'files', {
       configurable: true,
       value: [oversized],

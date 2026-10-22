@@ -1,10 +1,7 @@
 <template>
   <AppLayout>
-    <!-- 宽屏下资料卡铺满主区，卡内分为左右两列。 -->
-    <div
-      data-testid="profile-shell"
-      class="mx-auto w-full min-w-0 max-w-screen-2xl"
-    >
+    <!-- The profile card fills the main region and arranges its internal sections in two columns on wide screens. -->
+    <div data-testid="profile-shell" class="mx-auto w-full min-w-0 max-w-screen-2xl">
       <ProfileInfoCard
         :user="user"
         :linuxdo-enabled="linuxdoOAuthEnabled"
@@ -15,15 +12,12 @@
         :wechat-open-enabled="wechatOAuthOpenEnabled"
         :wechat-mp-enabled="wechatOAuthMPEnabled"
       >
-        <!-- 右列：安全设置与余额提醒 -->
+        <!-- Security and notification settings occupy the companion column. -->
         <template #side>
           <ProfilePasswordForm />
-          <!-- 双因素认证卡片根据接口返回的开放状态自行决定是否显示 -->
+          <!-- The TOTP card decides visibility from the feature status returned by its own endpoint. -->
           <ProfileTotpCard />
-          <ProfilePasskeyCard
-            v-if="passkeyEnabled"
-            :enabled="passkeyEnabled"
-          />
+          <ProfilePasskeyCard v-if="passkeyEnabled" :enabled="passkeyEnabled" />
 
           <ProfileBalanceNotifyCard
             v-if="user && balanceLowNotifyEnabled"
@@ -36,7 +30,9 @@
         </template>
       </ProfileInfoCard>
       <section v-if="appStore.contactInfo" id="contact-support" class="card mt-4 p-6">
-        <h2 class="mb-4 text-base font-semibold text-gray-900 dark:text-dark-50">{{ t('common.contactSupport') }}</h2>
+        <h2 class="mb-4 text-base font-semibold text-gray-900 dark:text-dark-50">{{
+          t('common.contactSupport')
+        }}</h2>
         <SupportContactList :value="appStore.contactInfo" />
       </section>
     </div>
@@ -57,17 +53,20 @@ import { isWeChatWebOAuthEnabled } from '@/api/auth'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 
-// ProfileView.vue combines account identity, security controls, notification
-// preferences, and the site's support contacts. Public settings determine optional
-// controls and localized contact details; the support renderer shares its numbers,
-// links, and image previews with the global header.
+// ProfileView.vue assembles profile details, balance notifications, and account security
+// sections. It refreshes the user and public settings independently at mount, then passes
+// feature availability and configured provider labels to the sections that own their editing
+// flows.
 
-// Profile state reads the shared account and site settings while feature responses control available identity and security panels.
+// The app store supplies public feature settings while the auth store supplies the shared
+// profile consumed by editable account sections.
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
 
+// Feature flags start disabled until settings load; optional WeChat capability flags remain
+// undefined when the server supplies no explicit per-flow value.
 const balanceLowNotifyEnabled = ref(false)
 const systemDefaultThreshold = ref(0)
 const linuxdoOAuthEnabled = ref(false)
@@ -79,12 +78,15 @@ const oidcOAuthEnabled = ref(false)
 const oidcOAuthProviderName = ref('OIDC')
 const passkeyEnabled = ref(false)
 
+// Load the profile and public settings concurrently so an unavailable settings response does
+// not prevent the account record from refreshing independently.
 onMounted(async () => {
   const profileRefresh = authStore.refreshUser().catch((error) => {
     console.error('Failed to refresh profile:', error)
   })
 
-  const settingsLoad = appStore.fetchPublicSettings()
+  const settingsLoad = appStore
+    .fetchPublicSettings()
     .then((settings) => {
       if (!settings) {
         return
@@ -94,12 +96,14 @@ onMounted(async () => {
       linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled ?? false
       dingtalkOAuthEnabled.value = settings.dingtalk_oauth_enabled ?? false
       wechatOAuthEnabled.value = isWeChatWebOAuthEnabled(settings)
-      wechatOAuthOpenEnabled.value = typeof settings.wechat_oauth_open_enabled === 'boolean'
-        ? settings.wechat_oauth_open_enabled
-        : undefined
-      wechatOAuthMPEnabled.value = typeof settings.wechat_oauth_mp_enabled === 'boolean'
-        ? settings.wechat_oauth_mp_enabled
-        : undefined
+      wechatOAuthOpenEnabled.value =
+        typeof settings.wechat_oauth_open_enabled === 'boolean'
+          ? settings.wechat_oauth_open_enabled
+          : undefined
+      wechatOAuthMPEnabled.value =
+        typeof settings.wechat_oauth_mp_enabled === 'boolean'
+          ? settings.wechat_oauth_mp_enabled
+          : undefined
       oidcOAuthEnabled.value = settings.oidc_oauth_enabled ?? false
       oidcOAuthProviderName.value = settings.oidc_oauth_provider_name || 'OIDC'
       passkeyEnabled.value = settings.passkey_enabled === true

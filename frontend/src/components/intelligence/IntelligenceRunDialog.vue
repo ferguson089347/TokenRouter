@@ -1,10 +1,5 @@
 <template>
-  <BaseDialog
-    :show="show"
-    :title="t('intelligence.detail')"
-    width="wide"
-    @close="emit('close')"
-  >
+  <BaseDialog :show="show" :title="t('intelligence.detail')" width="wide" @close="emit('close')">
     <div v-if="loading" role="status" class="py-12 text-center text-gray-500">
       {{ t('common.loading') }}
     </div>
@@ -35,29 +30,20 @@
       >
         {{ run.error_message }}
       </p>
-      <p
-        v-if="run.assessment_reason"
-        class="text-sm text-gray-600 dark:text-gray-300"
-      >
+      <p v-if="run.assessment_reason" class="text-sm text-gray-600 dark:text-gray-300">
         {{ run.assessment_reason }}
       </p>
       <section v-if="run.question">
         <h4 class="mb-2 text-sm font-semibold">
           {{ t('intelligence.question') }}
         </h4>
-        <div
-          class="intelligence-markdown"
-          v-html="resultMarkdown(run.question)"
-        />
+        <div class="intelligence-markdown" v-html="resultMarkdown(run.question)" />
       </section>
       <section v-if="run.answer">
         <h4 class="mb-2 text-sm font-semibold">
           {{ t('intelligence.answer') }}
         </h4>
-        <div
-          class="intelligence-markdown"
-          v-html="resultMarkdown(run.answer)"
-        />
+        <div class="intelligence-markdown" v-html="resultMarkdown(run.answer)" />
       </section>
       <p
         v-if="!run.question && !run.answer && !run.html && !run.error_message"
@@ -113,9 +99,7 @@ const { t } = useI18n()
 // number formats finite reported measurements and leaves absent or invalid
 // values unknown.
 const number = (value?: number | null) =>
-  typeof value === 'number' && Number.isFinite(value)
-    ? value.toLocaleString()
-    : '—'
+  typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '—'
 const stats = computed(() => [
   {
     label: 'duration',

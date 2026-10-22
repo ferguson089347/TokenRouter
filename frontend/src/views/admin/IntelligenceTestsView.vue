@@ -9,18 +9,9 @@
           </p>
         </div>
         <div class="flex gap-2">
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm"
-            :disabled="loading"
-            @click="load"
-          >
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="loading" @click="load">
             {{ t('common.refresh') }}</button
-          ><button
-            type="button"
-            class="btn btn-primary btn-sm"
-            @click="openForm()"
-          >
+          ><button type="button" class="btn btn-primary btn-sm" @click="openForm()">
             {{ t('intelligence.add') }}
           </button>
         </div>
@@ -38,27 +29,16 @@
       >
         {{ error }}
       </p>
-      <div
-        v-if="loading && !configs.length"
-        role="status"
-        class="py-16 text-center text-gray-500"
-      >
+      <div v-if="loading && !configs.length" role="status" class="py-16 text-center text-gray-500">
         {{ t('common.loading') }}
       </div>
-      <div
-        v-if="!loading && !error && !configs.length"
-        class="card p-12 text-center"
-      >
+      <div v-if="!loading && !error && !configs.length" class="card p-12 text-center">
         <h2 class="font-semibold">{{ t('intelligence.adminEmpty') }}</h2>
         <p class="mt-2 text-sm text-gray-500">
           {{ t('intelligence.adminEmptyHint') }}
         </p>
       </div>
-      <section
-        v-for="group in groupedConfigs"
-        :key="group.id"
-        class="card overflow-hidden"
-      >
+      <section v-for="group in groupedConfigs" :key="group.id" class="card overflow-hidden">
         <div
           class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-4 dark:border-dark-700 sm:px-6"
         >
@@ -98,11 +78,7 @@
                 }}</span>
               </div>
               <p class="mt-2 text-xs text-gray-500">
-                {{
-                  config.protocol === 'responses'
-                    ? 'Responses'
-                    : 'Chat Completions'
-                }}
+                {{ config.protocol === 'responses' ? 'Responses' : 'Chat Completions' }}
                 ·
                 {{
                   config.schedule_enabled
@@ -116,10 +92,7 @@
                 v-if="config.latest_run"
                 class="mt-2 inline-flex items-center gap-2 text-xs text-gray-500"
               >
-                <span
-                  class="h-2 w-2 rounded-full"
-                  :class="resultColor(config.latest_run)"
-                />{{
+                <span class="h-2 w-2 rounded-full" :class="resultColor(config.latest_run)" />{{
                   t(`intelligence.statuses.${resultStatus(config.latest_run)}`)
                 }}
                 · {{ formatDateTime(config.latest_run.created_at) }}
@@ -130,19 +103,12 @@
                 type="button"
                 class="btn btn-primary btn-sm"
                 :disabled="
-                  !moduleEnabled ||
-                  !config.enabled ||
-                  isBusy(config) ||
-                  runningIDs.has(config.id)
+                  !moduleEnabled || !config.enabled || isBusy(config) || runningIDs.has(config.id)
                 "
                 @click="runTest(config)"
               >
                 {{ t('intelligence.run') }}</button
-              ><button
-                type="button"
-                class="btn btn-secondary btn-sm"
-                @click="openHistory(config)"
-              >
+              ><button type="button" class="btn btn-secondary btn-sm" @click="openHistory(config)">
                 {{ t('intelligence.history') }}</button
               ><button
                 type="button"
@@ -171,11 +137,7 @@
         :close-on-escape="!saving"
         @close="closeForm"
       >
-        <form
-          id="intelligence-config-form"
-          class="space-y-5"
-          @submit.prevent="save"
-        >
+        <form id="intelligence-config-form" class="space-y-5" @submit.prevent="save">
           <p v-if="formError" role="alert" class="text-sm text-red-600">
             {{ formError }}
           </p>
@@ -201,9 +163,7 @@
                 id="intelligence-model"
                 v-model="form.model"
                 :options="modelOptions"
-                :disabled="
-                  saving || !!editingID || !form.group_id || modelsLoading
-                "
+                :disabled="saving || !!editingID || !form.group_id || modelsLoading"
                 searchable
                 creatable
                 :placeholder="t('intelligence.modelPlaceholder')"
@@ -232,10 +192,7 @@
                 :options="protocolOptions"
                 :disabled="saving || form.benchmark === 'candy'"
               />
-              <p
-                v-if="form.benchmark === 'candy'"
-                class="mt-2 text-xs text-gray-500"
-              >
+              <p v-if="form.benchmark === 'candy'" class="mt-2 text-xs text-gray-500">
                 {{ t('intelligence.candyProtocolHint') }}
               </p>
             </div>
@@ -325,11 +282,7 @@
               :required="!storedKey"
               :disabled="saving"
               :placeholder="
-                t(
-                  storedKey
-                    ? 'intelligence.apiKeyKeep'
-                    : 'intelligence.apiKeyRequired',
-                )
+                t(storedKey ? 'intelligence.apiKeyKeep' : 'intelligence.apiKeyRequired')
               "
               @input="selectedKeyID = null"
             />
@@ -353,9 +306,7 @@
               />
             </div>
             <div>
-              <label for="intelligence-tier" class="input-label">{{
-                t('intelligence.tier')
-              }}</label
+              <label for="intelligence-tier" class="input-label">{{ t('intelligence.tier') }}</label
               ><Select
                 id="intelligence-tier"
                 v-model="form.service_tier"
@@ -370,11 +321,7 @@
             <label for="intelligence-config-enabled" class="input-label">{{
               t('intelligence.enabled')
             }}</label
-            ><Toggle
-              id="intelligence-config-enabled"
-              v-model="form.enabled"
-              :disabled="saving"
-            />
+            ><Toggle id="intelligence-config-enabled" v-model="form.enabled" :disabled="saving" />
           </div>
           <div class="flex items-center justify-between gap-4">
             <div>
@@ -385,11 +332,7 @@
                 {{ t('intelligence.scheduleHint') }}
               </p>
             </div>
-            <Toggle
-              id="intelligence-schedule"
-              v-model="form.schedule_enabled"
-              :disabled="saving"
-            />
+            <Toggle id="intelligence-schedule" v-model="form.schedule_enabled" :disabled="saving" />
           </div>
           <div v-if="form.schedule_enabled">
             <label for="intelligence-interval" class="input-label">{{
@@ -409,12 +352,7 @@
           </div>
         </form>
         <template #footer
-          ><button
-            type="button"
-            class="btn btn-secondary"
-            :disabled="saving"
-            @click="closeForm"
-          >
+          ><button type="button" class="btn btn-secondary" :disabled="saving" @click="closeForm">
             {{ t('common.cancel') }}</button
           ><button
             type="submit"
@@ -444,12 +382,7 @@
             @click="deleting = null"
           >
             {{ t('common.cancel') }}</button
-          ><button
-            type="button"
-            class="btn btn-primary"
-            :disabled="removing"
-            @click="remove"
-          >
+          ><button type="button" class="btn btn-primary" :disabled="removing" @click="remove">
             {{ t('common.delete') }}
           </button></template
         ></BaseDialog
@@ -459,11 +392,7 @@
         :title="`${t('intelligence.history')} · ${historyConfig?.model || ''}`"
         width="wide"
         @close="closeHistory"
-        ><p
-          v-if="historyLoading"
-          role="status"
-          class="py-8 text-center text-gray-500"
-        >
+        ><p v-if="historyLoading" role="status" class="py-8 text-center text-gray-500">
           {{ t('common.loading') }}
         </p>
         <p v-else-if="historyError" role="alert" class="text-sm text-red-600">
@@ -481,10 +410,9 @@
             >
               <span>{{ formatDateTime(run.created_at) }}</span
               ><span class="inline-flex items-center gap-2"
-                ><span
-                  class="h-2.5 w-2.5 rounded-full"
-                  :class="resultColor(run)"
-                />{{ t(`intelligence.statuses.${resultStatus(run)}`) }}</span
+                ><span class="h-2.5 w-2.5 rounded-full" :class="resultColor(run)" />{{
+                  t(`intelligence.statuses.${resultStatus(run)}`)
+                }}</span
               >
             </button>
           </div></template
@@ -519,7 +447,8 @@ import {
 } from '@/api/intelligence'
 import * as groupsAPI from '@/api/admin/groups'
 import { keysAPI } from '@/api/keys'
-import type { AdminGroup, ApiKey } from '@/types'
+import type { AdminGroup } from '@/api/groups.types'
+import type { ApiKey } from '@/api/keys.types'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatDateTime } from '@/utils/format'
@@ -543,9 +472,7 @@ import { provideIntelligenceResults } from '@/components/intelligence/useIntelli
 const { t } = useI18n()
 const results = provideIntelligenceResults(true)
 const appStore = useAppStore()
-const moduleEnabled = computed(
-  () => appStore.cachedPublicSettings?.intelligence_enabled === true,
-)
+const moduleEnabled = computed(() => appStore.cachedPublicSettings?.intelligence_enabled === true)
 const configs = ref<IntelligenceConfig[]>([])
 const groups = ref<AdminGroup[]>([])
 const loading = ref(false)
@@ -598,10 +525,7 @@ const defaultForm = (): IntelligenceConfigInput => ({
 })
 const form = reactive<IntelligenceConfigInput>(defaultForm())
 const groupedConfigs = computed(() => {
-  const map = new Map<
-    number,
-    { id: number; name: string; configs: IntelligenceConfig[] }
-  >()
+  const map = new Map<number, { id: number; name: string; configs: IntelligenceConfig[] }>()
   for (const config of configs.value) {
     if (!map.has(config.group_id))
       map.set(config.group_id, {
@@ -618,13 +542,8 @@ const groupOptions = computed(() => {
     value: group.id,
     label: group.name,
   }))
-  if (
-    form.group_id &&
-    !options.some((option) => option.value === form.group_id)
-  ) {
-    const existing = configs.value.find(
-      (config) => config.group_id === form.group_id,
-    )
+  if (form.group_id && !options.some((option) => option.value === form.group_id)) {
+    const existing = configs.value.find((config) => config.group_id === form.group_id)
     options.push({
       value: form.group_id,
       label: existing?.group_name || `#${form.group_id}`,
@@ -633,9 +552,10 @@ const groupOptions = computed(() => {
   return options
 })
 const modelOptions = computed(() =>
-  [...new Set([...models.value, ...(form.model ? [form.model] : [])])].map(
-    (model) => ({ value: model, label: model }),
-  ),
+  [...new Set([...models.value, ...(form.model ? [form.model] : [])])].map((model) => ({
+    value: model,
+    label: model,
+  })),
 )
 // Key options identify credentials by name and ID, keeping password values
 // confined to the submitted form and its transient candidate records.
@@ -669,11 +589,7 @@ const valid = computed(() => {
   try {
     const url = new URL(form.base_url.trim())
     validURL =
-      url.protocol === 'https:' &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash
+      url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash
   } catch {
     /* Incomplete input remains invalid while the administrator types the address, so parsing failures do not interrupt form editing. */
   }
@@ -690,8 +606,7 @@ const valid = computed(() => {
 // isBusy reports whether the latest observation occupies the configuration's
 // active job slot.
 const isBusy = (config: IntelligenceConfig) =>
-  !!config.latest_run &&
-  ['queued', 'submitting', 'running'].includes(config.latest_run.status)
+  !!config.latest_run && ['queued', 'submitting', 'running'].includes(config.latest_run.status)
 
 // load refreshes the visible configuration or result list for this page. It
 // cancels the previous request and ignores aborted completions so an older
@@ -720,8 +635,7 @@ async function loadGroups() {
     const result = await groupsAPI.getAll()
     if (!disposed) groups.value = result
   } catch (err) {
-    if (!disposed)
-      error.value = extractApiErrorMessage(err, t('intelligence.loadFailed'))
+    if (!disposed) error.value = extractApiErrorMessage(err, t('intelligence.loadFailed'))
   }
 }
 // loadModels reads model candidates for the selected group using an increasing
@@ -740,10 +654,7 @@ async function loadModels() {
     if (revision === modelRevision && !disposed) models.value = result
   } catch (err) {
     if (revision === modelRevision && !disposed)
-      formError.value = extractApiErrorMessage(
-        err,
-        t('intelligence.loadFailed'),
-      )
+      formError.value = extractApiErrorMessage(err, t('intelligence.loadFailed'))
   } finally {
     if (revision === modelRevision && !disposed) modelsLoading.value = false
   }
@@ -816,15 +727,9 @@ async function loadAPIKeys() {
         },
         { signal: controller.signal },
       )
-      if (
-        controller.signal.aborted ||
-        disposed ||
-        !showForm.value ||
-        form.group_id !== groupID
-      )
+      if (controller.signal.aborted || disposed || !showForm.value || form.group_id !== groupID)
         return
-      for (const key of result.items)
-        if (canUseKey(key, groupID)) collected.set(key.id, key)
+      for (const key of result.items) if (canUseKey(key, groupID)) collected.set(key.id, key)
       if (!result.items.length || page * result.page_size >= result.total) break
     }
     apiKeys.value = [...collected.values()]
@@ -841,9 +746,7 @@ async function loadAPIKeys() {
 // Missing or stale options clear the value, and backend validation checks the
 // submitted credential again before saving or running tests.
 function selectApiKey(id: string | number | boolean | null | undefined) {
-  const key = apiKeys.value.find(
-    (item) => item.id === id && canUseKey(item, form.group_id),
-  )
+  const key = apiKeys.value.find((item) => item.id === id && canUseKey(item, form.group_id))
   selectedKeyID.value = key?.id ?? null
   form.api_key = key?.key ?? ''
 }
@@ -921,13 +824,7 @@ async function save() {
 // observation updates the row while server-side persistence handles concurrent
 // requests.
 async function runTest(config: IntelligenceConfig) {
-  if (
-    !moduleEnabled.value ||
-    !config.enabled ||
-    runningIDs.has(config.id) ||
-    isBusy(config)
-  )
-    return
+  if (!moduleEnabled.value || !config.enabled || runningIDs.has(config.id) || isBusy(config)) return
   runningIDs.add(config.id)
   try {
     const run = await intelligenceAPI.run(config.id)
@@ -951,9 +848,7 @@ async function remove() {
     appStore.showSuccess(t('intelligence.deleted'))
     await load()
   } catch (err) {
-    appStore.showError(
-      extractApiErrorMessage(err, t('intelligence.deleteFailed')),
-    )
+    appStore.showError(extractApiErrorMessage(err, t('intelligence.deleteFailed')))
   } finally {
     removing.value = false
   }
@@ -974,10 +869,7 @@ async function openHistory(config: IntelligenceConfig) {
     if (!controller.signal.aborted) history.value = runs
   } catch (err) {
     if (!controller.signal.aborted)
-      historyError.value = extractApiErrorMessage(
-        err,
-        t('intelligence.loadFailed'),
-      )
+      historyError.value = extractApiErrorMessage(err, t('intelligence.loadFailed'))
   } finally {
     if (!controller.signal.aborted) historyLoading.value = false
   }
@@ -1005,10 +897,7 @@ async function openRun(run: IntelligenceRun) {
     if (!controller.signal.aborted) selectedRun.value = result
   } catch (err) {
     if (!controller.signal.aborted)
-      detailError.value = extractApiErrorMessage(
-        err,
-        t('intelligence.loadFailed'),
-      )
+      detailError.value = extractApiErrorMessage(err, t('intelligence.loadFailed'))
   } finally {
     if (!controller.signal.aborted) detailLoading.value = false
   }
@@ -1039,11 +928,7 @@ watch(
   () => form.benchmark,
   (benchmark) => {
     if (benchmark === 'candy') form.protocol = 'responses'
-    if (
-      !reasoningOptions.value.some(
-        (option) => option.value === form.reasoning_effort,
-      )
-    )
+    if (!reasoningOptions.value.some((option) => option.value === form.reasoning_effort))
       form.reasoning_effort = ''
   },
 )
@@ -1053,12 +938,7 @@ onMounted(() => {
   // Refresh summaries while active work exists so the administrator sees
   // progress; paid submissions remain tied to the explicit run action.
   refreshTimer = setInterval(() => {
-    if (
-      !document.hidden &&
-      !loading.value &&
-      !showForm.value &&
-      configs.value.some(isBusy)
-    )
+    if (!document.hidden && !loading.value && !showForm.value && configs.value.some(isBusy))
       void load()
   }, 15000)
 })

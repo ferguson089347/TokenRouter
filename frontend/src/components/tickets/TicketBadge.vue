@@ -3,17 +3,13 @@
     <span
       class="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium"
       :class="color"
-      >{{
-        t(`tickets.${kind === 'status' ? 'statuses' : 'priorities'}.${value}`)
-      }}</span
+      >{{ t(`tickets.${kind === 'status' ? 'statuses' : 'priorities'}.${value}`) }}</span
     >
     <span
       v-if="closeRole"
       data-testid="ticket-close-role"
       class="whitespace-nowrap text-xs text-gray-500 dark:text-dark-400"
-      >{{
-        t('tickets.closedBy', { role: t(`tickets.closeRoles.${closeRole}`) })
-      }}</span
+      >{{ t('tickets.closedBy', { role: t(`tickets.closeRoles.${closeRole}`) }) }}</span
     >
   </span>
 </template>
@@ -36,15 +32,9 @@ const { t } = useI18n()
 // Closing role comes from the server snapshot; missing historical actors remain
 // unknown because the current viewer and last sender may differ.
 const closeRole = computed(() => {
-  if (
-    props.kind !== 'status' ||
-    !['completed', 'cancelled', 'expired'].includes(props.value)
-  )
+  if (props.kind !== 'status' || !['completed', 'cancelled', 'expired'].includes(props.value))
     return null
-  if (
-    props.closedByRole &&
-    ['user', 'admin', 'system'].includes(props.closedByRole)
-  )
+  if (props.closedByRole && ['user', 'admin', 'system'].includes(props.closedByRole))
     return props.closedByRole
   return props.value === 'expired' ? 'system' : 'unknown'
 })

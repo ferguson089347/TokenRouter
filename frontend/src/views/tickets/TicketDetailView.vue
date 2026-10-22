@@ -4,9 +4,7 @@
     <div
       class="ticket-workspace mx-auto flex min-h-0 min-w-0 w-full max-w-5xl flex-1 flex-col gap-2 overflow-hidden"
     >
-      <div
-        class="ticket-toolbar flex min-w-0 shrink-0 items-center justify-between gap-2"
-      >
+      <div class="ticket-toolbar flex min-w-0 shrink-0 items-center justify-between gap-2">
         <RouterLink
           :to="base"
           class="min-w-0 truncate py-2 text-sm text-primary-600 hover:underline dark:text-primary-400"
@@ -34,11 +32,7 @@
       >
         {{ error }}
       </p>
-      <div
-        v-if="loading && !ticket"
-        class="p-12 text-center text-gray-500"
-        role="status"
-      >
+      <div v-if="loading && !ticket" class="p-12 text-center text-gray-500" role="status">
         {{ t('common.loading') }}
       </div>
       <template v-if="ticket">
@@ -59,19 +53,14 @@
               </h1>
             </div>
             <div class="ticket-badges flex min-w-0 flex-wrap gap-2 sm:shrink-0">
-              <TicketBadge
-                kind="priority"
-                :value="ticket.priority"
-              /><TicketBadge
+              <TicketBadge kind="priority" :value="ticket.priority" /><TicketBadge
                 kind="status"
                 :value="ticket.status"
                 :closed-by-role="ticket.closed_by_role"
               />
             </div>
           </div>
-          <dl
-            class="ticket-metadata mt-3 grid min-w-0 gap-2 text-xs sm:grid-cols-3 sm:gap-2"
-          >
+          <dl class="ticket-metadata mt-3 grid min-w-0 gap-2 text-xs sm:grid-cols-3 sm:gap-2">
             <div v-if="admin" class="min-w-0">
               <dt class="text-gray-500">{{ t('tickets.user') }}</dt>
               <dd
@@ -83,10 +72,7 @@
             </div>
             <div class="min-w-0">
               <dt class="text-gray-500">{{ t('tickets.createdAt') }}</dt>
-              <dd
-                class="mt-1 min-w-0 truncate"
-                :title="formatDate(ticket.created_at)"
-              >
+              <dd class="mt-1 min-w-0 truncate" :title="formatDate(ticket.created_at)">
                 {{ formatDate(ticket.created_at) }}
               </dd>
             </div>
@@ -99,9 +85,7 @@
                 <span
                   class="min-w-0 truncate"
                   :title="ticket.order?.out_trade_no || `#${ticket.order_id}`"
-                  >{{
-                    ticket.order?.out_trade_no || `#${ticket.order_id}`
-                  }}</span
+                  >{{ ticket.order?.out_trade_no || `#${ticket.order_id}` }}</span
                 ><span v-if="ticket.order" class="shrink-0"
                   >{{ ticket.order.currency || 'CNY' }}
                   {{ ticket.order.pay_amount.toFixed(2) }}</span
@@ -113,10 +97,7 @@
             v-if="isOpen"
             class="ticket-actions mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-dark-700 sm:gap-2"
           >
-            <div
-              v-if="admin"
-              class="ticket-priority-control flex min-w-0 items-center gap-2"
-            >
+            <div v-if="admin" class="ticket-priority-control flex min-w-0 items-center gap-2">
               <label
                 for="detail-priority"
                 class="sr-only shrink-0 text-sm text-gray-500 sm:not-sr-only"
@@ -131,9 +112,7 @@
                 @update:model-value="changePriority"
               />
             </div>
-            <div
-              class="ticket-close-actions flex min-w-0 flex-1 justify-end gap-2"
-            >
+            <div class="ticket-close-actions flex min-w-0 flex-1 justify-end gap-2">
               <button
                 type="button"
                 class="btn btn-secondary btn-sm"
@@ -156,9 +135,7 @@
           class="ticket-thread flex min-h-0 min-w-0 flex-1 flex-col gap-2"
           :aria-label="t('tickets.conversation')"
         >
-          <div
-            class="ticket-conversation-heading flex shrink-0 items-center justify-between gap-2"
-          >
+          <div class="ticket-conversation-heading flex shrink-0 items-center justify-between gap-2">
             <h2
               id="ticket-conversation-heading"
               class="text-sm font-semibold text-gray-900 dark:text-white"
@@ -193,9 +170,7 @@
                   : 'border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900'
               "
             >
-              <div
-                class="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs"
-              >
+              <div class="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs">
                 <div class="flex min-w-0 max-w-full items-center gap-2">
                   <span
                     class="min-w-0 truncate font-semibold text-gray-900 dark:text-white"
@@ -290,16 +265,12 @@
               :settings="settings"
               :disabled="busy"
           /></Disclosure>
-          <div
-            class="ticket-reply-actions flex min-w-0 items-center justify-between gap-2"
-          >
+          <div class="ticket-reply-actions flex min-w-0 items-center justify-between gap-2">
             <p
               v-if="!admin && settings.auto_expire_hours > 0"
               class="ticket-expiry-hint min-w-0 text-xs text-gray-500"
             >
-              {{
-                t('tickets.expiryHint', { hours: settings.auto_expire_hours })
-              }}
+              {{ t('tickets.expiryHint', { hours: settings.auto_expire_hours }) }}
             </p>
             <button
               type="submit"
@@ -320,16 +291,8 @@
     </div>
     <ConfirmDialog
       :show="!!closeAction"
-      :title="
-        t(closeAction === 'cancel' ? 'tickets.cancel' : 'tickets.complete')
-      "
-      :message="
-        t(
-          closeAction === 'cancel'
-            ? 'tickets.cancelConfirm'
-            : 'tickets.completeConfirm',
-        )
-      "
+      :title="t(closeAction === 'cancel' ? 'tickets.cancel' : 'tickets.complete')"
+      :message="t(closeAction === 'cancel' ? 'tickets.cancelConfirm' : 'tickets.completeConfirm')"
       :danger="closeAction === 'cancel'"
       :loading="busy"
       @cancel="!busy && (closeAction = null)"
@@ -412,8 +375,7 @@ const conversationElement = ref<HTMLElement>()
 const followLatest = ref(true)
 const submission = ticketSubmission()
 const isOpen = computed(
-  () =>
-    ticket.value && ['pending', 'waiting_user'].includes(ticket.value.status),
+  () => ticket.value && ['pending', 'waiting_user'].includes(ticket.value.status),
 )
 const priorityOptions = computed(() =>
   ticketPriorities.map((value) => ({
@@ -429,8 +391,7 @@ let requestID = 0
 function trackConversationScroll() {
   const element = conversationElement.value
   if (element)
-    followLatest.value =
-      element.scrollHeight - element.scrollTop - element.clientHeight < 80
+    followLatest.value = element.scrollHeight - element.scrollTop - element.clientHeight < 80
 }
 // scrollToLatest follows the conversation after Vue finishes applying its latest
 // message update. It waits for the next render before measuring and setting the
@@ -460,8 +421,7 @@ function markDisabled() {
 // dialogs; other failures preserve the current conversation and draft for retry.
 function handleError(err: unknown, fallback: string) {
   if (extractApiErrorCode(err) === 'TICKET_DISABLED') markDisabled()
-  else
-    error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t(fallback))
+  else error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t(fallback))
 }
 
 // load reads current settings and conversation detail for the selected route. A
@@ -537,18 +497,11 @@ async function mutate(action: () => Promise<Ticket>): Promise<boolean> {
 // text and files are cleared only when the committed result applies to this
 // conversation, then the reader follows the newest message.
 async function reply() {
-  if (
-    !ticket.value ||
-    (!content.value.trim() && !files.value.length) ||
-    !isOpen.value
-  )
-    return
+  if (!ticket.value || (!content.value.trim() && !files.value.length) || !isOpen.value) return
   const id = ticket.value.id
   const body = content.value.trim()
   const key = submission.key({ id, content: body }, files.value)
-  if (
-    await mutate(() => ticketAPI(props.admin).reply(id, body, files.value, key))
-  ) {
+  if (await mutate(() => ticketAPI(props.admin).reply(id, body, files.value, key))) {
     content.value = ''
     files.value = []
     submission.reset()
@@ -577,9 +530,7 @@ async function changePriority(value: string | number | boolean | null) {
 async function closeTicket() {
   if (!ticket.value || !closeAction.value) return
   const action = closeAction.value
-  if (
-    await mutate(() => ticketAPI(props.admin).close(ticket.value!.id, action))
-  )
+  if (await mutate(() => ticketAPI(props.admin).close(ticket.value!.id, action)))
     closeAction.value = null
 }
 watch(

@@ -67,11 +67,7 @@ import SettingRow from '@/components/common/settings/SettingRow.vue'
 import SettingToggleRow from '@/components/common/settings/SettingToggleRow.vue'
 import ContentSkeleton from '@/components/common/ContentSkeleton.vue'
 import { useSettingsSaveTarget } from '@/composables/useSettingsSaveRegistry'
-import {
-  ticketAPI,
-  saveTicketSettings,
-  type TicketSettings,
-} from '@/api/tickets'
+import { ticketAPI, saveTicketSettings, type TicketSettings } from '@/api/tickets'
 import { useAppStore } from '@/stores/app'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 
@@ -88,9 +84,7 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const saved = ref('')
-const dirty = computed(
-  () => !!form.value && JSON.stringify(form.value) !== saved.value,
-)
+const dirty = computed(() => !!form.value && JSON.stringify(form.value) !== saved.value)
 const numberFields = [
   { key: 'max_open_tickets', min: 1, max: 100 },
   { key: 'max_attachments', min: 0, max: 10 },
@@ -102,9 +96,7 @@ const valid = computed(
     !!form.value &&
     numberFields.every(
       ({ key, min, max }) =>
-        Number.isInteger(form.value![key]) &&
-        form.value![key] >= min &&
-        form.value![key] <= max,
+        Number.isInteger(form.value![key]) && form.value![key] >= min && form.value![key] <= max,
     ),
 )
 
@@ -118,12 +110,7 @@ async function load() {
     form.value = await ticketAPI(true).config()
     saved.value = JSON.stringify(form.value)
   } catch (err) {
-    error.value = extractI18nErrorMessage(
-      err,
-      t,
-      'tickets.errors',
-      t('tickets.loadFailed'),
-    )
+    error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t('tickets.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -145,12 +132,7 @@ async function save(): Promise<boolean> {
     appStore.showSuccess(t('tickets.settings.saved'))
     return true
   } catch (err) {
-    error.value = extractI18nErrorMessage(
-      err,
-      t,
-      'tickets.errors',
-      t('tickets.actionFailed'),
-    )
+    error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t('tickets.actionFailed'))
     return false
   } finally {
     saving.value = false

@@ -40,14 +40,14 @@ export default {
       groups: '所属分组',
       rate_multiplier: '倍率',
       usage_windows: '用量窗口',
-      last_used_at: '最近使用'
+      last_used_at: '最近使用',
     },
     status: {
       active: '可用',
       rate_limited: '限流中',
       temporarily_unavailable: '暂不可用',
       paused: '已暂停',
-      error: '异常'
+      error: '异常',
     },
     bindings: '分组绑定',
     loadSourceGroups: '加载远端分组',
@@ -59,6 +59,6 @@ export default {
     rtInvalid: '远端 RT 已失效，请管理员在配置中更新 RT。列表保留最后一次成功获取的数据。',
     staleHint: '远端数据暂未更新，当前展示最近一次成功获取的数据。请联系管理员检查连接或更新 RT。',
     snapshotAt: '数据更新时间',
-    sourceGroup: '远端分组'
-  }
+    sourceGroup: '远端分组',
+  },
 }

@@ -1,9 +1,5 @@
 <template>
-  <BaseDialog
-    :show="show"
-    :title="t('tickets.create')"
-    @close="!saving && emit('close')"
-  >
+  <BaseDialog :show="show" :title="t('tickets.create')" @close="!saving && emit('close')">
     <p
       v-if="disabled || !settings.enabled"
       role="status"
@@ -24,20 +20,11 @@
       </p>
       <div class="grid min-w-0 grid-cols-2 gap-2 sm:gap-4">
         <div>
-          <label class="input-label" for="ticket-type">{{
-            t('tickets.type')
-          }}</label
-          ><Select
-            id="ticket-type"
-            v-model="form.type"
-            :options="typeOptions"
-            :disabled="saving"
-          />
+          <label class="input-label" for="ticket-type">{{ t('tickets.type') }}</label
+          ><Select id="ticket-type" v-model="form.type" :options="typeOptions" :disabled="saving" />
         </div>
         <div>
-          <label class="input-label" for="ticket-priority">{{
-            t('tickets.priority')
-          }}</label
+          <label class="input-label" for="ticket-priority">{{ t('tickets.priority') }}</label
           ><Select
             id="ticket-priority"
             v-model="form.priority"
@@ -47,9 +34,7 @@
         </div>
       </div>
       <div v-if="form.type === 'financial'" class="space-y-2">
-        <label class="input-label" for="ticket-order">{{
-          t('tickets.order')
-        }}</label>
+        <label class="input-label" for="ticket-order">{{ t('tickets.order') }}</label>
         <Select
           id="ticket-order"
           v-model="form.order_id"
@@ -60,10 +45,7 @@
           clearable
         />
         <p class="text-xs text-gray-500">{{ t('tickets.orderHint') }}</p>
-        <p
-          v-if="!ordersLoading && !orders.length && !ordersError"
-          class="text-sm text-gray-500"
-        >
+        <p v-if="!ordersLoading && !orders.length && !ordersError" class="text-sm text-gray-500">
           {{ t('tickets.noOrders') }}
         </p>
         <p v-if="ordersError" role="alert" class="text-sm text-red-600">
@@ -86,9 +68,7 @@
         </button>
       </div>
       <div>
-        <label class="input-label" for="ticket-title">{{
-          t('tickets.subject')
-        }}</label>
+        <label class="input-label" for="ticket-title">{{ t('tickets.subject') }}</label>
         <input
           id="ticket-title"
           v-model="form.title"
@@ -122,9 +102,7 @@
         </p>
       </div>
       <div>
-        <label class="input-label" for="ticket-content">{{
-          t('tickets.content')
-        }}</label
+        <label class="input-label" for="ticket-content">{{ t('tickets.content') }}</label
         ><textarea
           id="ticket-content"
           v-model="form.content"
@@ -136,22 +114,13 @@
           :placeholder="t('tickets.contentPlaceholder')"
         />
       </div>
-      <TicketAttachments
-        v-model="files"
-        :settings="settings"
-        :disabled="saving"
-      />
+      <TicketAttachments v-model="files" :settings="settings" :disabled="saving" />
       <p v-if="error" role="alert" class="text-sm text-red-600">{{ error }}</p>
     </form>
     <template #footer>
       <!-- Dialog actions share available width on narrow screens and align at the end on desktop. -->
       <div class="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-        <button
-          type="button"
-          class="btn btn-secondary"
-          :disabled="saving"
-          @click="emit('close')"
-        >
+        <button type="button" class="btn btn-secondary" :disabled="saving" @click="emit('close')">
           {{ t('common.cancel') }}</button
         ><button
           type="submit"
@@ -191,7 +160,7 @@ import {
   type TicketPriority,
 } from '@/api/tickets'
 import { paymentAPI } from '@/api/payment'
-import type { PaymentOrder } from '@/types/payment'
+import type { PaymentOrder } from '@/api/payment.types'
 import { extractApiErrorCode, extractI18nErrorMessage } from '@/utils/apiError'
 import { ticketSubmission } from './submission'
 
@@ -332,9 +301,7 @@ async function submit() {
       priority: form.priority,
       title: form.title.trim(),
       content: form.content.trim(),
-      ...(form.type === 'financial' && form.order_id
-        ? { order_id: form.order_id }
-        : {}),
+      ...(form.type === 'financial' && form.order_id ? { order_id: form.order_id } : {}),
     }
     const ticket = await ticketAPI().create(
       payload,
@@ -350,12 +317,7 @@ async function submit() {
       disabled.value = true
       emit('disabled')
     } else
-      error.value = extractI18nErrorMessage(
-        err,
-        t,
-        'tickets.errors',
-        t('tickets.createFailed'),
-      )
+      error.value = extractI18nErrorMessage(err, t, 'tickets.errors', t('tickets.createFailed'))
   } finally {
     saving.value = false
   }

@@ -24,7 +24,12 @@ export interface SupportContact {
  */
 export function safeContactUrl(value: string, image = false): string {
   const text = value.trim()
-  if (image && /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,[a-z\d+/=\s]+$/i.test(text))
+  if (
+    image &&
+    /^data:image\/(?:png|jpe?g|gif|webp|avif|bmp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,[a-z\d+/=\s]+$/i.test(
+      text,
+    )
+  )
     return text
   if (image && text.startsWith('/') && !text.startsWith('//') && !text.includes('\\')) return text
   try {
@@ -68,8 +73,8 @@ export function parseSupportContacts(raw: string): SupportContact[] {
             {
               label: 'label' in entry && typeof entry.label === 'string' ? entry.label : '',
               value: 'value' in entry && typeof entry.value === 'string' ? entry.value : '',
-              image: 'image' in entry && typeof entry.image === 'string' ? entry.image : ''
-            }
+              image: 'image' in entry && typeof entry.image === 'string' ? entry.image : '',
+            },
           ]
         })
       }
@@ -91,7 +96,7 @@ export function parseSupportContacts(raw: string): SupportContact[] {
       return {
         label: part.slice(0, separator).trim(),
         value: part.slice(separator + 1).trim(),
-        image: ''
+        image: '',
       }
     })
     .filter((entry) => entry.value)

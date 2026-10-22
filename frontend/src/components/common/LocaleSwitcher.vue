@@ -24,12 +24,8 @@
       />
     </button>
 
-    <!-- 语言列表用顶栏的内缩菜单样式，当前语言文字转为品牌色并在行尾打勾。 -->
     <MotionTransition name="dropdown-fade">
-      <div
-        v-if="isOpen"
-        class="dropdown right-0 z-50 mt-2 w-44 origin-top-right py-0"
-      >
+      <div v-if="isOpen" class="dropdown right-0 z-50 mt-2 w-44 origin-top-right py-0">
         <div class="menu-section">
           <button
             v-for="locale in availableLocales"
@@ -63,25 +59,62 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { setLocale, availableLocales } from '@/i18n'
 
-// LocaleSwitcher.vue displays the current language and opens the available
-// translations. Its header variant reveals the language code on wider screens,
-// while language changes use the shared locale loader and disable the trigger
-// until loading finishes.
+/**
+ * LocaleSwitcher.vue switches the application locale from a compact dropdown or status
+ * icon. The component locks selection while setLocale runs, closes after successful
+ * selection, and owns the document click listener that dismisses the menu outside its
+ * root.
+ */
 
-const props = withDefaults(defineProps<{
-  variant?: 'default' | 'status'
-}>(), {
-  variant: 'default'
-})
+/**
+ * props chooses the ordinary language and flag button or the compact header language
+ * icon used to open the menu.
+ */
+const props = withDefaults(
+  defineProps<{
+    variant?: 'default' | 'status' /* visual presentation variant */
+  }>(),
+  {
+    variant: 'default',
+  },
+)
 
+/**
+ * The active i18n locale is the source for the trigger label and selected language
+ * indicator.
+ */
 const { locale } = useI18n()
 
+/**
+ * isOpen owns the menu visibility for this switcher instance and changes on selection
+ * or outside clicks.
+ */
 const isOpen = ref(false)
+/**
+ * dropdownRef identifies the root used to distinguish document clicks inside the
+ * switcher from clicks that dismiss it.
+ */
 const dropdownRef = ref<HTMLElement | null>(null)
+/**
+ * switching blocks another locale selection until the current setLocale promise
+ * settles and restores the controls.
+ */
 const switching = ref(false)
 
+/**
+ * currentLocaleCode exposes the active i18n locale used for selection equality and the
+ * menu checkmark.
+ */
 const currentLocaleCode = computed(() => locale.value)
+/**
+ * currentLocale resolves the catalog entry that supplies the current locale flag,
+ * name, and short code.
+ */
 const currentLocale = computed(() => availableLocales.find((l) => l.code === locale.value))
+/**
+ * variant exposes the caller selected trigger presentation for both the template and
+ * the computed button classes.
+ */
 const variant = computed(() => props.variant)
 
 // currentLocaleLabel shows the primary language tag in the header, where space
@@ -100,10 +133,19 @@ const triggerClass = computed(() => {
   return 'flex items-center gap-1.5 rounded-control px-2 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-300 dark:hover:bg-dark-700'
 })
 
+/**
+ * toggleDropdown switches the local language menu between open and closed.
+ */
 function toggleDropdown() {
   isOpen.value = !isOpen.value
 }
 
+/**
+ * selectLocale applies a different locale while serializing selections through
+ * switching. An already active locale or concurrent selection closes the menu
+ * immediately; successful application closes it, and finally restores the controls
+ * after failures.
+ */
 async function selectLocale(code: string) {
   if (switching.value || code === currentLocaleCode.value) {
     isOpen.value = false
@@ -118,16 +160,29 @@ async function selectLocale(code: string) {
   }
 }
 
+/**
+ * handleClickOutside closes the menu when a click falls outside its root. It leaves
+ * the current visibility unchanged while the root reference is unavailable during
+ * component setup or teardown.
+ */
 function handleClickOutside(event: MouseEvent) {
   if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
     isOpen.value = false
   }
 }
 
+/**
+ * Mounting installs the outside click observer on document, allowing clicks beyond the
+ * dropdown root to dismiss the language menu.
+ */
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
 })
 
+/**
+ * Unmounting removes the same document click observer so a detached switcher no longer
+ * receives events or retains its root state.
+ */
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
 })

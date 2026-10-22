@@ -1,4 +1,4 @@
-import type { ProtocolID } from '@/types'
+import type { ProtocolID } from '@/api/protocols.types'
 
 // magpieImport.ts builds Magpie's web import links from gateway addresses and
 // the text protocols available to an API key. Credentials stay in the fragment,
@@ -38,14 +38,23 @@ export function buildMagpieImportUrl(input: MagpieImportInput): string {
   }
   if (
     !['http:', 'https:'].includes(base.protocol) ||
-    base.username || base.password || base.search || base.hash ||
+    base.username ||
+    base.password ||
+    base.search ||
+    base.hash ||
     !input.apiKey
-  ) return ''
+  )
+    return ''
 
   const root = base.href.replace(/\/+$/, '').replace(/\/v1(?:beta)?$/, '')
   const params = new URLSearchParams()
   // Magpie limits provider names to eighty characters in its import protocol.
-  params.set('name', Array.from(input.providerName.trim() || 'TokenRouter').slice(0, 80).join(''))
+  params.set(
+    'name',
+    Array.from(input.providerName.trim() || 'TokenRouter')
+      .slice(0, 80)
+      .join(''),
+  )
   for (const [protocol, parameter, suffix] of MAGPIE_ENDPOINTS) {
     if (input.protocols.includes(protocol)) params.set(parameter, root + suffix)
   }
