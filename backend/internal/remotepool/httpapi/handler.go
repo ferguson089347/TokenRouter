@@ -14,6 +14,7 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/identity/httpapi/authctx"
 	"github.com/TokenFlux/TokenRouter/internal/remotepool"
 	"github.com/TokenFlux/TokenRouter/internal/routing"
+	"github.com/TokenFlux/TokenRouter/internal/server/adminapi"
 	response "github.com/TokenFlux/TokenRouter/internal/server/httpx"
 )
 
@@ -188,9 +189,10 @@ func RegisterUserRoutes(group *gin.RouterGroup, endpoint *RemoteAccountPoolHandl
 // administrator group.
 // The caller installs administrator authentication, panel limits, and auditing before
 // registration. Settings request bodies are omitted by the shared audit recorder.
+// Each route also registers its browser continuation in the MCP operation catalogue.
 func RegisterAdminRoutes(group *gin.RouterGroup, endpoint *RemoteAccountPoolHandler) {
 	pool := group.Group("/remote-account-pool")
-	pool.GET("/settings", endpoint.GetSettings)
-	pool.PUT("/settings", endpoint.UpdateSettings)
-	pool.GET("/source-groups", endpoint.SourceGroups)
+	adminapi.Register(pool, ManagementOperations["remote_pool.settings.get"], endpoint.GetSettings)
+	adminapi.Register(pool, ManagementOperations["remote_pool.settings.update"], endpoint.UpdateSettings)
+	adminapi.Register(pool, ManagementOperations["remote_pool.source_groups.list"], endpoint.SourceGroups)
 }

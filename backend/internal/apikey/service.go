@@ -68,7 +68,7 @@ var (
 	ErrGroupNotAllowed                   = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
 	ErrGroupDisabledForUser              = infraerrors.Forbidden("GROUP_DISABLED_FOR_USER", "user is not allowed to use this public group")
 	ErrAPIKeyExists                      = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
-	ErrAPIKeyRotationConflict            = infraerrors.Conflict("API_KEY_ROTATION_CONFLICT", "API Key 已变更，请刷新后重试")
+	ErrAPIKeyRotationConflict            = infraerrors.Conflict("API_KEY_ROTATION_CONFLICT", "API key has changed; refresh and try again")
 	ErrAPIKeyLimitReached                = infraerrors.Conflict("API_KEY_LIMIT_REACHED", "api key limit reached")
 	ErrAPIKeyTooShort                    = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
 	ErrAPIKeyInvalidChars                = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
@@ -1074,7 +1074,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		scope = "personal"
 	}
 	if scope != "personal" && scope != "team" {
-		return nil, infraerrors.BadRequest("API_KEY_SCOPE_INVALID", "api key 作用域必须为 personal 或 team")
+		return nil, infraerrors.BadRequest("API_KEY_SCOPE_INVALID", "API key scope must be personal or team")
 	}
 	if scope == "team" {
 		if s.cfg != nil && !s.cfg.Team.Enabled {
@@ -1360,14 +1360,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 			if err != nil {
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
-			if !apiKey.IsComposite {
-				apiKey = s.KeyApplyExplicitGroupFallback(ctx, apiKey)
-				if !s.KeyCanUserUseBoundGroup(ctx, apiKey) {
-					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
-				}
-			}
-			s.KeyCompileAPIKeyIPRules(apiKey)
-			return apiKey, nil
+			return s.prepareKeyForAuthentication(ctx, apiKey)
 		}
 	}
 
@@ -1386,14 +1379,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 			if err != nil {
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
-			if !apiKey.IsComposite {
-				apiKey = s.KeyApplyExplicitGroupFallback(ctx, apiKey)
-				if !s.KeyCanUserUseBoundGroup(ctx, apiKey) {
-					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
-				}
-			}
-			s.KeyCompileAPIKeyIPRules(apiKey)
-			return apiKey, nil
+			return s.prepareKeyForAuthentication(ctx, apiKey)
 		}
 	} else {
 		entry, err := s.KeyLoadAuthCacheEntry(ctx, key, cacheKey)
@@ -1404,14 +1390,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 			if err != nil {
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
-			if !apiKey.IsComposite {
-				apiKey = s.KeyApplyExplicitGroupFallback(ctx, apiKey)
-				if !s.KeyCanUserUseBoundGroup(ctx, apiKey) {
-					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
-				}
-			}
-			s.KeyCompileAPIKeyIPRules(apiKey)
-			return apiKey, nil
+			return s.prepareKeyForAuthentication(ctx, apiKey)
 		}
 	}
 
@@ -1422,7 +1401,19 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 		return nil, fmt.Errorf("get api key: %w", err)
 	}
 	apiKey.Key = key
+	return s.prepareKeyForAuthentication(ctx, apiKey)
+}
+
+// prepareKeyForAuthentication applies runtime group selection and compiles
+// address rules for a loaded Key. Callers supply a nonnil request view after
+// loading or snapshot reconstruction. Ordinary Keys resolve configured fallback
+// before public-group permission checks; composite Keys defer group selection
+// to the request's model prefix. Permission rejection returns the wrapped
+// group error before compiling the selected view's IP rules.
+func (s *APIKeyService) prepareKeyForAuthentication(ctx context.Context, apiKey *APIKey) (*APIKey, error) {
 	if !apiKey.IsComposite {
+		// A disabled source group can be forbidden while its configured target is
+		// allowed, so permission follows target selection for this request.
 		apiKey = s.KeyApplyExplicitGroupFallback(ctx, apiKey)
 		if !s.KeyCanUserUseBoundGroup(ctx, apiKey) {
 			return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)

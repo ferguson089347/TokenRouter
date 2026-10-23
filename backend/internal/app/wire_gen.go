@@ -528,7 +528,7 @@ func initializeApplication(ctx context.Context, cfg *config.Config, info BuildIn
 	routeMiddleware := provideGatewayRouteMiddleware(apiKeyAuthMiddleware, apiKeyService, subscriptionService, opsService, cfg, errorLogQueue, appMessageHTTPBindings, modelAttributeService, gatewayRuntimeSettings)
 	appGatewayRouteMount := provideGatewayRouteMount(countTokensHandler, qoderCompatibleHandler, compatibleTextHandler, geminiNativeHandler, openAITextHandler, openAITokensHandler, responsesWSHandler, modelsHandler, messagesHandler, mediaHandler, auxiliaryHandler, liveHandler, searchHandler, publicUsageHandler, qoderChatHandler, batchImageHandler, routeMiddleware)
 	paymentHandler := providePaymentHTTP(paymentRuntime, paymentConfigService, plans)
-	paymentWebhookHandler := providePaymentWebhookHTTP(paymentRuntime, paymentRegistry)
+	paymentWebhookHandler := providePaymentWebhookHTTP(paymentRuntime)
 	httpapiAdminHandler := providePaymentAdminHTTP(paymentRuntime, paymentConfigService, plans, calendar)
 	planHandler := httpapi3.NewPlanHandler(plans)
 	appPaymentRouteMount := providePaymentRouteMount(paymentHandler, paymentWebhookHandler, httpapiAdminHandler, planHandler)
@@ -537,10 +537,12 @@ func initializeApplication(ctx context.Context, cfg *config.Config, info BuildIn
 	idempotencyCleanupService := provideIdempotencyCleanupService(idempotencyRepository, cfg)
 	appHttpRouteMount := provideHTTPRouteMount(appAuthRouteMount, appUserRouteMount, appAdminRouteMount, appGatewayRouteMount, appPaymentRouteMount, idempotencyCoordinator, idempotencyCleanupService)
 	jwtAuthMiddleware := provideJWTAuth(appIdentityAuthGraph, userService, runtimeSettings, auditLogService)
-	adminAuthMiddleware := provideAdminAuth(appIdentityAuthGraph, userService, runtimeSettings, auditLogService)
+	mcpTokenService := provideMCPTokens(db, userService, secretEncryptor, cfg)
+	adminAuthMiddleware := provideAdminAuth(appIdentityAuthGraph, userService, runtimeSettings, auditLogService, mcpTokenService)
 	v := provideAuditMiddleware(auditLogService, redactor)
 	stepUpAuthMiddleware := provideStepUpAuth(totpService, userService, runtimeSettings)
-	routerRuntime, err := provideRouterRuntime(service, intelligenceHandler, publicService, pageHandler, backendMode, store, redisClient, manager, cfg, appHttpRouteMount, panelSettings, opsService, jwtAuthMiddleware, adminAuthMiddleware, v, stepUpAuthMiddleware)
+	handler3 := provideMCPHTTP(mcpTokenService, redisClient, secretEncryptor, totpService, userService, runtimeSettings, store, cfg)
+	routerRuntime, err := provideRouterRuntime(service, intelligenceHandler, publicService, pageHandler, backendMode, store, redisClient, manager, cfg, appHttpRouteMount, panelSettings, opsService, jwtAuthMiddleware, adminAuthMiddleware, v, stepUpAuthMiddleware, handler3)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +556,7 @@ func initializeApplication(ctx context.Context, cfg *config.Config, info BuildIn
 	subscriptionExpiryService := provideSubscriptionExpiry(subscriptionStore, store, notificationEmailService, leaderLock, db)
 	announcementExpiryService := provideAnnouncementExpiry(announcementRepository)
 	scheduledTestRunnerService := provideScheduledTestRunner(scheduledTestPlanRepository, scheduledTestService, testService, recoveryService, cfg)
-	groupAvailabilityProbeRunnerService := provideGroupProbeRunner(groupAvailabilityProbeRepository, testService, generic, compatible, gemini, cfg)
+	groupAvailabilityProbeRunnerService := provideGroupProbeRunner(groupAvailabilityProbeRepository, testService, generic, compatible, gemini, cfg, modelAttributeService)
 	appMaintenanceRuntimeReady := provideMaintenanceRuntime(backgroundRefreshService, expiryService, proxyExpiryService, subscriptionExpiryService, announcementExpiryService, scheduledTestRunnerService, groupAvailabilityProbeRunnerService, cfg, manager, concurrencyService, userMessageQueueService)
 	opsMetricsCollector := provideOpsCollector(opsRepository, store, providerStore, concurrencyService, db, redisClient, opsOptions)
 	opsAlertEvaluatorService := provideOpsEvaluator(opsService, opsRepository, mailer, notificationEmailService, redisClient, opsOptions, proxyStore)

@@ -637,6 +637,11 @@ export default {
     settings: {
       allowedModels: '允许的模型',
       billingAndStatus: '计费与状态',
+      marketplace: '模型广场展示',
+      showMaxDiscount: '显示「最高优惠」标签',
+      showMaxDiscountHint: '在模型广场的分组标题处显示最高优惠，有有效折扣时展示。',
+      showRateMultiplier: '显示「倍率」标签',
+      showRateMultiplierHint: '在模型广场的分组标题处显示分组倍率。',
       providerSelection: '提供商来源与筛选',
       scheduling: '调度与会话',
       fallbacks: '分组回退',
@@ -996,6 +1001,9 @@ export default {
       empty: '暂无可展示模型',
     },
     availabilityProbe: {
+      protocol: '探针协议',
+      automatic: '自动',
+      protocolUnavailable: '请选择分组允许且支持测试的协议，或关闭探针。',
       title: '分组可用性探测',
       hint: '按固定间隔对该分组主动发起轻量请求，模型广场将按配置的公开窗口展示可用率。',
       model: '探测模型',

@@ -15,6 +15,7 @@ import (
 	identityhttp "github.com/TokenFlux/TokenRouter/internal/identity/httpapi"
 	redisinfra "github.com/TokenFlux/TokenRouter/internal/infra/redis"
 	intelligencehttp "github.com/TokenFlux/TokenRouter/internal/intelligence/httpapi"
+	mcphttp "github.com/TokenFlux/TokenRouter/internal/mcp/httpapi"
 	"github.com/TokenFlux/TokenRouter/internal/ops"
 	"github.com/TokenFlux/TokenRouter/internal/protocol"
 	"github.com/TokenFlux/TokenRouter/internal/requestlog"
@@ -33,6 +34,8 @@ import (
 // and CSP frame origins while settings updates refresh those values. Failed
 // refreshes retain the last successful state, and embedded frontend builds add
 // cache invalidation to the same notification that reloads frame origins.
+// MCP registration follows the application routes so its catalogue can validate
+// every mounted administrator endpoint before the server starts accepting requests.
 
 // httpRouteMount registers application route families with their shared
 // security middleware.
@@ -43,8 +46,27 @@ type httpRouteMount func(*gin.Engine, httpRouteSecurity, gin.HandlerFunc, func(*
 // default locale during construction, initializes frame origins during startup,
 // and retains prior values when either settings refresh fails. Embedded
 // frontend construction can return an error after hooks have been registered;
-// the application rollback owns their cleanup.
-func provideRouterRuntime(requests *requestlog.Service, intelligence *intelligencehttp.IntelligenceHandler, public *site.PublicService, pages *sitehttp.PageHandler, backendMode *admission.BackendMode, store *settings.Store, redisClient *redis.Client, manager *lifecycle.Manager, cfg *config.Config, mount httpRouteMount, panelSettings *runtimeconfig.PanelSettings, opsService *ops.OpsService, jwtAuth identityhttp.JWTAuthMiddleware, adminAuth identityhttp.AdminAuthMiddleware, auditLog middleware.AuditLogMiddleware, stepUpAuth identityhttp.StepUpAuthMiddleware,
+// the application rollback owns their cleanup. MCP catalogue validation runs
+// after route mounting and panics when an administrator endpoint lacks metadata,
+// preventing startup with an incomplete permission directory.
+func provideRouterRuntime(
+	requests *requestlog.Service,
+	intelligence *intelligencehttp.IntelligenceHandler,
+	public *site.PublicService,
+	pages *sitehttp.PageHandler,
+	backendMode *admission.BackendMode,
+	store *settings.Store,
+	redisClient *redis.Client,
+	manager *lifecycle.Manager,
+	cfg *config.Config,
+	mount httpRouteMount,
+	panelSettings *runtimeconfig.PanelSettings,
+	opsService *ops.OpsService,
+	jwtAuth identityhttp.JWTAuthMiddleware,
+	adminAuth identityhttp.AdminAuthMiddleware,
+	auditLog middleware.AuditLogMiddleware,
+	stepUpAuth identityhttp.StepUpAuthMiddleware,
+	mcpHandler *mcphttp.Handler,
 ) (*server.RouterRuntime, error) {
 	// Seal update admission before waiting for HTTP handlers, then wait for
 	// accepted settings work so later settings subscribers and shared stores can close safely.
@@ -103,7 +125,7 @@ func provideRouterRuntime(requests *requestlog.Service, intelligence *intelligen
 		// frame origins, so later HTML generation and CSP reads can consume the refreshed inputs.
 		notify = func() { frontend.InvalidateCache(); refresh() }
 	}
-	manager.Register(lifecycle.Hook{Name: "HTTPSettingsInitialization", StartOrder: 182, StopOrder: 800, Start: func(context.Context) error {
+	manager.Register(lifecycle.Hook{Name: "HTTPSettingsInitialization", StartOrder: 182, StopOrder: shutdownStageSettings, Start: func(context.Context) error {
 		refresh()
 		return nil
 	}})
@@ -111,7 +133,7 @@ func provideRouterRuntime(requests *requestlog.Service, intelligence *intelligen
 	// Retain this unsubscribe callback until its late cleanup hook; settings
 	// notifications remain available while earlier producer and request phases are still draining.
 	unsubscribe := store.Subscribe(notify)
-	manager.Register(lifecycle.Hook{Name: "SettingsHTTPNotification", StopOrder: 800, Stop: func(context.Context) error { unsubscribe(); return nil }})
+	manager.Register(lifecycle.Hook{Name: "SettingsHTTPNotification", StopOrder: shutdownStageSettings, Stop: func(context.Context) error { unsubscribe(); return nil }})
 	counter := redisinfra.NewFixedWindowLimiter(redisClient, "rate_limit:")
 	authLimiter := middleware.NewRateLimiter(counter)
 	var panelCounter *middleware.RateLimiter
@@ -125,6 +147,9 @@ func provideRouterRuntime(requests *requestlog.Service, intelligence *intelligen
 			pages.Register(v1, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth))
 			registerRequestLogRoutes(v1, requests, gin.HandlerFunc(adminAuth), gin.HandlerFunc(auditLog), panelLimiter.Heavy())
 		})
+		if err := mcpHandler.Mount(r, gin.HandlerFunc(adminAuth), gin.HandlerFunc(auditLog)); err != nil {
+			panic(err)
+		}
 	}}
 
 	return rt, nil

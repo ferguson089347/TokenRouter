@@ -30,6 +30,8 @@ func (*intelligenceRouteRepo) ListConfigs(context.Context) ([]intelligence.Intel
 // routes with test panel identities. Anonymous submissions and ordinary users'
 // administrator commands are denied, while disabled features retain administrator
 // configuration access for editing saved site settings.
+// Production /api/v1 prefixes keep the fixture's management metadata validation
+// aligned with the absolute routes mounted by the application.
 func TestIntelligenceRoutesAccess(t *testing.T) {
 	svc := intelligence.NewIntelligenceService(&intelligenceRouteRepo{}, nil, nil, nil, nil, func(context.Context) bool { return false }, func(string) error { return nil }, nil)
 	defer svc.Stop()
@@ -65,10 +67,10 @@ func TestIntelligenceRoutesAccess(t *testing.T) {
 					c.Set(string(authctx.ContextKeyUserRole), tc.role)
 				}
 			})
-			RegisterUserRoutes(r.Group(""), h)
-			RegisterAdminRoutes(r.Group("/admin"), h)
+			RegisterUserRoutes(r.Group("/api/v1"), h)
+			RegisterAdminRoutes(r.Group("/api/v1/admin"), h)
 			w := httptest.NewRecorder()
-			r.ServeHTTP(w, httptest.NewRequest(tc.method, tc.path, nil))
+			r.ServeHTTP(w, httptest.NewRequest(tc.method, "/api/v1"+tc.path, nil))
 			require.Equal(t, tc.status, w.Code, w.Body.String())
 		})
 	}

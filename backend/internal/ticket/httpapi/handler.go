@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/TokenFlux/TokenRouter/internal/identity/httpapi/authctx"
+	"github.com/TokenFlux/TokenRouter/internal/server/adminapi"
 	response "github.com/TokenFlux/TokenRouter/internal/server/httpx"
 	support "github.com/TokenFlux/TokenRouter/internal/ticket"
 )
@@ -499,16 +500,17 @@ func RegisterUserRoutes(parent *gin.RouterGroup, h *TicketHandler) {
 // RegisterAdminRoutes mounts support handling and ticket settings behind administrator authentication.
 // The parent supplies authentication, auditing, and request limits. Settings remain
 // accessible when the module is disabled so administrators can enable it again.
+// Each route also registers its browser continuation in the MCP operation catalogue.
 func RegisterAdminRoutes(parent *gin.RouterGroup, h *TicketHandler) {
 	g := parent.Group("/tickets")
-	g.GET("/settings", h.AdminConfig)
-	g.PUT("/settings", h.UpdateConfig)
-	g.GET("", h.AdminList)
-	g.GET("/:id", h.AdminGet)
-	g.PATCH("/:id", h.Update)
-	g.POST("/:id/replies", h.AdminReply)
-	g.POST("/:id/complete", h.AdminComplete)
-	g.POST("/:id/cancel", h.AdminCancel)
-	g.GET("/:id/attachments/:attachmentId", h.AdminDownload)
-	g.GET("/:id/attachments/:attachmentId/preview", h.AdminPreview)
+	adminapi.Register(g, ManagementOperations["tickets.settings.get"], h.AdminConfig)
+	adminapi.Register(g, ManagementOperations["tickets.settings.update"], h.UpdateConfig)
+	adminapi.Register(g, ManagementOperations["tickets.list"], h.AdminList)
+	adminapi.Register(g, ManagementOperations["tickets.get"], h.AdminGet)
+	adminapi.Register(g, ManagementOperations["tickets.update"], h.Update)
+	adminapi.Register(g, ManagementOperations["tickets.reply"], h.AdminReply)
+	adminapi.Register(g, ManagementOperations["tickets.complete"], h.AdminComplete)
+	adminapi.Register(g, ManagementOperations["tickets.cancel"], h.AdminCancel)
+	adminapi.Register(g, ManagementOperations["tickets.attachments.download"], h.AdminDownload)
+	adminapi.Register(g, ManagementOperations["tickets.attachments.preview"], h.AdminPreview)
 }

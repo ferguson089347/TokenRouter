@@ -1,6 +1,10 @@
 package httpapi
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+
+	"github.com/TokenFlux/TokenRouter/internal/server/adminapi"
+)
 
 // routes.go mounts administrator quality-check commands, user submissions, and results.
 // The application supplies authenticated panel groups, while preview content uses
@@ -22,15 +26,16 @@ func RegisterUserRoutes(parent *gin.RouterGroup, h *IntelligenceHandler) {
 // RegisterAdminRoutes mounts configuration and manual checks behind administrator authentication.
 // Configuration remains accessible while the feature is disabled, and the service
 // rejects submissions until the stored global switch is enabled again.
+// Each route also registers its browser continuation in the MCP operation catalogue.
 func RegisterAdminRoutes(parent *gin.RouterGroup, h *IntelligenceHandler) {
 	g := parent.Group("/intelligence-tests")
-	g.GET("", h.AdminList)
-	g.POST("", h.AdminSave)
-	g.GET("/runs/:id", h.AdminDetail)
-	g.GET("/runs/:id/preview", h.AdminPreview)
-	g.GET("/runs/:id/thumbnail", h.AdminThumbnail)
-	g.PUT("/:id", h.AdminSave)
-	g.DELETE("/:id", h.AdminDelete)
-	g.POST("/:id/run", h.AdminRun)
-	g.GET("/:id/runs", h.AdminRuns)
+	adminapi.Register(g, ManagementOperations["intelligence.configs.list"], h.AdminList)
+	adminapi.Register(g, ManagementOperations["intelligence.configs.create"], h.AdminSave)
+	adminapi.Register(g, ManagementOperations["intelligence.runs.get"], h.AdminDetail)
+	adminapi.Register(g, ManagementOperations["intelligence.runs.preview"], h.AdminPreview)
+	adminapi.Register(g, ManagementOperations["intelligence.runs.thumbnail"], h.AdminThumbnail)
+	adminapi.Register(g, ManagementOperations["intelligence.configs.update"], h.AdminSave)
+	adminapi.Register(g, ManagementOperations["intelligence.configs.delete"], h.AdminDelete)
+	adminapi.Register(g, ManagementOperations["intelligence.configs.run"], h.AdminRun)
+	adminapi.Register(g, ManagementOperations["intelligence.runs.list"], h.AdminRuns)
 }

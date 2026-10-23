@@ -653,6 +653,12 @@ export default {
     settings: {
       allowedModels: 'Allowed models',
       billingAndStatus: 'Billing & status',
+      marketplace: 'Model marketplace display',
+      showMaxDiscount: 'Show maximum discount tag',
+      showMaxDiscountHint:
+        'Show the maximum discount in the marketplace group header when a discount is available.',
+      showRateMultiplier: 'Show multiplier tag',
+      showRateMultiplierHint: 'Show the group multiplier in the marketplace group header.',
       providerSelection: 'Provider sources & filters',
       scheduling: 'Scheduling & sessions',
       fallbacks: 'Group fallbacks',
@@ -1020,6 +1026,10 @@ export default {
       empty: 'No displayable models',
     },
     availabilityProbe: {
+      protocol: 'Probe Protocol',
+      automatic: 'Automatic',
+      protocolUnavailable:
+        'Select a supported protocol allowed by this group, or disable the probe.',
       title: 'Group Availability Probe',
       hint: 'Send lightweight active probes to this group on a fixed interval. The marketplace shows availability using the configured public window.',
       model: 'Probe Model',

@@ -43,6 +43,9 @@ var (
 	// auditSensitiveReads selects GET method/route pairs that expose sensitive data
 	// and assigns their stable actions before the handler executes the read.
 	auditSensitiveReads = map[string]string{
+		"GET /api/v1/admin/mcp/tokens/:id/credential": "admin.mcp.tokens.copy",
+		"GET /api/v1/admin/mcp/files/:id":             "admin.mcp.files.download",
+		"GET /api/v1/admin/mcp/confirmations/:id":     "admin.mcp.confirmations.read",
 		"GET /api/v1/admin/providers/data":            "admin.providers.export",
 		"GET /api/v1/admin/proxies/data":              "admin.proxies.export",
 		"GET /api/v1/admin/redeem-codes/export":       "admin.redeem_codes.export",
@@ -86,6 +89,7 @@ var (
 		"POST /api/v1/tickets/:id/replies":                           {},
 		"POST /api/v1/admin/tickets/:id/replies":                     {},
 		"PUT /api/v1/admin/remote-account-pool/settings":             {},
+		"POST /api/v1/admin/mcp/files":                               {},
 		"POST /api/v1/auth/passkey/login/finish":                     {},
 		"POST /api/v1/user/passkeys/register/finish":                 {},
 		"POST /api/v1/admin/providers/import/codex-session":          {},
@@ -158,6 +162,9 @@ func NewAuditLogMiddleware(auditService *audit.AuditLogService, redactor *audit.
 				record = true
 				action = v
 			}
+		}
+		if !record {
+			_, record = authctx.GetMCPDispatch(c.Request.Context())
 		}
 		if !record {
 			c.Next()
@@ -262,6 +269,18 @@ func NewAuditLogMiddleware(auditService *audit.AuditLogService, redactor *audit.
 		entry.CredentialMasked = MaskedRequestCredential(c)
 
 		extra := map[string]any{}
+		if dispatch, ok := authctx.GetMCPDispatch(c.Request.Context()); ok {
+			extra["mcp_token_id"] = dispatch.TokenID
+			extra["mcp_operation_id"] = dispatch.OperationID
+			extra["mcp_confirmation_skipped"] = dispatch.ConfirmationSkipped
+			entry.CredentialMasked = c.GetString("mcp_token_prefix")
+		} else if tokenID := c.GetInt64("mcp_related_token_id"); tokenID > 0 {
+			// Browser approvals and downloads retain JWT actor authentication while
+			// indexing the originating token, so its history includes human continuation actions.
+			extra["mcp_token_id"] = tokenID
+			extra["mcp_operation_id"] = c.GetString("mcp_related_operation_id")
+			entry.CredentialMasked = c.GetString("mcp_related_token_prefix")
+		}
 		if len(c.Params) > 0 {
 			params := make(map[string]string, len(c.Params))
 			for _, p := range c.Params {

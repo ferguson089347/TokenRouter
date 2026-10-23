@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/TokenFlux/TokenRouter/internal/provider"
 )
 
 // group_probe_lifecycle.go coordinates availability probe startup, round
@@ -51,7 +53,14 @@ type ProbeExecutionResult struct {
 // GroupProbeTarget identifies a selected provider and its group-mapped
 // execution model.
 type GroupProbeTarget struct {
-	ProviderID int64 // selected provider row ID
+	// Attributes retains the selected attempt's catalogue and group profile for
+	// provider testing. Automatic probes leave it nil and initialize testing normally.
+	Attributes *ModelAttributeSession
+	// ProtocolRoute carries the selected entry and resolved upstream endpoint.
+	// Its zero value keeps legacy automatic tests independent of explicit routing.
+	ProtocolRoute provider.TestProtocolRoute
+	GroupID       int64 // selected probe group identifier
+	ProviderID    int64 // selected provider row ID
 	// ModelID is the selector's group-mapped model sent to the test service. That
 	// service applies provider mapping; history keeps the configured request model
 	// separately.
@@ -65,10 +74,10 @@ type GroupProbeExecutor interface {
 	// saved rules. It returns the group-mapped model for Test, leaving the
 	// original name available for history.
 	Select(context.Context, GroupAvailabilityProbeDueGroup, string) (GroupProbeTarget, error)
-	// Test executes the selected provider and model with the probe prompt and
+	// Test executes the selected group, provider, and model with the probe prompt and
 	// User-Agent. The runner supplies an attempt deadline, and an error makes the
 	// attempt fail even when result metadata is returned.
-	Test(context.Context, int64, string, string, string) (*ProbeExecutionResult, error)
+	Test(context.Context, GroupProbeTarget, string, string) (*ProbeExecutionResult, error)
 }
 
 // GroupProbeOptions supplies runner identity, scheduling, time, and diagnostic

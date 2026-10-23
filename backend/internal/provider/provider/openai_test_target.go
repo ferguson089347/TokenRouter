@@ -43,9 +43,18 @@ func (t openaiTestTarget) Execute(ctx context.Context, request provider.Prepared
 	headers.Set("User-Agent", request.UserAgent)
 	headers.Set("originator", request.Originator)
 	run := NewTestRun(ctx, headers, sink)
+	run.GroupID = request.GroupID
 	defer run.Cancel()
 	run.Automatic = request.Automatic
 	run.RequestedProtocol = provider.TextProtocol(request.Protocol)
+	// The executor's existing text selector uses legacy provider spellings. Map
+	// the resolved upstream identity here so provider defaults cannot replace it.
+	switch request.ProtocolRoute.UpstreamProtocol {
+	case "openai_responses":
+		run.RequestedProtocol = provider.TextProtocolResponses
+	case "openai_chat_completions":
+		run.RequestedProtocol = provider.TextProtocolChatCompletions
+	}
 	if t.executor.Prepare != nil {
 		if err := t.executor.Prepare(run, t.record); err != nil {
 			return run.Result((TestStreamOutput{}).Error(run, err.Error()))

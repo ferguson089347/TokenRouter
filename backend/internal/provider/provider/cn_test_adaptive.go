@@ -50,6 +50,11 @@ func (s *CNProviderTest) ExecuteAdaptive(c *TestRun, value *providercore.Record,
 		testModelID = openai.DefaultTestModel
 	}
 	testModelID = mappedTestModel(value, testModelID)
+	if c.ProtocolRoute.ClientProtocol != "" {
+		if _, err := resolveProbeType(c.Context, s.Attributes, value, c.GroupID, testModelID, string(selected), providercore.ProviderTestTypeText); err != nil {
+			return (TestStreamOutput{}).Error(c, err.Error())
+		}
+	}
 
 	authToken := strings.TrimSpace(value.GetOpenAIProtocolAPIKey())
 	if authToken == "" {
@@ -117,12 +122,15 @@ func (s *CNProviderTest) executeAdaptiveAnthropic(c *TestRun, value *providercor
 	if err != nil {
 		return (TestStreamOutput{}).Error(c, "Failed to create adaptive Anthropic test payload")
 	}
+	if err := applyProbeSampling(c, s.Attributes, value, testModelID, "anthropic_messages", payload); err != nil {
+		return (TestStreamOutput{}).Error(c, err.Error())
+	}
 	// These fixed probe payloads contain JSON-compatible values supplied by
 	// platform builders. Encoding retains their supported shapes after the local
 	// protocol preparation.
 	payloadBytes, _ := json.Marshal(payload)
 
-	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "正在通过原生 /v1/messages 测试自适应 Anthropic 端点"})
+	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "Testing adaptive Anthropic endpoint through native /v1/messages"})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payloadBytes))
 	if err != nil {
 		return (TestStreamOutput{}).Error(c, "Failed to create adaptive Anthropic request")
@@ -160,7 +168,7 @@ func (s *CNProviderTest) executeAdaptiveAnthropic(c *TestRun, value *providercor
 	if err := (TestStreamOutput{}).AdaptiveAnthropic(c, resp.Body); err != nil {
 		return err
 	}
-	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "已通过原生 /v1/messages 验证"})
+	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "Verified through native /v1/messages"})
 	return nil
 }
 
@@ -177,6 +185,9 @@ func (s *CNProviderTest) executeAdaptiveResponses(c *TestRun, value *providercor
 	apiURL := cnTestResponsesURL(value.Platform, baseURL)
 
 	payload := openai.TestResponsesPayload(testModelID, prompt, false)
+	if err := applyProbeSampling(c, s.Attributes, value, testModelID, "openai_responses", payload); err != nil {
+		return (TestStreamOutput{}).Error(c, err.Error())
+	}
 	// Codex's probe builder supplies synthetic instructions for its own endpoint.
 	// Remove that field before native CN Responses execution so this payload
 	// carries the selected prompt directly.
@@ -192,7 +203,7 @@ func (s *CNProviderTest) executeAdaptiveResponses(c *TestRun, value *providercor
 		payloadBytes = openaiprotocol.StatelessResponsesRequest(payloadBytes)
 	}
 
-	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "正在通过原生 /responses 测试自适应 Responses 端点"})
+	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "Testing adaptive Responses endpoint through native /responses"})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payloadBytes))
 	if err != nil {
 		return (TestStreamOutput{}).Error(c, "Failed to create adaptive Responses request")
@@ -227,7 +238,7 @@ func (s *CNProviderTest) executeAdaptiveResponses(c *TestRun, value *providercor
 	if err := (TestStreamOutput{}).Responses(c, resp.Body); err != nil {
 		return err
 	}
-	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "已通过原生 /responses 验证"})
+	(TestStreamOutput{}).SendEvent(c, providercore.TestEvent{Type: "status", Text: "Verified through native /responses"})
 	return nil
 }
 

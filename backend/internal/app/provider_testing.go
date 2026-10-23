@@ -91,38 +91,59 @@ func provideScheduledTestRunner(plans provider.ScheduledTestPlanRepository, sche
 
 // provideProviderTests constructs shared platform test targets and their
 // operator URL policy. cfg and manager are required; a nonnil catalog supplies
-// capability snapshots, while Qoder tests receive a separate session provider
+// capability snapshots. The attribute service resolves the requested group and
+// final model, while Qoder tests receive a separate session provider
 // with its own registered stop.
 func provideProviderTests(store *providerpostgres.ProviderStore, geminiToken *provider.GeminiTokenSource, claudeToken *provider.ClaudeTokenSource, grokToken *provider.GrokTokenSource, ag *provideradapter.AntigravityProbe, transport httpclient.UpstreamTransport, cfg *config.Config, profiles *egressprovider.TLSProfiles, routers *egress.TLSFingerprintRouterService, settings *gateway.RuntimeSettings, tasks *provideradapter.ProbeTasks, manager *lifecycle.Manager, catalog *catalogprovider.Service, modelAttributes *routing.ModelAttributeService) *provider.TestService {
 	urlPolicy := egress.OperatorURLPolicy{Enabled: cfg.Security.URLAllowlist.Enabled, AllowInsecureHTTP: cfg.Security.URLAllowlist.AllowInsecureHTTP, AllowPrivateHosts: cfg.Security.URLAllowlist.AllowPrivateHosts, UpstreamHosts: slices.Clone(cfg.Security.URLAllowlist.UpstreamHosts)}
 	probePolicy := &provideradapter.OpenAIProbePolicy{Available: true, ForceCLI: cfg.Gateway.ForceCodexCLI, Read: store.GetByID, AllowClaudeCode: settings.IsOpenAIAllowClaudeCodeCodexPluginEnabled, BrowserUserAgent: settings.GetOpenAICodexUserAgent, DefaultBrowserUserAgent: gateway.DefaultOpenAICodexUserAgent, Routers: routers, Profiles: profiles, ManualProfiles: profiles}
-	probeAttributes := func(ctx context.Context, value *provider.Record, model, protocol string) (modelcatalog.Attributes, error) {
-		resolved, err := gatewayprovider.ResolveModelAttributes(ctx, &gatewayprovider.ExecutionProvider{Record: *value}, model, modelAttributes, protocol)
-		return resolved.Attributes, err
+	// Assemblies that supply only a catalogue still resolve default capabilities.
+	// Production supplies the profile service so tests can load their selected group.
+	if modelAttributes == nil && catalog != nil {
+		modelAttributes = &routing.ModelAttributeService{Catalog: routing.ModelAttributeCatalog{View: catalog.CapabilityView}}
+	}
+	probeAttributes := func(ctx context.Context, value *provider.Record, groupID int64, model, protocol string) (modelcatalog.Resolution, error) {
+		route := provider.TestProtocolRouteFromContext(ctx)
+		if route.UpstreamProtocol != "" {
+			protocol = string(route.UpstreamProtocol)
+		}
+		target := value.ModelAttributeTarget(model, protocol)
+		target.ClientProtocol = protocol
+		if route.ClientProtocol != "" {
+			target.ClientProtocol = string(route.ClientProtocol)
+		}
+		session := routing.ModelAttributesFromContext(ctx)
+		if session == nil {
+			session = modelAttributes.NewSession()
+		}
+		return session.Resolve(ctx, groupID, target)
 	}
 	openaiTest := &provideradapter.OpenAIProviderTest{Attributes: probeAttributes, Store: store, Transport: transport, ValidateURL: urlPolicy.Validate, Prepare: probePolicy.Prepare, ApplyRouting: probePolicy.ApplyTestRouting, ResolveTLS: probePolicy.ResolveTestTLS, EnsureTask: tasks.Ensure}
 	geminiTest := &provideradapter.GeminiProviderTest{Attributes: probeAttributes, Tokens: geminiToken, Transport: transport, Profiles: profiles, ValidateURL: urlPolicy.Validate}
-	var attributes func() modelcatalog.View
-	if catalog != nil {
-		attributes = catalog.CapabilityView
-	}
-	anthropicTest := &provideradapter.AnthropicProviderTest{Attributes: attributes, Tokens: claudeToken, Transport: transport, Profiles: profiles, Store: store, ValidateURL: urlPolicy.Validate}
+	anthropicTest := &provideradapter.AnthropicProviderTest{Attributes: probeAttributes, Tokens: claudeToken, Transport: transport, Profiles: profiles, Store: store, ValidateURL: urlPolicy.Validate}
 	// Administrator probes build Qoder sessions in their own provider. Register
 	// its stop after periodic test producers so shared session builds finish before transport cleanup.
 	qoderSessions := provideradapter.NewQoderTokenProvider(qoder.SessionBuilder{})
 	qoderSessions.SetHTTPUpstream(transport, profiles)
 	manager.Register(lifecycle.Hook{Name: "ProviderTestQoderSessions", StopOrder: 26, Stop: qoderSessions.StopContext})
 	targets := &provideradapter.TestTargets{
-		Jev:  &provideradapter.JevProviderTest{Transport: transport, ValidateURL: urlPolicy.Validate},
+		Jev:  &provideradapter.JevProviderTest{Attributes: probeAttributes, Transport: transport, ValidateURL: urlPolicy.Validate},
 		Read: store.GetByID, OpenAI: openaiTest, Gemini: geminiTest, Anthropic: anthropicTest,
-		Qoder: &provideradapter.QoderProviderTest{Sessions: qoderSessions, Client: qoder.NewClient(qoder.APIBaseURL), Transport: transport, Profiles: profiles, RewriteModel: openaiprotocol.ReplaceModelInBody},
-		Grok:  &provideradapter.GrokProviderTest{Tokens: grokToken, Transport: transport, Store: store, OperatorValidator: urlPolicy.Validate, DefaultBaseURL: gatewayprovider.GrokDefaultBaseURLReader(settings)},
-		CN:    &provideradapter.CNProviderTest{Transport: transport, Profiles: profiles, Store: store, ValidateURL: urlPolicy.Validate, Responses: openaiTest},
+		Qoder: &provideradapter.QoderProviderTest{Attributes: probeAttributes, Sessions: qoderSessions, Client: qoder.NewClient(qoder.APIBaseURL), Transport: transport, Profiles: profiles, RewriteModel: openaiprotocol.ReplaceModelInBody},
+		Grok:  &provideradapter.GrokProviderTest{Attributes: probeAttributes, Tokens: grokToken, Transport: transport, Store: store, OperatorValidator: urlPolicy.Validate, DefaultBaseURL: gatewayprovider.GrokDefaultBaseURLReader(settings)},
+		CN:    &provideradapter.CNProviderTest{Attributes: probeAttributes, Transport: transport, Profiles: profiles, Store: store, ValidateURL: urlPolicy.Validate, Responses: openaiTest},
 		Antigravity: &provideradapter.AntigravityProviderTest{Probe: func(ctx context.Context, value *provider.Record, request provider.PreparedTestRequest) (*antigravity.TestConnectionResult, error) {
-			return ag.Execute(ctx, value, request)
+			probe := *ag
+			probe.Attributes = probeAttributes
+			return probe.Execute(ctx, value, request)
 		}},
 	}
-	core := provider.NewTestService(targets, provider.TestOptions{Now: time.Now, Error: func(message string) { log.Printf("Provider test error: %s", message) }, WriteError: func(err error) { log.Printf("failed to write SSE event: %v", err) }})
+	core := provider.NewTestService(targets, provider.TestOptions{Now: time.Now, PrepareContext: func(ctx context.Context) context.Context {
+		if routing.ModelAttributesFromContext(ctx) != nil {
+			return ctx
+		}
+		return routing.WithModelAttributes(ctx, modelAttributes)
+	}, Error: func(message string) { log.Printf("Provider test error: %s", message) }, WriteError: func(err error) { log.Printf("failed to write SSE event: %v", err) }})
 	return core
 }
 
