@@ -92,7 +92,11 @@ func newOAuthFixture(t *testing.T) *oauthFixture {
 	base := newMCPFixture(t)
 	db := postgrescontainer.New(t)
 	var id int64
-	require.NoError(t, db.QueryRow(`INSERT INTO users(email,password_hash,role,status) VALUES('oauth@example.invalid','unused','admin','active') RETURNING id`).Scan(&id))
+	// Seed the administrator shared by browser and manual-token fixtures so
+	// migration-controlled user sequences cannot change their common account identity.
+	query := `INSERT INTO users(id,email,password_hash,role,status)
+        VALUES($1,'oauth@example.invalid','unused','admin','active') RETURNING id`
+	require.NoError(t, db.QueryRow(query, base.token.UserID).Scan(&id))
 	router, ok := base.handler.router.(*gin.Engine)
 	require.True(t, ok)
 	server := httptest.NewUnstartedServer(router)
