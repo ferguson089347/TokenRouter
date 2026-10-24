@@ -537,11 +537,18 @@ func initializeApplication(ctx context.Context, cfg *config.Config, info BuildIn
 	idempotencyCleanupService := provideIdempotencyCleanupService(idempotencyRepository, cfg)
 	appHttpRouteMount := provideHTTPRouteMount(appAuthRouteMount, appUserRouteMount, appAdminRouteMount, appGatewayRouteMount, appPaymentRouteMount, idempotencyCoordinator, idempotencyCleanupService)
 	jwtAuthMiddleware := provideJWTAuth(appIdentityAuthGraph, userService, runtimeSettings, auditLogService)
-	mcpTokenService := provideMCPTokens(db, userService, secretEncryptor, cfg)
+	mcpoAuthServer, err := provideMCPOAuth(db, userService, cfg, store, manager)
+	if err != nil {
+		return nil, err
+	}
+	mcpTokenService := provideMCPTokens(db, userService, secretEncryptor, cfg, mcpoAuthServer)
 	adminAuthMiddleware := provideAdminAuth(appIdentityAuthGraph, userService, runtimeSettings, auditLogService, mcpTokenService)
 	v := provideAuditMiddleware(auditLogService, redactor)
 	stepUpAuthMiddleware := provideStepUpAuth(totpService, userService, runtimeSettings)
-	handler3 := provideMCPHTTP(mcpTokenService, redisClient, secretEncryptor, totpService, userService, runtimeSettings, store, cfg)
+	handler3, err := provideMCPHTTP(mcpoAuthServer, mcpTokenService, redisClient, secretEncryptor, totpService, userService, runtimeSettings, store, cfg)
+	if err != nil {
+		return nil, err
+	}
 	routerRuntime, err := provideRouterRuntime(service, intelligenceHandler, publicService, pageHandler, backendMode, store, redisClient, manager, cfg, appHttpRouteMount, panelSettings, opsService, jwtAuthMiddleware, adminAuthMiddleware, v, stepUpAuthMiddleware, handler3)
 	if err != nil {
 		return nil, err

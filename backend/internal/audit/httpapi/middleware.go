@@ -89,6 +89,7 @@ var (
 		"POST /api/v1/tickets/:id/replies":                           {},
 		"POST /api/v1/admin/tickets/:id/replies":                     {},
 		"PUT /api/v1/admin/remote-account-pool/settings":             {},
+		"POST /api/v1/admin/mcp/oauth/requests/:id/decision":         {},
 		"POST /api/v1/admin/mcp/files":                               {},
 		"POST /api/v1/auth/passkey/login/finish":                     {},
 		"POST /api/v1/user/passkeys/register/finish":                 {},
@@ -271,6 +272,7 @@ func NewAuditLogMiddleware(auditService *audit.AuditLogService, redactor *audit.
 		extra := map[string]any{}
 		if dispatch, ok := authctx.GetMCPDispatch(c.Request.Context()); ok {
 			extra["mcp_token_id"] = dispatch.TokenID
+			extra["mcp_source"] = dispatch.Source
 			extra["mcp_operation_id"] = dispatch.OperationID
 			extra["mcp_confirmation_skipped"] = dispatch.ConfirmationSkipped
 			entry.CredentialMasked = c.GetString("mcp_token_prefix")
@@ -278,6 +280,7 @@ func NewAuditLogMiddleware(auditService *audit.AuditLogService, redactor *audit.
 			// Browser approvals and downloads retain JWT actor authentication while
 			// indexing the originating token, so its history includes human continuation actions.
 			extra["mcp_token_id"] = tokenID
+			extra["mcp_source"] = c.GetString("mcp_related_source")
 			extra["mcp_operation_id"] = c.GetString("mcp_related_operation_id")
 			entry.CredentialMasked = c.GetString("mcp_related_token_prefix")
 		}

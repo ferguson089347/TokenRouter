@@ -247,7 +247,7 @@ func TestForwardImagesJSONBodyKeepalive(t *testing.T) {
 							require.Zero(t, headerBytes)
 						}
 						releaseOnce.Do(func() { close(releaseHeaders) })
-						responseBody := `{"created":1710000000,"data":[{"url":"https://example.invalid/a.png","size":"512x512"},{"b64_json":"second","size":"1024x1024"}],"usage":{"input_tokens":3,"output_tokens":4}}`
+						responseBody := `{"created":1710000000,"data":[{"b64_json":"first","size":"512x512"},{"b64_json":"second","size":"1024x1024"}],"usage":{"input_tokens":3,"output_tokens":4}}`
 						if outcome == "error" || outcome == "http_error" {
 							responseBody = `{"error":{"type":"invalid_request_error","code":"content_policy_violation","param":"prompt","message":"fixture policy"}}`
 						}
@@ -2297,7 +2297,9 @@ func TestOpenAIGatewayServiceForwardImages_APIKeyStreamRawJSONEventStreamFallbac
 	require.Equal(t, 10, result.Usage.InputTokens)
 	require.Equal(t, 18, result.Usage.OutputTokens)
 	require.Equal(t, 8, result.Usage.ImageOutputTokens)
-	require.Equal(t, "ZmluYWw=", gjson.Get(rec.Body.String(), "data.0.b64_json").String())
+	event, found := findOpenAIImageTestSSEEvent(parseOpenAIImageTestSSEEvents(rec.Body.String()), "image_generation.completed")
+	require.True(t, found)
+	require.Equal(t, "ZmluYWw=", gjson.Get(event.Data, "b64_json").String())
 }
 
 // TestOpenAIGatewayServiceForwardImages_APIKeyStreamMultilineSSEDataBillsImage
@@ -3322,5 +3324,269 @@ func TestImagesRejectUnknownCapabilityBeforeTransport(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, recorder.Code)
 			require.Equal(t, tc.reason, gjson.GetBytes(recorder.Body.Bytes(), "error.code").String())
 		})
+	}
+}
+
+// TestForwardImagesModeMatrix submits JSON generations and JSON/multipart edits
+// through the actual request builder and executor. Every capability/client-mode
+// combination must send an accepted upstream request and deliver the client format.
+func TestForwardImagesModeMatrix(t *testing.T) {
+	for _, format := range []string{"generation", "edit_json", "edit_multipart"} {
+		for _, mode := range []string{"both", "streaming", "non_streaming"} {
+			for _, clientStream := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/%s/client_%t", format, mode, clientStream), func(t *testing.T) {
+					endpoint := "/v1/images/generations"
+					contentType := "application/json"
+					body := []byte(fmt.Sprintf(`{"model":"gpt-image-2","prompt":"draw","stream":%t,"partial_images":2}`, clientStream))
+					if format != "generation" {
+						endpoint = "/v1/images/edits"
+						body = []byte(fmt.Sprintf(`{"model":"gpt-image-2","prompt":"edit","stream":%t,"partial_images":2,"images":[{"image_url":"https://example.invalid/reference.png"}]}`, clientStream))
+					}
+					if format == "edit_multipart" {
+						var buffer bytes.Buffer
+						writer := multipart.NewWriter(&buffer)
+						require.NoError(t, writer.WriteField("model", "gpt-image-2"))
+						require.NoError(t, writer.WriteField("prompt", "edit"))
+						require.NoError(t, writer.WriteField("stream", fmt.Sprint(clientStream)))
+						require.NoError(t, writer.WriteField("partial_images", "2"))
+						file, err := writer.CreateFormFile("image", "reference.png")
+						require.NoError(t, err)
+						_, err = file.Write([]byte("reference"))
+						require.NoError(t, err)
+						require.NoError(t, writer.Close())
+						body = buffer.Bytes()
+						contentType = writer.FormDataContentType()
+					}
+					parsed, err := media.ParseImageRequest(endpoint, contentType, body, true)
+					require.NoError(t, err)
+					upstreamStream := mode == "streaming" || (mode == "both" && clientStream)
+					calls := 0
+					transport := &auxiliaryHTTPRecorder{onRequest: func(req *http.Request) (*http.Response, error) {
+						calls++
+						sent, err := io.ReadAll(req.Body)
+						require.NoError(t, err)
+						request, err := upstreamcore.ParseImageRequest(endpoint, req.Header.Get("Content-Type"), sent)
+						require.NoError(t, err)
+						require.Equal(t, upstreamStream, request.Stream)
+						if mode == "non_streaming" {
+							require.Nil(t, request.PartialImages)
+						}
+						if mode == "streaming" && !clientStream {
+							require.Equal(t, 0, *request.PartialImages)
+						}
+						result := `{"created":123,"data":[{"b64_json":"aW1hZ2U="}],"usage":{"input_tokens":4,"output_tokens":6}}`
+						mediaType := "application/json"
+						if upstreamStream {
+							family := "image_generation"
+							if format != "generation" {
+								family = "image_edit"
+							}
+							result = fmt.Sprintf("data: {\"type\":%q,\"b64_json\":\"aW1hZ2U=\",\"usage\":{\"input_tokens\":4,\"output_tokens\":6}}\n\n", family+".completed")
+							mediaType = "text/event-stream; charset=utf-8"
+						}
+						return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {mediaType}}, Body: io.NopCloser(strings.NewReader(result))}, nil
+					}}
+					svc := newImagesFixture(imagesFixtureInputs{transport: transport})
+					provider := newOpenAIImagesAPIKeyProvider()
+					key := providerimages.ImagesGenerationsModeKey
+					if format != "generation" {
+						key = providerimages.ImagesEditsModeKey
+					}
+					provider.Record.Credentials[key] = mode
+					recorder := httptest.NewRecorder()
+					c, _ := gin.CreateTestContext(recorder)
+					c.Request = httptest.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+					c.Request.Header.Set("Content-Type", contentType)
+					result, err := svc.ForwardImages(t.Context(), c, provider, body, parsed, "")
+					require.NoError(t, err)
+					require.Equal(t, 1, calls)
+					require.Equal(t, 1, result.ImageCount)
+					require.Equal(t, 4, result.Usage.InputTokens)
+					require.Equal(t, 6, result.Usage.OutputTokens)
+					require.Equal(t, clientStream, parsed.Stream, "the client request remains immutable")
+					if clientStream {
+						require.Contains(t, recorder.Header().Get("Content-Type"), "text/event-stream")
+						require.Contains(t, recorder.Body.String(), ".completed")
+					} else {
+						require.Contains(t, recorder.Header().Get("Content-Type"), "application/json")
+						require.Equal(t, "aW1hZ2U=", gjson.GetBytes(recorder.Body.Bytes(), "data.0.b64_json").String())
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestForwardImagesURLConversionKeepsWaitingAlive delays a public image download
+// after generation completed. JSON and SSE upstreams must retain downstream
+// heartbeats during conversion, isolate download credentials, and submit one generation.
+func TestForwardImagesURLConversionKeepsWaitingAlive(t *testing.T) {
+	for _, responseStream := range []bool{false, true} {
+		synctest.Test(t, func(t *testing.T) {
+			var pngBytes bytes.Buffer
+			require.NoError(t, png.Encode(&pngBytes, image.NewRGBA(image.Rect(0, 0, 1, 1))))
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			body := []byte(`{"model":"gpt-image-2","prompt":"draw","stream":true}`)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			parsed, err := media.ParseImageRequest(c.Request.URL.Path, "application/json", body, true)
+			require.NoError(t, err)
+			generations, downloads := 0, 0
+			transport := &auxiliaryHTTPRecorder{onRequest: func(req *http.Request) (*http.Response, error) {
+				if req.Method == http.MethodGet {
+					downloads++
+					require.Empty(t, req.Header.Get("Authorization"))
+					require.Empty(t, req.Header.Get("Cookie"))
+					time.Sleep(2 * time.Second)
+					// Synchronize the recorder observation with the download's waiting writer,
+					// since virtual-time advancement can make the next heartbeat ready together.
+					value, _ := c.Get(openAICompactSSEKeepaliveKey)
+					waiting, ok := value.(*openAICompactSSEKeepalive)
+					require.True(t, ok)
+					waiting.mu.Lock()
+					received := rec.Body.String()
+					waiting.mu.Unlock()
+					require.Contains(t, received, ": keepalive")
+					require.NotContains(t, received, ".completed")
+					return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"image/png"}}, Body: io.NopCloser(bytes.NewReader(pngBytes.Bytes()))}, nil
+				}
+				generations++
+				response := `{"data":[{"url":"https://cdn.example.com/image.png"}],"usage":{"output_tokens":7}}`
+				mediaType := "application/json"
+				if responseStream {
+					response = "data: {\"type\":\"image_generation.completed\",\"url\":\"https://cdn.example.com/image.png\",\"usage\":{\"output_tokens\":7}}\n\n"
+					mediaType = "text/event-stream"
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {mediaType}}, Body: io.NopCloser(strings.NewReader(response))}, nil
+			}}
+			svc := newImagesFixture(imagesFixtureInputs{transport: transport, ImageStreamKeepaliveInterval: 1})
+			result, err := svc.ForwardImages(t.Context(), c, newOpenAIImagesAPIKeyProvider(), body, parsed, "")
+			require.NoError(t, err)
+			require.Equal(t, 1, generations)
+			require.Equal(t, 1, downloads)
+			require.Equal(t, 1, result.ImageCount)
+			require.Equal(t, 7, result.Usage.OutputTokens)
+			require.Contains(t, rec.Body.String(), `"b64_json":`)
+		})
+	}
+}
+
+// TestForwardImagesErrorWire exercises error responses after the native reader has
+// selected its client format. The recorder must expose failures and never retain
+// a requested image count when an upstream JSON error contains no image output.
+func TestForwardImagesErrorWire(t *testing.T) {
+	for _, tc := range []struct {
+		name        string // error-path fixture label
+		payload     string // upstream response body
+		contentType string // upstream response format
+		stream      bool   // client streaming selection
+	}{
+		{"partial_then_error", "data: {\"type\":\"image_generation.partial_image\",\"b64_json\":\"preview\"}\n\nevent: error\ndata: {\"error\":{\"message\":\"failed after preview\",\"code\":\"server_error\",\"type\":\"server_error\"}}\n\n", "text/event-stream", true},
+		{"completed_then_error", "data: {\"type\":\"image_generation.completed\",\"b64_json\":\"image\",\"usage\":{\"output_tokens\":9}}\n\nevent: error\ndata: {\"error\":{\"message\":\"failed after image\",\"code\":\"server_error\",\"type\":\"server_error\"}}\n\n", "text/event-stream", true},
+		{"partial_then_eof", "data: {\"type\":\"image_generation.partial_image\",\"b64_json\":\"preview\"}\n\n", "text/event-stream", true},
+		{"completed_then_truncation", "data: {\"type\":\"image_generation.completed\",\"b64_json\":\"image\",\"usage\":{\"output_tokens\":9}}\n\ndata: {", "text/event-stream", true},
+		{"buffered_completed_then_error", "data: {\"type\":\"image_generation.completed\",\"b64_json\":\"image\",\"usage\":{\"output_tokens\":9}}\n\nevent: error\ndata: {\"error\":{\"message\":\"failed after image\",\"code\":\"server_error\",\"type\":\"server_error\"}}\n\n", "text/event-stream", false},
+		{"fast_stream_error", "event: error\ndata: {\"error\":{\"message\":\"failed before image\",\"code\":\"server_error\",\"type\":\"server_error\"}}\n\n", "text/event-stream", true},
+		{"nonstream_json_error", `{"error":{"message":"failed","code":"server_error","type":"server_error"}}`, "application/json", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(fmt.Sprintf(`{"model":"gpt-image-2","prompt":"draw","stream":%t,"n":3}`, tc.stream))
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			parsed, err := media.ParseImageRequest(c.Request.URL.Path, "application/json", body, true)
+			require.NoError(t, err)
+			transport := &auxiliaryHTTPRecorder{resp: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {tc.contentType}}, Body: io.NopCloser(strings.NewReader(tc.payload))}}
+			svc := newImagesFixture(imagesFixtureInputs{transport: transport})
+			result, err := svc.ForwardImages(t.Context(), c, newOpenAIImagesAPIKeyProvider(), body, parsed, "")
+			count := 0
+			if result != nil {
+				count = result.ImageCount
+			}
+
+			switch tc.name {
+			case "buffered_completed_then_error":
+				require.Error(t, err)
+				require.Equal(t, 1, count)
+				require.Equal(t, 9, result.Usage.OutputTokens)
+				require.Equal(t, http.StatusBadGateway, rec.Code)
+				require.False(t, gjson.GetBytes(rec.Body.Bytes(), "data").Exists())
+				require.True(t, gjson.GetBytes(rec.Body.Bytes(), "error").Exists())
+			case "nonstream_json_error":
+				require.Error(t, err, "an error envelope must not reach successful completion")
+				require.Zero(t, count)
+			case "fast_stream_error":
+				require.Error(t, err)
+				require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+			default:
+				require.Error(t, err)
+				require.Equal(t, 1, strings.Count(rec.Body.String(), "event: error"))
+				require.NotContains(t, rec.Body.String(), "data: [DONE]")
+				observed, ok := GetOpsStreamError(c)
+				require.True(t, ok)
+				require.True(t, observed.CountTowardsSLA)
+				require.Equal(t, http.StatusBadGateway, observed.IntendedStatus)
+				require.Equal(t, http.StatusOK, observed.UpstreamStatus)
+				if tc.name == "completed_then_error" || tc.name == "completed_then_truncation" {
+					require.Equal(t, 1, count)
+					require.Equal(t, 9, result.Usage.OutputTokens)
+				} else {
+					require.Zero(t, count)
+				}
+			}
+		})
+	}
+}
+
+// TestForwardImagesErrorAfterWaitingHeartbeat delays an upstream error until
+// either client format has committed a heartbeat. Errors remain parseable in
+// the selected representation and never retain requested images for billing.
+func TestForwardImagesErrorAfterWaitingHeartbeat(t *testing.T) {
+	for _, clientStream := range []bool{false, true} {
+		for _, upstreamStream := range []bool{false, true} {
+			synctest.Test(t, func(t *testing.T) {
+				body := []byte(fmt.Sprintf(`{"model":"gpt-image-2","prompt":"draw","stream":%t,"n":3}`, clientStream))
+				recorder := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(recorder)
+				c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", bytes.NewReader(body))
+				c.Request.Header.Set("Content-Type", "application/json")
+				parsed, err := media.ParseImageRequest(c.Request.URL.Path, "application/json", body, true)
+				require.NoError(t, err)
+				if !clientStream {
+					stop := StartOpenAIImagesJSONKeepalive(c, time.Second)
+					defer stop()
+				}
+				calls := 0
+				transport := &auxiliaryHTTPRecorder{onRequest: func(*http.Request) (*http.Response, error) {
+					calls++
+					// A virtual-time header delay lets the existing waiting controller commit
+					// its response before native JSON validation or stream error parsing begins.
+					time.Sleep(2 * time.Second)
+					payload := `{"error":{"message":"blocked","code":"content_policy_violation","type":"invalid_request_error"}}`
+					contentType := "application/json"
+					if upstreamStream {
+						contentType = "text/event-stream"
+						payload = "event: error\ndata: " + payload + "\n\n"
+					}
+					return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(strings.NewReader(payload))}, nil
+				}}
+				executor := newImagesFixture(imagesFixtureInputs{transport: transport, ImageStreamKeepaliveInterval: 1})
+				result, err := executor.ForwardImages(t.Context(), c, newOpenAIImagesAPIKeyProvider(), body, parsed, "")
+				require.Error(t, err)
+				require.Nil(t, result)
+				require.Equal(t, 1, calls)
+				require.Equal(t, http.StatusOK, recorder.Code)
+				if clientStream {
+					require.Contains(t, recorder.Header().Get("Content-Type"), "text/event-stream")
+					require.Equal(t, 1, strings.Count(recorder.Body.String(), "event: error"))
+				} else {
+					require.Contains(t, recorder.Header().Get("Content-Type"), "application/json")
+					require.True(t, gjson.ValidBytes(recorder.Body.Bytes()))
+					require.Equal(t, "content_policy_violation", gjson.GetBytes(recorder.Body.Bytes(), "error.code").String())
+				}
+			})
+		}
 	}
 }

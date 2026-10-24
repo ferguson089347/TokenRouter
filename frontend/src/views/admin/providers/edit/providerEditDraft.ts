@@ -1,4 +1,5 @@
 import { ref, reactive } from 'vue'
+import { readImageStreamModes } from '@/components/provider/form/imageStreamModes'
 import type { ProtocolID } from '@/api/protocols.types'
 import type {
   OpenAICompactMode,
@@ -37,6 +38,7 @@ export type GeminiProviderType = 'official' | 'third_party'
 // dialog opens or its provider changes; server responses remain separate inputs.
 export function createProviderEditDraft() {
   return {
+    imageModes: ref(readImageStreamModes()), // Independent native Images capabilities.
     // Undefined selects native catalog defaults at submission; an explicit empty array
     // remains an empty administrator selection.
     upstreamProtocols: ref<ProtocolID[] | undefined>(undefined), // Selected native protocol identifiers.

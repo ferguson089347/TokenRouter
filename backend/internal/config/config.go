@@ -113,6 +113,8 @@ type RequestLogConfig struct {
 // application construction. Load normalizes and validates these values, while
 // the forwarded-IP accessors separately publish copied live policy snapshots.
 type Config struct {
+	MCPOAuthSigningSecret string `mapstructure:"-" json:"-"` // Bootstrap-resolved hexadecimal OAuth signing key.
+
 	// request summary retention settings
 	RequestLog RequestLogConfig `mapstructure:"request_log"`
 	// HTTP ingress and listener settings
@@ -570,7 +572,7 @@ type ServerConfig struct {
 	// Gin debug or release mode
 	Mode               string `mapstructure:"mode"`
 	EnableServerTiming bool   `mapstructure:"enable_server_timing"` // Return Server-Timing for admin page requests.
-	FrontendURL        string `mapstructure:"frontend_url"`         // Frontend base URL used for external links in email.
+	FrontendURL        string `mapstructure:"frontend_url"`         // Default frontend address for email links and MCP OAuth.
 	ReadHeaderTimeout  int    `mapstructure:"read_header_timeout"`  // Request-header read timeout, in seconds.
 	MaxHeaderBytes     int    `mapstructure:"max_header_bytes"`     // Header size limit in bytes; maps to the HTTP/2 header-list limit.
 	IdleTimeout        int    `mapstructure:"idle_timeout"`         // Idle connection timeout, in seconds.

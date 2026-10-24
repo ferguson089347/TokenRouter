@@ -15,8 +15,9 @@ import (
 	postgresinfra "github.com/TokenFlux/TokenRouter/internal/infra/postgres"
 )
 
-// security_secret_bootstrap.go resolves and persists the JWT signing secret
-// shared by application instances.
+// security_secret_bootstrap.go resolves persisted JWT and MCP OAuth signing
+// secrets retained across backend restarts. OAuth always prepares its independent
+// generated key so configuring the frontend URL can enable it at runtime.
 // Multiple application instances need the same persisted JWT signing value
 // even when their configured or generated candidates differ. Bootstrap trims
 // the configured value, inserts a candidate only when its key is absent, then
@@ -42,10 +43,11 @@ const (
 // test cases inject failures before restoring the process-wide function.
 var readRandomBytes = rand.Read
 
-// ensureBootstrapSecrets resolves the persisted JWT value and writes it into
-// cfg. Nil client or cfg returns an error, and cfg.JWT.Secret is trimmed
-// before lookup or persistence, so a later failure can leave that trimmed
-// value in cfg.
+// ensureBootstrapSecrets resolves independent JWT and OAuth signing keys into
+// cfg. Nil client or cfg returns an error. OAuth signing material is resolved
+// first and assigned to cfg.MCPOAuthSigningSecret; a later JWT failure leaves
+// that assignment in place. The JWT candidate is trimmed before its own lookup
+// or persistence, so JWT resolution errors can also leave that trimmed value.
 //
 // A nonempty configured candidate is persisted only if the key is absent, then
 // replaced with readback from the database. An empty candidate triggers
@@ -63,6 +65,13 @@ func ensureBootstrapSecrets(ctx context.Context, client *ent.Client, cfg *config
 		return fmt.Errorf("nil config")
 	}
 
+	// Resolve signing material even before a frontend URL is configured, so
+	// enabling OAuth through site settings does not require restarting the service.
+	value, _, err := getOrCreateGeneratedSecuritySecret(ctx, client, "mcp_oauth_secret", 32)
+	if err != nil {
+		return fmt.Errorf("ensure MCP OAuth secret: %w", err)
+	}
+	cfg.MCPOAuthSigningSecret = value
 	cfg.JWT.Secret = strings.TrimSpace(cfg.JWT.Secret)
 	if cfg.JWT.Secret != "" {
 		storedSecret, err := createSecuritySecretIfAbsent(ctx, client, securitySecretKeyJWT, cfg.JWT.Secret)

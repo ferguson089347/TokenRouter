@@ -147,7 +147,7 @@ app 直接构造一个 TestService 和 TestTargets。计划测试和分组探测
 
 Kimi、Zhipu、DeepSeek 的连接测试，只测试提供商 `upstream_protocols` 里启用的原生端点；集合为空时，直接报告没有启用的协议，不发起上游请求。管理端可以用 `protocol=chat_completions|anthropic|responses` 只测其中一个已经启用的协议，选了没启用的协议，在请求上游之前就会失败；省略时，按 Chat、Messages、Responses 的顺序，依次验证所有已启用的协议。测试复用提供商的自定义 Base URL、代理、TLS 指纹和受保护的 Header Override。Anthropic 协议的自定义中继，在模型同步等 OpenAI 格式的请求里，只去掉末尾的 `/anthropic`，host 和之前的路径前缀都保持不变。
 
-管理端的连接测试请求，要明确选择 `test_type=text|image`，并在同一个请求里传自定义的 `prompt`。文字测试不会因为模型名里有图片标记就换端点；图片测试由 OpenAI、Gemini 或 Grok 提供商的平台图片端点执行，和模型名无关。OpenAI 的 `compact` 和 `legacy_compact` 只执行固定载荷的连接测试，不显示也不使用自定义提示词。未传 `test_type` 的调用按所选分组的最终模型输出属性选择文字或图片测试，输出未知时要求明确测试类型或补充属性。图片和文字的结果，分别通过 SSE 的图片事件和内容事件返回；不支持图片端点的平台，直接返回可以诊断的错误，不会悄悄改成文字测试。OpenAI API Key 和 Grok 的图片测试，同时接受 `b64_json` 和图片链接（OpenAI 只接受 `https` 或 `data:image/` 开头的链接）；上游返回了结果、但没有可以展示的图片时，测试判为失败，并附上截断的响应正文。
+管理端的连接测试请求，要明确选择 `test_type=text|image`，并在同一个请求里传自定义的 `prompt`。文字测试不会因为模型名里有图片标记就换端点；图片测试由 OpenAI、Gemini 或 Grok 提供商的平台图片端点执行，和模型名无关。OpenAI 的 `compact` 和 `legacy_compact` 只执行固定载荷的连接测试，不显示也不使用自定义提示词。未传 `test_type` 的调用按所选分组的最终模型输出属性选择文字或图片测试，输出未知时要求明确测试类型或补充属性。图片和文字的结果，分别通过 SSE 的图片事件和内容事件返回；不支持图片端点的平台，直接返回可以诊断的错误，不会悄悄改成文字测试。OpenAI API Key 和 Grok 的图片测试，同时接受 `b64_json` 和图片链接（OpenAI 只接受 `https` 或 `data:image/` 开头的链接）；OpenAI 原生 JSON 先通过共享图片结果校验，HTTP 200 错误体、空数组和损坏图片条目直接返回诊断错误，不发送图片或成功事件。通过结构校验、但没有可展示链接的结果仍判为失败，并附上截断的响应正文。
 
 ## 额度与能力探测
 
@@ -161,7 +161,7 @@ OpenAI 的额度和重置，由 `provider.OpenAIQuotaService` 统一编排，app
 
 Codex 的邀请资格、规则和 credit 查询的汇总，由 `provider.CodexInviteResetService` 执行；资格接口失败时，只关闭邀请入口，已有的次数照常按顺序查询。提供商 provider 在准备时读取共享的 token、代理和专用的 TLS 和 UA，`upstream/openai.CodexInviteClient` 负责 HTTP 报文和关闭响应体。管理员路由直接绑定这个用例。
 
-OpenAI API Key 不会自动探测 Responses 能力；创建、编辑、批量更新和复制，都以管理员选择的上游协议为准，历史的探测字段已经清除，不参与调度。两种压缩也由各自的管理员开关决定，手动连接测试不更新能力配置，但额度观测、401 认证错误的记录和 429 限流的处理照常进行。提供商写入时统一清理历史探测状态，并将兼容的压缩开关值规范为开启或关闭。API Key 的文字测试可以明确选择 Responses 或 Chat Completions，OAuth 使用 Codex Responses。HTTP continuation 是独立的开关，没有配置时关闭。
+OpenAI API Key 不会自动探测 Responses 能力；创建、编辑、批量更新和复制，都以管理员选择的上游协议为准，历史的探测字段已经清除，不参与调度。两种压缩也由各自的管理员开关决定，手动连接测试不更新能力配置，但额度观测、401 认证错误的记录和 429 限流的处理照常进行。提供商写入时统一清理历史探测状态，并将兼容的压缩开关值规范为开启或关闭。API Key 的文字测试可以明确选择 Responses 或 Chat Completions，OAuth 使用 Codex Responses。OpenAI API Key 生图测试读取生成端点的模式配置；仅流式时请求 `stream=true`、`partial_images=0`，使用与网关和创作台相同的读取器聚合预览结果。手动测试和定时测试共用该执行方法，失败不会改模式重发生图。HTTP continuation 是独立的开关，没有配置时关闭。
 
 调度数据要保留原生协议集合、认证方式、两种压缩开关和 continuation 设置，配置变化时按提供商数据的失效机制传播。国产供应商不会异步写回旧的 OpenAI 文本路由镜像。Grok 的计费和媒体资格、Ollama Cloud 和各平台的额度探测，各自是独立的流程。
 

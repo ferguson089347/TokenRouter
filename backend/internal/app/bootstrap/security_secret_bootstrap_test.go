@@ -431,3 +431,17 @@ func TestGenerateHexSecretLengths(t *testing.T) {
 
 	require.NotEqual(t, v1, v2)
 }
+
+// TestEnsureBootstrapSecretsOAuthPersistsIndependentKey starts before any frontend URL exists.
+// The generated OAuth key must differ from the JWT secret and remain unchanged
+// when another bootstrap follows a backend restart.
+func TestEnsureBootstrapSecretsOAuthPersistsIndependentKey(t *testing.T) {
+	client := newSecuritySecretTestClient(t)
+	first := &config.Config{}
+	require.NoError(t, ensureBootstrapSecrets(t.Context(), client, first))
+	require.Len(t, first.MCPOAuthSigningSecret, 64)
+	require.NotEqual(t, first.JWT.Secret, first.MCPOAuthSigningSecret)
+	second := &config.Config{}
+	require.NoError(t, ensureBootstrapSecrets(t.Context(), client, second))
+	require.Equal(t, first.MCPOAuthSigningSecret, second.MCPOAuthSigningSecret)
+}

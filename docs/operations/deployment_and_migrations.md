@@ -129,3 +129,11 @@ Apple container 的新栈使用 `org.tokenrouter.stack` 标签；已有的 `sub2
 ## MCP 管理接入
 
 迁移 310 创建独立的 MCP 令牌表，保存认证摘要和加密凭据，迁移 311 增加默认关闭的跳过浏览器确认设置。服务沿用现有 PostgreSQL、Redis 和持久加密密钥；创建与复制令牌要求配置固定的 `TOTP_ENCRYPTION_KEY`（或 `totp.encryption_key`），所有实例使用相同值，并与数据库一起备份。入口与网页使用同一监听端口，反向代理需要允许 `/mcp`。浏览器确认链接使用 `frontend_url`，原生客户端通过专用 Bearer 令牌连接，部署时按需限制管理入口的网络可达范围。令牌迁移、回退和临时数据规则见 [MCP 管理接口](../interfaces/mcp_management.md#client_setup)。
+
+### MCP OAuth 部署
+
+迁移 312 创建 OAuth 客户端、应用授权、短期请求和凭据表。单实例部署同步升级前后端；已有有效 `frontend_url` 的部署升级后即可使用 OAuth，无需新增环境变量。地址缺失或无效时，在原系统设置中补全前端地址即可，无需重启。MCP 接入配置显示当前地址或需要修正的原因，手工 Token 表及接入方式保持原结构。
+
+`frontend_url` 对应的公开入口必须将 `/mcp`、`/mcp/oauth/*` 和 `/.well-known/oauth-*` 转发到后端，并提供 `/admin/mcp/authorize` 网页。即使前后端物理分开部署，也使用这个统一公开入口。嵌入前端的发行构建保留这些后端路径；跨域浏览器接入按 CORS 配置放行 Origin，并暴露 `WWW-Authenticate`。
+
+备份包含 OAuth 表及 `security_secrets` 内独立的 `mcp_oauth_secret`。该密钥在后端重启后继续使用；固定 TOTP 加密密钥缺省时，MCP 临时文件加密密钥从该持久值独立派生。固定 TOTP 密钥已配置时沿用原文件加密方式。变更前端 origin 后，旧地址的 OAuth 凭据被拒绝，客户端需要重新连接。回退到不支持 OAuth 的版本时保留新增表。ChatGPT 联调需要可公开访问的 HTTPS 部署，不能由本地协议夹具测试代替。
