@@ -369,11 +369,18 @@ jobs:
       - name: Sync VERSION file to released tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION=${{ github.event.inputs.tag }}
-            VERSION=${VERSION#v}
+            TAG_NAME=${{ github.event.inputs.tag }}
           else
-            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG_NAME=${GITHUB_REF#refs/tags/}
           fi
+
+          # Keep the default branch version on stable releases only. A patch
+          # tag such as v0.4.0-fix can follow a newer stable main version.
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Skipping VERSION sync for patch tag $TAG_NAME"
+            exit 0
+          fi
+          VERSION=${TAG_NAME#v}
 
           CURRENT_VERSION=$(tr -d '\r\n' < backend/cmd/server/VERSION || true)
           if [ "$CURRENT_VERSION" = "$VERSION" ]; then
