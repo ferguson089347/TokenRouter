@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"time"
 
@@ -208,10 +209,10 @@ func (e *Target) CreativeOpenAIURL(endpoint string) (string, error) { return e.O
 //
 // Both representations carry the fixed upstream model, prompt, size mapping,
 // and one PNG output. Only DALL-E names request the legacy base64
-// response_format field. Editing repeats the image form field for sources and
-// adds a supplied mask; closing the multipart writer completes its boundary
-// before bytes and content type are returned. Optional quality and background
-// are forwarded after trimming.
+// response_format field. Editing repeats the image form field for sources,
+// labels each file part with its image MIME, and adds a supplied mask; closing
+// the multipart writer completes its boundary before bytes and content type
+// are returned. Optional quality and background are forwarded after trimming.
 func BuildCreativeOpenAIRequestBody(run creative.CreativeRun, payload creative.CreativeRunPayload, upstreamModel string) ([]byte, string, error) {
 	if run.Operation == creative.CreativeOperationGenerate {
 		bodyMap := map[string]any{
@@ -243,7 +244,15 @@ func BuildCreativeOpenAIRequestBody(run creative.CreativeRun, payload creative.C
 	var buffer bytes.Buffer
 	writer := multipart.NewWriter(&buffer)
 	for i, image := range payload.Sources {
-		part, err := writer.CreateFormFile("image", fmt.Sprintf("source_%d.%s", i, CreativeFileExtension(image.Mime)))
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", fmt.Sprintf(
+			`form-data; name="image"; filename="source_%d.%s"`, i, CreativeFileExtension(image.Mime),
+		))
+		// Source MIME is validated before execution. Preserve it on the file part:
+		// CreateFormFile defaults to application/octet-stream, which this image
+		// provider rejects even when the bytes contain a valid PNG.
+		header.Set("Content-Type", image.Mime)
+		part, err := writer.CreatePart(header)
 		if err != nil {
 			return nil, "", err
 		}
@@ -252,7 +261,10 @@ func BuildCreativeOpenAIRequestBody(run creative.CreativeRun, payload creative.C
 		}
 	}
 	if payload.Mask != nil {
-		part, err := writer.CreateFormFile("mask", "mask."+CreativeFileExtension(payload.Mask.Mime))
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", `form-data; name="mask"; filename="mask.`+CreativeFileExtension(payload.Mask.Mime)+`"`)
+		header.Set("Content-Type", payload.Mask.Mime)
+		part, err := writer.CreatePart(header)
 		if err != nil {
 			return nil, "", err
 		}

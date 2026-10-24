@@ -1,12 +1,15 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"testing"
@@ -21,8 +24,9 @@ import (
 
 // OpenAI image fixtures simulate response bodies and download callbacks to
 // observe delivery order without real transport. Tests inspect exact request
-// fields, base64 preference, signed URL preservation, bounded download counts,
-// and fixed result errors under synctest timing and injected cancellation.
+// fields and file MIME types, base64 preference, signed URL preservation,
+// bounded download counts, and fixed result errors under synctest timing and
+// injected cancellation.
 
 // creativeImageResponseBody wraps the fixture reader and records
 // close-before-download observations.
@@ -65,7 +69,8 @@ func TestParseCreativeOpenAIImageOutputs(t *testing.T) {
 
 // TestBuildCreativeOpenAIRequestBody inspects JSON generation and multipart
 // inpaint fields using a two-output run. Requests still use one PNG output;
-// the fixture checks DALL-E response_format and the listed four-K dimensions.
+// the fixture checks DALL-E response_format, four-K dimensions, and image part
+// MIME types required by the edit upstream.
 func TestBuildCreativeOpenAIRequestBody(t *testing.T) {
 	// Generation uses JSON.
 	run := creative.CreativeRun{Operation: creative.CreativeOperationGenerate, ImageSize: "1K", RequestedOutputCount: 2}
@@ -122,6 +127,24 @@ func TestBuildCreativeOpenAIRequestBody(t *testing.T) {
 	require.Contains(t, string(body), `name="output_format"`)
 	require.NotContains(t, string(body), `name="output_compression"`)
 	require.Contains(t, string(body), `name="background"`)
+	_, parameters, err := mime.ParseMediaType(contentType)
+	require.NoError(t, err)
+	parts := multipart.NewReader(bytes.NewReader(body), parameters["boundary"])
+	for _, expected := range []struct {
+		name string
+		data string
+	}{
+		{name: "image", data: "img"},
+		{name: "mask", data: "mask"},
+	} {
+		part, partErr := parts.NextPart()
+		require.NoError(t, partErr)
+		require.Equal(t, expected.name, part.FormName())
+		require.Equal(t, "image/png", part.Header.Get("Content-Type"))
+		data, readErr := io.ReadAll(part)
+		require.NoError(t, readErr)
+		require.Equal(t, expected.data, string(data))
+	}
 }
 
 // Close records that the fixture response body was closed and returns success.
