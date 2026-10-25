@@ -5,18 +5,19 @@
 export default {
   intelligence: {
     selfTest: 'Test a model',
+    selfTestForModel: 'Test {model}',
+    rateMultiplier: 'Rate',
     startSelfTest: 'Start test',
     userTests: 'User tests',
     siteTests: 'Site checks',
     channelModel: 'Channel / Model',
     selfTestHint:
-      'Select your personal API key to test with the system settings for this channel. Results are public, and calls count toward usage for the selected key.',
-    noSelfTestKeys:
-      'No eligible personal keys. Use a key bound to a channel with an enabled system drawing check.',
-    title: 'Intelligence checks',
+      'Use a personal API key from this group to test this model. Results are public, and calls count toward usage for the selected key.',
+    noSelfTestKeys: 'No eligible personal keys in this group. Create one in key management first.',
+    title: 'IQ tests',
     description:
       'Review recent model checks and drawing results by group. Each result reflects only that individual test.',
-    adminTitle: 'Intelligence checks',
+    adminTitle: 'IQ tests',
     adminDescription:
       'Configure models and tests by group. Drawing tests generate HTML on this site before evaluation and support custom prompts.',
     add: 'Add test',
@@ -33,9 +34,9 @@ export default {
     emptyHint: 'Results will appear after an administrator configures and runs tests.',
     adminEmpty: 'No test configurations',
     adminEmptyHint: 'Choose a group and model, then add a candy or drawing test.',
-    disabled: 'Intelligence checks are disabled',
+    disabled: 'IQ tests are disabled',
     disabledHint:
-      'You can maintain configurations. Enable intelligence checks in system settings before running tests.',
+      'You can maintain configurations. Enable IQ tests in system settings before running tests.',
     loadFailed: 'Failed to load tests',
     saveFailed: 'Failed to save configuration',
     runFailed: 'Failed to submit test',
@@ -130,7 +131,7 @@ export default {
       queued: 'Queued',
     },
     settings: {
-      enabled: 'Enable intelligence checks',
+      enabled: 'Enable IQ tests',
       hint: 'Show user test results and allow administrators to run configured model tests manually or on a schedule. Disabled by default.',
     },
   },

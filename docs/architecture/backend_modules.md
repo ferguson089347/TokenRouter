@@ -447,7 +447,7 @@ app/lifecycle 管理这些组件的启动和关闭。audit 独立记录操作审
 | requestlog | [请求 ID 与请求查询](../operations/request_lookup.md) |
 | usage、audit、ops | [数据生命周期](../operations/observability_and_data_lifecycle.md)、[监控告警](../operations/ops_monitoring_and_alerting.md)、[预聚合](../operations/pre_aggregation.md) |
 | backup | [备份与恢复](../operations/deployment_and_migrations.md#maintenance_execution) |
-| intelligence | [降智检测](../domains/intelligence_tests.md) |
+| intelligence | [智商测试](../domains/intelligence_tests.md) |
 | remotepool | [远端号池](../interfaces/remote_account_pool.md) |
 | settings、site | [配置](../interfaces/configuration.md)、[HTTP 与页面权限](../interfaces/http_api.md) |
 | idempotency | [面板命令幂等](../interfaces/http_api.md#write_idempotency) |

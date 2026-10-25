@@ -99,13 +99,17 @@ export interface IntelligenceTest {
   benchmark: IntelligenceBenchmark // selected benchmark type
   runs: IntelligenceRun[] // lightweight execution history
   artifacts: IntelligenceRun[] // retained artwork summaries
+  rate_multiplier: number // current group billing multiplier
 }
 
 // IntelligenceSelfTestInput selects a personal Key for the channel's system drawing.
-// The server checks ownership and copies the first enabled site drawing's execution
+// The server checks ownership and copies the selected site drawing's execution
 // parameters before queuing a publicly shared result under the user's credential.
 export interface IntelligenceSelfTestInput {
   api_key_id: number // selected personal credential
+  // Omission selects the group's first enabled drawing for clients that start
+  // outside a model row. A supplied identifier must belong to this Key's group.
+  config_id?: number // selected site configuration
 }
 
 // IntelligencePreview grants short-lived access to one sandboxed drawing

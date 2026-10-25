@@ -37,7 +37,7 @@ var (
 	// Module errors distinguish unavailable access, missing records and occupied
 	// configurations so panel callers can report the relevant recovery action.
 	ErrIntelligenceNotFound = apperror.NotFound("INTELLIGENCE_NOT_FOUND", "检测配置或记录不存在")
-	ErrIntelligenceDisabled = apperror.Forbidden("INTELLIGENCE_DISABLED", "降智检测未开启")
+	ErrIntelligenceDisabled = apperror.Forbidden("INTELLIGENCE_DISABLED", "智商测试未开启")
 	ErrIntelligenceBusy     = apperror.Conflict("INTELLIGENCE_BUSY", "当前配置正在检测，请等待本次检测结束")
 
 	// intelligenceKeyPattern removes recognizable local credentials from result
@@ -327,14 +327,18 @@ func (s *IntelligenceService) visibleGroups(ctx context.Context, userID int64) (
 // UserList returns enabled checks belonging to the user's currently available
 // groups. The global switch gates access, histories contain lightweight
 // summaries from both site checks and public user submissions, and each check
-// exposes at most ten retained drawing artifacts.
+// exposes at most ten retained drawing artifacts and its current group multiplier.
 func (s *IntelligenceService) UserList(ctx context.Context, userID int64) ([]IntelligenceTest, error) {
 	if !s.isEnabled(ctx) {
 		return nil, ErrIntelligenceDisabled
 	}
-	visible, err := s.visibleGroups(ctx, userID)
+	groups, err := s.available.GetAvailableGroups(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+	visible := make(map[int64]float64, len(groups))
+	for _, group := range groups {
+		visible[group.ID] = group.RateMultiplier
 	}
 	configs, err := s.repo.ListConfigs(ctx)
 	if err != nil {
@@ -347,7 +351,8 @@ func (s *IntelligenceService) UserList(ctx context.Context, userID int64) ([]Int
 	configs = append(configs, community...)
 	out := make([]IntelligenceTest, 0)
 	for _, c := range configs {
-		if !c.Enabled || !visible[c.GroupID] {
+		rate, allowed := visible[c.GroupID]
+		if !c.Enabled || !allowed {
 			continue
 		}
 		runs, err := s.repo.ListRuns(ctx, c.ID)
@@ -355,8 +360,10 @@ func (s *IntelligenceService) UserList(ctx context.Context, userID int64) ([]Int
 			return nil, err
 		}
 		test := IntelligenceTest{ID: c.ID, GroupID: c.GroupID, GroupName: c.GroupName, Model: c.Model, Benchmark: c.Benchmark, Source: c.Source, Runs: make([]IntelligenceRun, 0, len(runs)), Artifacts: make([]IntelligenceRun, 0)}
+		test.RateMultiplier = rate
 		for _, run := range runs {
 			test.Runs = append(test.Runs, intelligenceSummary(run))
+			// Limit drawing previews while keeping the full lightweight status history.
 			if run.HasArtifact && len(test.Artifacts) < 10 {
 				test.Artifacts = append(test.Artifacts, intelligenceSummary(run))
 			}
@@ -497,7 +504,7 @@ func (s *IntelligenceService) execute(ctx context.Context, run *IntelligenceRun)
 	}
 	if run.Status == "queued" {
 		if !s.isEnabled(ctx) {
-			s.finish(ctx, run, "error", "error", "降智检测已关闭，本次尚未提交")
+			s.finish(ctx, run, "error", "error", "智商测试已关闭，本次尚未提交")
 			return
 		}
 		c, err := s.repo.GetConfig(ctx, run.ConfigID)

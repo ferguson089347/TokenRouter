@@ -143,7 +143,7 @@ usage、audit 和 ops 的静态参数，由 app 整理成各模块的 Options；
 
 `remote_account_pool` 保存远端号池配置、加密会话和最近完整快照，由专用号池页面维护。凭据持久化要求固定的 `TOTP_ENCRYPTION_KEY`，配置请求正文从审计记录中省略。具体的刷新、快照和本地权限规则见[远端号池](remote_account_pool.md)。
 
-`intelligence_enabled` 是降智检测的全局开关，默认关闭。综合设置由 `intelligence.SettingsParticipant` 拥有此字段并原子保存；公开 API 和 HTML 注入包含同名布尔值，服务在用户读取和创建任务前即时检查。关闭后已提交的任务继续轮询，具体规则见[降智检测](../domains/intelligence_tests.md)。
+`intelligence_enabled` 是智商测试的全局开关，默认关闭。综合设置由 `intelligence.SettingsParticipant` 拥有此字段并原子保存；公开 API 和 HTML 注入包含同名布尔值，服务在用户读取和创建任务前即时检查。关闭后已提交的任务继续轮询，具体规则见[智商测试](../domains/intelligence_tests.md)。
 
 `subscription_entry_enabled` 控制用户端订阅入口，默认开启。系统设置的「功能开关」页可关闭「订阅入口」，公开 API 与 HTML 注入同步下发此值。关闭后隐藏订阅菜单、购买标签、续费按钮和订阅详情链接，充值入口、页面标题和浏览器标签页标题改为「充值账户」，页面说明改为充值余额。已有订阅的计费、额度展示、管理端操作和订阅 API 继续可用；直接访问订阅页仍可查看已有权益。
 

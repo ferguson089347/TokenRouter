@@ -5,16 +5,17 @@
 export default {
   intelligence: {
     selfTest: '用户自测',
+    selfTestForModel: '自测 {model}',
+    rateMultiplier: '倍率',
     startSelfTest: '开始测试',
     userTests: '用户测试',
     siteTests: '站点检测',
     channelModel: '渠道 / 模型',
-    selfTestHint:
-      '选择自己的个人 API Key，按该渠道的系统配置测试。结果公开显示，调用计入所选 Key 的用量。',
-    noSelfTestKeys: '暂无可测试的个人普通 Key，请使用绑定已启用系统画图检测渠道的 Key。',
-    title: '降智检测',
+    selfTestHint: '使用当前分组的个人 API Key 测试此模型。结果公开显示，调用计入所选 Key 的用量。',
+    noSelfTestKeys: '当前分组暂无可测试的个人普通 Key，请先在密钥管理中创建。',
+    title: '智商测试',
     description: '按分组和模型查看近期测试结果与绘图作品。测试结果仅反映当次测试表现。',
-    adminTitle: '降智检测',
+    adminTitle: '智商测试',
     adminDescription:
       '按分组配置模型与测试。画图测试在本站生成 HTML 后提交评价，可自定义生成提示词。',
     add: '新增测试',
@@ -31,8 +32,8 @@ export default {
     emptyHint: '管理员配置并完成测试后，会在这里显示结果。',
     adminEmpty: '还没有测试配置',
     adminEmptyHint: '选择分组与模型，为它添加糖果测试或画图测试。',
-    disabled: '降智检测已关闭',
-    disabledHint: '可以继续维护配置，开启系统设置中的“降智检测”后才能运行测试。',
+    disabled: '智商测试已关闭',
+    disabledHint: '可以继续维护配置，开启系统设置中的“智商测试”后才能运行测试。',
     loadFailed: '加载测试数据失败',
     saveFailed: '保存配置失败',
     runFailed: '提交测试失败',
@@ -122,8 +123,8 @@ export default {
       queued: '等待中',
     },
     settings: {
-      enabled: '开启降智检测',
-      hint: '显示用户降智检测页面，并允许管理员运行或定时执行已配置的模型测试。默认关闭。',
+      enabled: '开启智商测试',
+      hint: '显示用户智商测试页面，并允许管理员运行或定时执行已配置的模型测试。默认关闭。',
     },
   },
 }

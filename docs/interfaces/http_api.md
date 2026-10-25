@@ -401,9 +401,9 @@ Grok 请求缓存开关使用 `X-TokenRouter-Grok-Client-Tool-Cache`，没有新
 
 用户通过 `/api/v1/tickets` 创建、查询、回复、完成或撤销自己的工单。管理员通过 `/api/v1/admin/tickets` 处理所有工单，并使用 `/settings` 读取和更新工单配置。附件原件和 `/preview` 均要求同一工单访问权限；multipart 提交使用 JSON `payload` 和重复的 `files` 字段。具体状态、限制与开关规则见[工单](../domains/support_tickets.md)。
 
-## 降智检测接口
+## 智商测试接口
 
-`/api/v1/admin/intelligence-tests` 提供配置、手动执行和历史查询；`/api/v1/intelligence-tests` 为登录用户提供站点检测和共享用户测试结果。POST `/api/v1/intelligence-tests/run` 使用当前用户自己的个人普通 Key ID 创建画图自测，请求仅含 `api_key_id`，执行参数与 API 地址取自所属渠道的第一个启用系统画图配置；成功返回 202。`/api/v1/intelligence-tests/preview-content/:ticket` 使用短期作品票据，并重新校验当前权限。用户和管理员的 `/runs/:id/thumbnail` 返回 PNG，每次校验当前权限；无截图且仍有 HTML 时补生成并保存。操作列表与隔离规则见[降智检测](../domains/intelligence_tests.md)。
+`/api/v1/admin/intelligence-tests` 提供配置、手动执行和历史查询；`/api/v1/intelligence-tests` 为登录用户提供站点检测和共享用户测试结果。POST `/api/v1/intelligence-tests/run` 使用当前用户自己的个人普通 Key ID 创建画图自测，请求包含 `api_key_id` 和可选的 `config_id`，执行参数与 API 地址取自所选的启用系统画图配置，服务端校验配置与 Key 属于同一分组。省略 `config_id` 时使用该分组第一个启用画图配置。成功返回 202。`/api/v1/intelligence-tests/preview-content/:ticket` 使用短期作品票据，并重新校验当前权限。用户和管理员的 `/runs/:id/thumbnail` 返回 PNG，每次校验当前权限；无截图且仍有 HTML 时补生成并保存。操作列表与隔离规则见[智商测试](../domains/intelligence_tests.md)。
 
 ## MCP OAuth 接入
 

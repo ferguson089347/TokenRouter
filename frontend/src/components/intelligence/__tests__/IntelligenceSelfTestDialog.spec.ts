@@ -22,9 +22,12 @@ function mountDialog() {
   return mount(IntelligenceSelfTestDialog, {
     props: {
       show: true,
-      tests: [
-        testFixture({ group_id: 7, group_name: 'Channel A', benchmark: 'drawing', source: 'site' }),
-      ],
+      test: testFixture({
+        group_id: 7,
+        group_name: 'Channel A',
+        benchmark: 'drawing',
+        source: 'site',
+      }),
     },
     global: {
       stubs: {
@@ -80,33 +83,87 @@ describe('用户公开自测', () => {
     })
     selfTest.mockReset().mockResolvedValue(runFixture({ status: 'queued' }))
   })
-  // The editor requires one personal Key bound to a system drawing channel.
-  // Submission sends the selected Key ID while keeping its secret outside request data and labels.
-  it('只选择自己的Key提交，模型和执行参数由系统配置提供', async () => {
+  // The selected model narrows candidates to valid personal Keys in its group.
+  // The first candidate is ready for submission, which sends identifiers and excludes credential text.
+  it('过滤当前分组并默认选中可用Key，提交所点模型的配置', async () => {
     const wrapper = mountDialog()
     await flushPromises()
     expect(list).toHaveBeenCalledWith(
       1,
       100,
-      { scope: 'personal', status: 'active' },
+      { scope: 'personal', status: 'active', group_id: 7 },
       { signal: expect.any(AbortSignal) },
     )
     expect(wrapper.getComponent('#self-test-key').props('options')).toEqual([
-      { value: 9, label: 'Personal key · Channel A' },
+      { value: 9, label: 'Personal key' },
     ])
     expect(wrapper.text()).not.toContain('private-credential')
-    await wrapper.get('#intelligence-self-test').trigger('submit')
+    expect(wrapper.getComponent('#self-test-key').props('modelValue')).toBe(9)
     expect(selfTest).not.toHaveBeenCalled()
     expect(wrapper.findAllComponents({ name: 'Select' })).toHaveLength(1)
     expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
-    wrapper.getComponent('#self-test-key').vm.$emit('update:modelValue', 9)
-    await flushPromises()
     await wrapper.get('#intelligence-self-test').trigger('submit')
     await flushPromises()
-    expect(selfTest).toHaveBeenCalledWith({ api_key_id: 9 })
+    expect(selfTest).toHaveBeenCalledWith({ api_key_id: 9, config_id: 1 })
     expect(wrapper.emitted('submitted')).toHaveLength(1)
     expect(wrapper.emitted('close')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  // A group without any usable personal Key has nothing that can fund a test.
+  // The editor keeps submission disabled and displays the group-specific empty state.
+  it('当前分组没有有效Key时禁止提交', async () => {
+    list.mockResolvedValue({ pages: 1, items: [] })
+    const wrapper = mountDialog()
+    await flushPromises()
+    expect(wrapper.text()).toContain('intelligence.noSelfTestKeys')
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('#intelligence-self-test').trigger('submit')
+    expect(selfTest).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  // Changing the target group starts a new candidate request while the prior one is pending.
+  // Its aborted response cannot replace the current group's automatically selected Key.
+  it('切换分组后忽略旧候选请求的迟到响应', async () => {
+    let resolvePrevious!: (value: unknown) => void
+    list.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePrevious = resolve
+        }),
+    )
+    const wrapper = mountDialog()
+    const previousSignal = list.mock.calls[0][3].signal as AbortSignal
+    list.mockResolvedValueOnce({
+      pages: 1,
+      items: [
+        {
+          id: 20,
+          name: 'Next group key',
+          group_id: 8,
+          status: 'active',
+          quota: 0,
+          quota_used: 0,
+        },
+      ],
+    })
+    await wrapper.setProps({ test: testFixture({ id: 2, group_id: 8, benchmark: 'drawing' }) })
+    await flushPromises()
+    expect(previousSignal.aborted).toBe(true)
+    resolvePrevious({
+      pages: 1,
+      items: [{ id: 9, group_id: 7, status: 'active', quota: 0, quota_used: 0 }],
+    })
+    await flushPromises()
+    expect(wrapper.getComponent('#self-test-key').props('modelValue')).toBe(20)
+    expect(wrapper.getComponent('#self-test-key').props('options')).toEqual([
+      { value: 20, label: 'Next group key' },
+    ])
+    await wrapper.get('#intelligence-self-test').trigger('submit')
+    await flushPromises()
+    expect(selfTest).toHaveBeenCalledWith({ api_key_id: 20, config_id: 2 })
     wrapper.unmount()
   })
 })

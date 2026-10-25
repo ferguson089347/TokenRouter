@@ -5,7 +5,7 @@ TokenRouter 在主 HTTP 服务的 `/mcp` 提供 Streamable HTTP MCP，支持专�
 ## 章节导航
 
 - [操作目录](#operation_catalog)：登记管理功能、参数和响应处理方式。
-- [Fork 管理功能](#fork_management)：号池、工单和降智检测的浏览器接续。
+- [Fork 管理功能](#fork_management)：号池、工单和智商测试的浏览器接续。
 - [访问令牌](#access_tokens)：签发、授权、撤销和接口范围。
 - [OAuth 应用授权](#oauth_authorization)：发现、客户端注册、浏览器授权和凭据轮换。
 - [工具调用](#tool_execution)：发现、校验、执行及错误结果。
@@ -31,7 +31,7 @@ JSON 响应提供共享 HTTP envelope schema；已声明的具体响应 DTO 会�
 <a id="fork_management"></a>
 ## Fork 管理功能
 
-号池、工单和降智检测的管理员接口也登记在操作目录中。对应操作通过 `execute_operation` 返回 `interaction_required` 和现有管理页地址，管理员登录浏览器后选择目标记录、填写参数并完成操作。目录中的请求 schema 描述接续所需的路径参数，配置正文、私有附件和作品预览在网页中处理。
+号池、工单和智商测试的管理员接口也登记在操作目录中。对应操作通过 `execute_operation` 返回 `interaction_required` 和现有管理页地址，管理员登录浏览器后选择目标记录、填写参数并完成操作。目录中的请求 schema 描述接续所需的路径参数，配置正文、私有附件和作品预览在网页中处理。
 
 <a id="access_tokens"></a>
 ## 访问令牌

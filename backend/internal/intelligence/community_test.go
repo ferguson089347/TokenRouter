@@ -11,6 +11,11 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/routing"
 )
 
+// community_test.go exercises personal Key admission with controlled site
+// configurations and captured queue writes. Tests verify configuration selection,
+// copied execution settings, ownership, and group access before any chargeable
+// work can enter shared user histories.
+
 // communityRepo captures authenticated submissions and exposes shared user rows.
 type communityRepo struct {
 	*intelligenceRepoStub                      // existing observation fixture
@@ -92,4 +97,59 @@ func TestCommunityRunUsesSystemParametersAndRequiresOwnerAccess(t *testing.T) {
 	_, err = service.CommunityRun(context.Background(), 12, input)
 	require.Error(t, err)
 	require.Nil(t, repo.submitted)
+}
+
+// TestCommunityRunSelectsMatchingSiteDrawing submits a later model's site ID.
+// Its settings reach the queue, while foreign, disabled, missing, user-source,
+// and candy configurations cannot redirect a chargeable request to another model.
+// Authorized histories also expose the current group multiplier for each model.
+func TestCommunityRunSelectsMatchingSiteDrawing(t *testing.T) {
+	service, original, _, key := newIntelligenceFixture()
+	key.UserID = 12
+	first := *original.config
+	first.Benchmark = "drawing"
+	selected := first
+	selected.ID = first.ID + 1
+	selected.Model = "selected-model"
+	selected.Prompt = "selected drawing instruction"
+	repo := &communityRepo{intelligenceRepoStub: original, sites: []IntelligenceConfig{first, selected}}
+	service.repo = repo
+	input := IntelligenceSelfTestInput{APIKeyID: key.ID, ConfigID: selected.ID}
+	run, err := service.CommunityRun(t.Context(), 12, input)
+	require.NoError(t, err)
+	require.Equal(t, selected.Model, run.Model)
+	require.Equal(t, selected.Prompt, repo.submitted.Prompt)
+	service.available = intelligenceGroupStub{visible: []routing.Group{{ID: selected.GroupID, RateMultiplier: 2.5}}}
+	histories, err := service.UserList(t.Context(), 12)
+	require.NoError(t, err)
+	require.Len(t, histories, 2)
+	for _, history := range histories {
+		require.Equal(t, 2.5, history.RateMultiplier)
+	}
+
+	for _, scenario := range []string{"foreign", "disabled", "missing", "user", "candy", "negative"} {
+		t.Run(scenario, func(t *testing.T) {
+			candidate := selected
+			request := input
+			switch scenario {
+			case "foreign":
+				candidate.GroupID++
+			case "disabled":
+				candidate.Enabled = false
+			case "missing":
+				request.ConfigID++
+			case "user":
+				candidate.Source = "user"
+			case "candy":
+				candidate.Benchmark = "candy"
+			case "negative":
+				request.ConfigID = -1
+			}
+			repo.sites = []IntelligenceConfig{first, candidate}
+			repo.submitted = nil
+			_, err := service.CommunityRun(t.Context(), 12, request)
+			require.Error(t, err)
+			require.Nil(t, repo.submitted)
+		})
+	}
 }

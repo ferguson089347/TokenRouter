@@ -30,8 +30,9 @@ func NewIntelligenceHandler(svc *intelligence.IntelligenceService) *Intelligence
 }
 
 // UserRun queues an authenticated user's drawing using the channel's site settings.
-// The request selects a Key identifier owned by that user. The service supplies
-// all execution parameters from the first enabled site drawing for its group.
+// The request selects an owned Key and an optional site configuration identifier.
+// The service validates their group and supplies execution parameters from that
+// enabled drawing; omitted configuration identifiers select the group's first drawing.
 func (h *IntelligenceHandler) UserRun(c *gin.Context) {
 	userID, ok := intelligenceActor(c, false)
 	if !ok {

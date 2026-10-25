@@ -20,10 +20,12 @@ export const runFixture = (overrides: Partial<IntelligenceRun> = {}): Intelligen
   updated_at: '2026-10-03T01:01:00Z',
   ...overrides,
 })
+// testFixture supplies authorized group histories with a current billing multiplier.
 export const testFixture = (overrides: Partial<IntelligenceTest> = {}): IntelligenceTest => ({
   id: 1,
   group_id: 1,
   group_name: 'Group A',
+  rate_multiplier: 1.5,
   model: 'model-a',
   benchmark: 'candy',
   runs: [],

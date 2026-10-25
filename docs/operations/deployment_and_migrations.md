@@ -33,7 +33,7 @@ Go 构建使用 1.27.3，后端模块、两个开发工具模块和三份源码 
 | 源码开发 Compose | `deploy/docker-compose.dev.yml` | 在本地构建应用，并启动配套的依赖 |
 | Apple Container | `deploy/apple-container.sh` | 独立脚本管理容器、卷和健康状态 |
 
-运行镜像包含降智检测截图使用的 Chromium。独立二进制部署如需历史截图，安装 Chromium 并按需用 `CHROMIUM_PATH` 指定路径；未安装时最新 HTML 仍可展示，截图读取返回暂不可用。
+运行镜像包含智商测试截图使用的 Chromium。独立二进制部署如需历史截图，安装 Chromium 并按需用 `CHROMIUM_PATH` 指定路径；未安装时最新 HTML 仍可展示，截图读取返回暂不可用。
 
 应用至少依赖 PostgreSQL 和 Redis。`/app/data` 或等价的 `DATA_DIR` 保存配置、安装锁和本地的运维产物；数据库、Redis 和对象存储各有自己的生命周期，只备份应用数据目录，不算完成了系统备份。
 
@@ -93,7 +93,7 @@ Apple container 的新栈使用 `org.tokenrouter.stack` 标签；已有的 `sub2
 - 从空数据库完整执行一遍，以及在已有的 schema 上重复执行；
 - `schema_migrations` 里的文件名符合预期，已有文件的 checksum 没有变。
 
-`304_intelligence_tests.sql` 创建独立的检测配置和任务表，包含活动任务唯一索引及轮询、历史索引。迁移为追加表结构，旧二进制可以继续使用既有表；功能默认关闭。回退应用前先关闭检测并等待在途任务结束，避免暂停远端结果的查询。凭据、权限、历史保留和恢复规则见[降智检测](../domains/intelligence_tests.md)。
+`304_intelligence_tests.sql` 创建独立的检测配置和任务表，包含活动任务唯一索引及轮询、历史索引。迁移为追加表结构，旧二进制可以继续使用既有表；功能默认关闭。回退应用前先关闭检测并等待在途任务结束，避免暂停远端结果的查询。凭据、权限、历史保留和恢复规则见[智商测试](../domains/intelligence_tests.md)。
 
 `305_users_id_start_at_1000.sql` 推进新用户 ID 的分配序列，已有用户行和关联保持原值。锁等待、验证查询和回退规则见[新用户 ID 起点](upgrade_notes.md#user_id_start)。
 

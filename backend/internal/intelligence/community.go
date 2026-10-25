@@ -7,7 +7,7 @@ import (
 
 // community.go admits authenticated users' personal Keys into public drawing
 // histories. Callers select their own Key by ID and retain current permission
-// for its bound group. The first enabled site drawing supplies its generation
+// for its bound group. The selected enabled site drawing supplies its generation
 // parameters and gateway address. Generated HTML, screenshots,
 // and measurements enter a user-test row visible to authorized group readers.
 //
@@ -20,8 +20,9 @@ import (
 
 // CommunityRun queues one public drawing using the caller's personal credential.
 // Positive userID must own APIKeyID and currently have access to its active group.
-// The first enabled site drawing in repository display order supplies its model,
-// protocol, reasoning effort, service tier, prompt, and public gateway address.
+// ConfigID selects an enabled site drawing in that group; zero selects the first
+// enabled drawing in repository display order. The selected configuration supplies
+// the model, protocol, reasoning effort, service tier, prompt, and gateway address.
 //
 // Successful results are shared through the group's user-test row. Repository
 // admission atomically updates execution settings and creates the queue record,
@@ -31,7 +32,7 @@ func (s *IntelligenceService) CommunityRun(ctx context.Context, userID int64, in
 	if !s.isEnabled(ctx) {
 		return nil, ErrIntelligenceDisabled
 	}
-	if userID <= 0 || in.APIKeyID <= 0 {
+	if userID <= 0 || in.APIKeyID <= 0 || in.ConfigID < 0 {
 		return nil, intelligenceInvalid("请选择自己的有效个人普通 Key")
 	}
 	key, err := s.keys.GetByID(ctx, in.APIKeyID)
@@ -54,7 +55,12 @@ func (s *IntelligenceService) CommunityRun(ctx context.Context, userID int64, in
 		return nil, err
 	}
 	for _, site := range configs {
-		if site.GroupID != group.ID || !site.Enabled || site.Benchmark != "drawing" {
+		if site.Source == "user" || site.GroupID != group.ID || !site.Enabled || site.Benchmark != "drawing" {
+			continue
+		}
+		// A row-specific request must match this group's site configuration so a
+		// stale or foreign identifier cannot silently test a different model.
+		if in.ConfigID > 0 && site.ID != in.ConfigID {
 			continue
 		}
 		base, err := validateIntelligenceBaseURL(site.BaseURL)

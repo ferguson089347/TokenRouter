@@ -110,14 +110,15 @@ type IntelligenceRun struct {
 
 // IntelligenceTest exposes shared site and user histories within authorized groups.
 type IntelligenceTest struct {
-	Source    string            `json:"source"`     // site or user history
-	ID        int64             `json:"id"`         // local record identifier
-	GroupID   int64             `json:"group_id"`   // configured routing group
-	GroupName string            `json:"group_name"` // current group name
-	Model     string            `json:"model"`      // requested model identifier
-	Benchmark string            `json:"benchmark"`  // candy or drawing benchmark
-	Runs      []IntelligenceRun `json:"runs"`       // lightweight execution history
-	Artifacts []IntelligenceRun `json:"artifacts"`  // retained artwork summaries
+	Source         string            `json:"source"`          // site or user history
+	ID             int64             `json:"id"`              // local record identifier
+	GroupID        int64             `json:"group_id"`        // configured routing group
+	GroupName      string            `json:"group_name"`      // current group name
+	RateMultiplier float64           `json:"rate_multiplier"` // current group billing multiplier
+	Model          string            `json:"model"`           // requested model identifier
+	Benchmark      string            `json:"benchmark"`       // candy or drawing benchmark
+	Runs           []IntelligenceRun `json:"runs"`            // lightweight execution history
+	Artifacts      []IntelligenceRun `json:"artifacts"`       // retained artwork summaries
 }
 
 // IntelligenceRepository persists configurations and conditionally advances
@@ -176,6 +177,9 @@ type IntelligenceRepository interface {
 // IntelligenceSelfTestInput selects the caller's credential for a system-configured drawing.
 type IntelligenceSelfTestInput struct {
 	APIKeyID int64 `json:"api_key_id"` // selected personal credential
+	// ConfigID selects an enabled site drawing in the Key's group. Zero uses
+	// the first enabled drawing in repository display order for older clients.
+	ConfigID int64 `json:"config_id,omitempty"` // selected site configuration
 }
 
 // IntelligenceThumbnailRenderer captures untrusted drawing documents as static PNG images.
