@@ -147,6 +147,7 @@ func buildSystemSettingsResponse(
 		SiteLogo:                                         settings.SiteLogo,
 		SiteSubtitle:                                     settings.SiteSubtitle,
 		APIBaseURL:                                       settings.APIBaseURL,
+		ClientProviderID:                                 settings.ClientProviderID,
 		ContactInfo:                                      settings.ContactInfo,
 		DocURL:                                           settings.DocURL,
 		HomeContent:                                      settings.HomeContent,

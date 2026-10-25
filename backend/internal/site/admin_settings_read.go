@@ -16,6 +16,7 @@ import (
 // AdminReadSettings contains source display values and localization state for administrator editing.
 type AdminReadSettings struct {
 	APIBaseURL          string // advertised API base
+	ClientProviderID    string // exported client provider identifier
 	ContactInfo         string // displayed contact details
 	CustomEndpoints     string // configured endpoint JSON
 	CustomMenuItems     string // configured menu JSON
@@ -84,6 +85,7 @@ func ReadAdminSettings(settings map[string]string) *AdminReadSettings {
 	result.SiteLogo = settings[SettingKeySiteLogo]
 	result.SiteSubtitle = settingvalues.StringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform")
 	result.APIBaseURL = settings[SettingKeyAPIBaseURL]
+	result.ClientProviderID = clientProviderIDOrDefault(settings[SettingKeyClientProviderID])
 	result.ContactInfo = settings[SettingKeyContactInfo]
 	result.DocURL = settings[SettingKeyDocURL]
 	result.HomeContent = settings[SettingKeyHomeContent]

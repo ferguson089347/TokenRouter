@@ -106,6 +106,9 @@ export interface PublicSettings {
   site_logo: string // Site logo resource.
   site_subtitle: string // Site subtitle text.
   api_base_url: string // Public API base URL.
+  // client_provider_id is absent from older responses; client exports then use
+  // tokenrouter independently of the localized site display name.
+  client_provider_id?: string // Exported client provider identifier.
   contact_info: string // Site contact details.
   doc_url: string // Site documentation URL.
   home_content: string // Homepage content markup.

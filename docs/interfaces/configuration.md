@@ -161,6 +161,12 @@ usage、audit 和 ops 的静态参数，由 app 整理成各模块的 Options；
 
 专用的设置入口各有自己的写入范围和通知行为。业务更新按“校验、批量原子写入、刷新缓存、发送通知”的顺序执行。业务调用方在持久化和缓存刷新完成后调用 `Store.NotifyUpdated`。`Subscribe` 按登记顺序同步通知订阅者，并返回幂等的注销函数。注销会阻止尚未领取的回调，已领取的回调可以完成一次。版本字段按应用版本赋值，JSON 中可以省略。运营内容另有持久化 `revision`，保存时在事务内比较已读取的版本，冲突返回 409。综合设置读取同时保存数据库原始值，参与者从同一快照校验文案版本。设置更新通知在单个应用实例内发布。公开设置、CSP、search 配置运行时和动态 worker 的回调由 app 装配。公开 API、embed 注入和 CSP 由 site 统一提供，各自保持字段格式：公开来源一次批量查询，认证、团队和用量分别解释自己需要的字段，site 只把公开的键和安全处理过的数据交给渲染层；OAuth secret 不会进入 web。
 
+### 客户端配置标识
+
+`client_provider_id` 由 site 设置参与者保存，管理员在“常规设置”的 API 地址附近编辑。它是 Codex 和 OpenCode 导出配置中的服务商标识，长度为 1 至 64 个字符，以小写英文字母开头，其余可使用小写字母、数字、下划线和短横线。写入时去除首尾空白，空值恢复 `tokenrouter`，非法值返回 `INVALID_CLIENT_PROVIDER_ID`；部分更新省略此字段时保留已有值。未保存或存储值无效时，管理读取、公开设置和 HTML 注入均使用 `tokenrouter`。
+
+展示名称读取当前语言的站点名称，标识本身不参与翻译。修改只作用于之后生成的配置，用户需重新复制到客户端。生成规则见[模型目录与市场](model_catalog_and_marketplace.md#client_config_export)。
+
 ### 用户可见文案
 
 站点文案使用 `site_texts`，其他独立运营文案通过 `localized_settings` 提交，完整字段和存储规则见[用户侧国际化](user_localization.md#content_owners)。`default_locale` 初始为 `en`。管理接口拒绝站点名称、标题和副标题的 `_zh`、`_en` 写入，返回 `REMOVED_SETTING_FIELD`。译文版本、核对和删除操作由统一内容模型处理。

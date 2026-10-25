@@ -3,8 +3,11 @@ package site
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/TokenFlux/TokenRouter/internal/pkg/apperror"
 )
 
 // admin_settings.go normalizes site administrator settings into values for a
@@ -18,11 +21,22 @@ import (
 // editing resolve the same deployment URL through their respective readers.
 const (
 	SettingKeyFrontendURL = "frontend_url"
+
+	// defaultClientProviderID keeps unconfigured exports using the established
+	// client namespace, independent of localized site names or API-key credentials.
+	defaultClientProviderID = "tokenrouter"
 )
+
+// clientProviderIDPattern accepts a bounded namespace shared by Codex TOML tables
+// and OpenCode provider/model references, keeping separators outside the identifier.
+var clientProviderIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
 
 // AdminSettings contains site display and login agreement settings.
 type AdminSettings struct {
-	APIBaseURL          string `json:"api_base_url"`           // advertised API base
+	APIBaseURL string `json:"api_base_url"` // advertised API base
+	// ClientProviderID names the Codex and OpenCode namespace. Blank input uses
+	// tokenrouter; preparation rejects identifiers outside the shared ASCII format.
+	ClientProviderID    string `json:"client_provider_id"`     // exported client provider identifier
 	ContactInfo         string `json:"contact_info"`           // displayed contact details
 	CustomEndpoints     string `json:"custom_endpoints"`       // configured endpoint JSON
 	CustomMenuItems     string `json:"custom_menu_items"`      // configured menu JSON
@@ -63,12 +77,19 @@ type AdminSettings struct {
 }
 
 // PrepareAdminSettings returns normalized string values for the supplied site settings.
-// settings is required and its agreement mode and date are updated in place.
+// settings is required; its client provider ID, agreement mode, and date are
+// normalized in place. Invalid provider identifiers return a validation error.
+// Provider IDs use one lowercase ASCII namespace across both client export formats.
 // Non-nil SiteTexts and nonempty DefaultLocale add their keys; other fields
 // produce values even when empty, so partial-update callers filter the result
 // to the submitted fields before persistence.
 func PrepareAdminSettings(settings *AdminSettings) (map[string]string, error) {
-	updates := map[string]string{}
+	settings.ClientProviderID = strings.TrimSpace(settings.ClientProviderID)
+	if settings.ClientProviderID != "" && !clientProviderIDPattern.MatchString(settings.ClientProviderID) {
+		return nil, apperror.BadRequest("INVALID_CLIENT_PROVIDER_ID", "Client provider ID must start with a lowercase letter and contain 1 to 64 lowercase letters, digits, underscores, or hyphens.")
+	}
+	settings.ClientProviderID = clientProviderIDOrDefault(settings.ClientProviderID)
+	updates := map[string]string{SettingKeyClientProviderID: settings.ClientProviderID}
 	if settings.SiteTexts != nil {
 		raw, err := json.Marshal(settings.SiteTexts)
 		if err != nil {
@@ -120,4 +141,17 @@ func PrepareAdminSettings(settings *AdminSettings) (map[string]string, error) {
 	updates[SettingKeyFooterText] = strings.TrimSpace(settings.FooterText)
 	updates[SettingKeyHomeFeaturedModels] = settings.HomeFeaturedModels
 	return updates, nil
+}
+
+// clientProviderIDOrDefault returns a usable namespace for client configuration
+// exports. Missing or invalid stored values use tokenrouter, allowing public and
+// administrator readers to produce valid references before any setting is saved.
+func clientProviderIDOrDefault(value string) string {
+	value = strings.TrimSpace(value)
+	// Readers can encounter pre-validation storage values, so select the established
+	// namespace when a value cannot form the same identifier in both client formats.
+	if !clientProviderIDPattern.MatchString(value) {
+		return defaultClientProviderID
+	}
+	return value
 }

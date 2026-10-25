@@ -166,6 +166,7 @@ export function createSettingsForm() {
     site_logo: '',
     site_subtitle: 'Subscription to API Conversion Platform',
     api_base_url: '',
+    client_provider_id: 'tokenrouter',
     contact_info: '',
     doc_url: '',
     home_content: '',

@@ -24,6 +24,56 @@ describe('客户端配置', () => {
     apiKey: 'secret',
     shell: 'unix' as const,
   }
+  // Custom branding uses one namespace for every provider reference in both clients.
+  // The displayed name keeps quotes and Unicode text through configuration serialization.
+  it('Codex 和 OpenCode 使用可配置标识和站点展示名', () => {
+    const input = {
+      ...base,
+      protocol: 'openai_responses' as const,
+      providerID: 'moonup_api-2',
+      providerName: '月升 "API"',
+    }
+    const [codex] = buildClientConfig({ ...input, client: 'codex' })
+    expect(codex.content).toContain('model_provider = "moonup_api-2"')
+    expect(codex.content).toContain('[model_providers.moonup_api-2]')
+    expect(codex.content).toContain(`name = ${JSON.stringify(input.providerName)}`)
+    expect(codex.content).not.toContain('tokenrouter')
+    const [openCode] = buildClientConfig({ ...input, client: 'opencode' })
+    const config = JSON.parse(openCode.content)
+    expect(config.model).toBe('moonup_api-2/custom-model')
+    expect(Object.keys(config.provider)).toEqual(['moonup_api-2'])
+    expect(config.provider['moonup_api-2'].name).toBe(input.providerName)
+  })
+
+  // Older public settings can omit provider branding, and administrators can clear it.
+  // Both paths retain the established tokenrouter namespace and TokenRouter display default.
+  it('未配置或留空时使用默认服务商标识', () => {
+    for (const providerID of [undefined, '', '  ']) {
+      const [codex] = buildClientConfig({
+        ...base,
+        client: 'codex',
+        protocol: 'openai_responses',
+        providerID,
+        providerName: ' ',
+      })
+      expect(codex.content).toContain('model_provider = "tokenrouter"')
+      expect(codex.content).toContain('name = "TokenRouter"')
+    }
+  })
+
+  // Invalid namespaces would break the relationship between provider definitions and references.
+  // Reject them before producing either client format, including separators, newlines, and excessive length.
+  it.each(['bad/name', 'Bad', 'bad.name', 'bad\nname', '1bad', '网关', 'a'.repeat(65)])(
+    '不为非法标识 %s 生成配置',
+    (providerID) => {
+      for (const client of ['codex', 'opencode'] as const) {
+        expect(
+          buildClientConfig({ ...base, client, protocol: 'openai_responses', providerID }),
+        ).toEqual([])
+      }
+    },
+  )
+
   /**
    * A group mixes protocol-specific models and wildcard routing rules. Only
    * concrete models admitted by the requested protocol may appear in the client

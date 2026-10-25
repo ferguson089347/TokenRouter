@@ -808,6 +808,11 @@ export default {
       apiBaseUrl: 'API 端点地址',
       apiBaseUrlHint: '用于"使用密钥"、"导入到 CC Switch"和回调地址建议，留空则使用当前站点地址',
       apiBaseUrlPlaceholder: 'https://api.example.com',
+      clientProviderId: '客户端服务商标识',
+      clientProviderIdHint:
+        '用于“使用密钥”生成的 Codex 和 OpenCode 配置。以小写字母开头，可包含小写字母、数字、下划线和短横线，最多 64 个字符。留空使用 tokenrouter，展示名称使用站点名称。保存后重新复制配置生效。',
+      clientProviderIdError:
+        '客户端服务商标识须以小写字母开头，仅包含小写字母、数字、下划线和短横线，长度为 1 至 64 个字符。',
       tablePreferencesTitle: '通用表格设置',
       tablePreferencesDescription: '设置后台与用户侧表格组件的默认分页行为',
       tableDefaultPageSize: '默认每页条数',

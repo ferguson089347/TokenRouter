@@ -858,6 +858,11 @@ export default {
         'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
       apiBaseUrl: 'API Base URL',
       apiBaseUrlPlaceholder: 'https://api.example.com',
+      clientProviderId: 'Client provider ID',
+      clientProviderIdHint:
+        'Used in Codex and OpenCode configurations from Use Key. Start with a lowercase letter and use up to 64 lowercase letters, digits, underscores, or hyphens. Blank uses tokenrouter; the display name uses the site name. Copy the configuration again after saving.',
+      clientProviderIdError:
+        'Client provider ID must start with a lowercase letter and contain 1 to 64 lowercase letters, digits, underscores, or hyphens.',
       apiBaseUrlHint:
         'Used for "Use Key", "Import to CC Switch", and callback URL suggestions. Leave empty to use current site URL.',
       tablePreferencesTitle: 'Global Table Preferences',

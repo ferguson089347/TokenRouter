@@ -41,7 +41,8 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/site"
 )
 
-// Combined settings HTTP must distinguish omitted fields, explicit clearing,
+// settings_composite_runtime_test.go checks combined settings HTTP updates,
+// including omitted fields, explicit clearing,
 // validation rejection, write failure, and committed data whose later
 // application fails. These scenarios inspect stored strings, response values,
 // reader order, notification timing, and security transitions across
@@ -473,8 +474,36 @@ func TestSettingsFieldOwnership(t *testing.T) {
 		delete(owners, name)
 		count++
 	}
-	require.Equal(t, 285, count, "HTTP 字段变化需要同步字段登记")
+	require.Equal(t, 286, count, "HTTP 字段变化需要同步字段登记")
 	require.Empty(t, owners, "参与者不应声明不存在的输入字段")
+}
+
+// TestSettingsClientProviderIDUpdates submits a custom namespace through the
+// assembled settings handler. Omitted updates retain it, invalid replacements
+// reject the entire batch, and an explicit empty value restores the default.
+func TestSettingsClientProviderIDUpdates(t *testing.T) {
+	handler, repo := newStepUpSwitchTestHandler(t, map[string]string{site.SettingKeyClientProviderID: "before"})
+	response := doUpdateSettings(t, handler, map[string]any{"client_provider_id": "  moonup_api-2  "}, nil)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Equal(t, "moonup_api-2", repo.values[site.SettingKeyClientProviderID])
+	var body struct {
+		Data map[string]any `json:"data"` // saved administrator settings
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	require.Equal(t, "moonup_api-2", body.Data["client_provider_id"])
+
+	response = doUpdateSettings(t, handler, map[string]any{"api_base_url": "https://api.example.com"}, nil)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Equal(t, "moonup_api-2", repo.values[site.SettingKeyClientProviderID])
+
+	response = doUpdateSettings(t, handler, map[string]any{"client_provider_id": "invalid/model", "api_base_url": "https://changed.example.com"}, nil)
+	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+	require.Equal(t, "moonup_api-2", repo.values[site.SettingKeyClientProviderID])
+	require.Equal(t, "https://api.example.com", repo.values[site.SettingKeyAPIBaseURL])
+
+	response = doUpdateSettings(t, handler, map[string]any{"client_provider_id": ""}, nil)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Equal(t, "tokenrouter", repo.values[site.SettingKeyClientProviderID])
 }
 
 // TestSettingsRejectedFastPolicyHasNoWrites combines a site-name change with

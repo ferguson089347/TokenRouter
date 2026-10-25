@@ -192,6 +192,7 @@ type Snapshot struct {
 	SiteLogo                    string                          // site logo reference text
 	SiteSubtitle                string                          // source site subtitle text
 	APIBaseURL                  string                          // displayed gateway API address
+	ClientProviderID            string                          // exported client provider identifier
 	ContactInfo                 string                          // source administrator contact text
 	DocURL                      string                          // source documentation destination text
 	HomeContent                 string                          // source custom homepage content

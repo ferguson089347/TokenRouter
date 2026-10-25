@@ -1319,6 +1319,8 @@
       :show="showUseKeyModal"
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
+      :provider-id="publicSettings?.client_provider_id"
+      :provider-name="publicSettings?.site_name"
       :group="selectedKeyGroup"
       :composite-groups="selectedCompositeGroups"
       @close="closeUseKeyModal"

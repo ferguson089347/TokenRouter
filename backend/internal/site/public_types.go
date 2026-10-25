@@ -66,6 +66,7 @@ type (
 		SiteLogo                string                   // branding image location
 		SiteSubtitle            string                   // resolved branding subtitle
 		APIBaseURL              string                   // advertised API base
+		ClientProviderID        string                   // exported client provider identifier
 		ContactInfo             string                   // resolved contact details
 		DocURL                  string                   // resolved documentation link
 		HomeContent             string                   // resolved homepage content

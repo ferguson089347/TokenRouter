@@ -198,6 +198,16 @@ function environment(values: Record<string, string>, shell: ConfigShell): string
 }
 
 /**
+ * normalizeClientProviderID trims the configured namespace and defaults blank
+ * values to tokenrouter. Invalid identifiers return null so settings validation
+ * can report the error and exports can refuse inconsistent provider references.
+ */
+export function normalizeClientProviderID(value?: string): string | null {
+  const identifier = value?.trim() || 'tokenrouter'
+  return /^[a-z][a-z0-9_-]{0,63}$/.test(identifier) ? identifier : null
+}
+
+/**
  * buildClientConfig exports files or shell instructions for a concrete
  * selected model. Blank models and wildcard names produce an empty list, while
  * the caller supplies a client and protocol combination already admitted by
@@ -208,7 +218,8 @@ function environment(values: Record<string, string>, shell: ConfigShell): string
  * bearer token in TOML, independently of the websocket option. OpenCode
  * chooses an adapter from the selected protocol and uses filtered model
  * attributes. Returned content includes credentials and is intended for
- * explicit user export.
+ * explicit user export. Provider namespaces default to tokenrouter and invalid
+ * values suppress exports; visible provider names use the supplied site name.
  */
 export function buildClientConfig(input: {
   client: ClientKind // selected export client
@@ -217,6 +228,16 @@ export function buildClientConfig(input: {
   baseUrl: string // gateway base URL
   apiKey: string // exported API credential
   shell: ConfigShell // instruction shell syntax
+  /**
+   * providerID selects the namespace for Codex and OpenCode. Blank values use
+   * tokenrouter; malformed identifiers prevent configuration generation.
+   */
+  providerID?: string
+  /**
+   * providerName supplies the localized site name shown in exported providers.
+   * Blank values use TokenRouter independently of the namespace.
+   */
+  providerName?: string
   /**
    * Enables generated Codex WebSocket settings when true; other clients ignore
    * this option during export.
@@ -235,6 +256,9 @@ export function buildClientConfig(input: {
 }): ClientConfigFile[] {
   if (!input.model || input.model.includes('*')) return []
   const { client, protocol, model, apiKey, shell } = input
+  const providerID = normalizeClientProviderID(input.providerID)
+  if (!providerID) return []
+  const providerName = input.providerName?.trim() || 'TokenRouter'
   const base = input.baseUrl.replace(/\/+$/, '').replace(/\/v1(?:beta)?$/, '')
   const apiBase = `${base}/v1`
   const terminal = shell === 'unix' ? 'Terminal' : shell === 'cmd' ? 'CMD' : 'PowerShell'
@@ -278,7 +302,7 @@ export function buildClientConfig(input: {
     const files = [
       {
         path: `${folder}config.toml`,
-        content: `model_provider = "tokenrouter"\nmodel = ${quote(model)}\nreview_model = ${quote(model)}\ndisable_response_storage = true\n\n[model_providers.tokenrouter]\nname = "TokenRouter"\nbase_url = ${quote(apiBase)}\nwire_api = "responses"\nsupports_websockets = ${input.websocket === true}\n${auth}${input.websocket ? '\n\n[features]\nresponses_websockets_v2 = true' : ''}`,
+        content: `model_provider = ${quote(providerID)}\nmodel = ${quote(model)}\nreview_model = ${quote(model)}\ndisable_response_storage = true\n\n[model_providers.${providerID}]\nname = ${quote(providerName)}\nbase_url = ${quote(apiBase)}\nwire_api = "responses"\nsupports_websockets = ${input.websocket === true}\n${auth}${input.websocket ? '\n\n[features]\nresponses_websockets_v2 = true' : ''}`,
       },
     ]
     if (!input.directAuth)
@@ -329,11 +353,11 @@ default = ${quote(model)}`,
       content: JSON.stringify(
         {
           $schema: 'https://opencode.ai/config.json',
-          model: `tokenrouter/${model}`,
+          model: `${providerID}/${model}`,
           provider: {
-            tokenrouter: {
+            [providerID]: {
               npm,
-              name: 'TokenRouter',
+              name: providerName,
               options: {
                 baseURL: protocol === 'gemini_generate_content' ? `${base}/v1beta` : apiBase,
                 apiKey,

@@ -15,6 +15,11 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/site"
 )
 
+// public_test.go checks public settings responses against their HTML injection
+// equivalents using controlled sources. Calendar, availability, and client provider
+// cases protect browser initialization so API reads and embedded settings expose
+// the same interpreted values.
+
 // calendarPublicSource supplies empty settings so the test exercises the injected calendar.
 type calendarPublicSource struct{}
 
@@ -138,5 +143,36 @@ func TestSubscriptionEntryVisibilityMatchesAPIAndInjection(t *testing.T) {
 			require.Equal(t, value != "false", public["subscription_entry_enabled"])
 			require.Equal(t, true, public["payment_enabled"])
 		}
+	}
+}
+
+// TestClientProviderIDMatchesAPIAndInjection supplies a custom namespace and
+// legacy missing or invalid settings. Public API and HTML injection agree on
+// the namespace, keeping client exports valid from either browser startup path.
+func TestClientProviderIDMatchesAPIAndInjection(t *testing.T) {
+	for _, value := range []string{"", "my_gateway-2", "invalid/model"} {
+		service := site.NewPublicService(ticketPublicSource{site.SettingKeyClientProviderID: value}, timezone.NewCalendar(time.UTC), "UTC")
+		handler := NewPublicHandler(service, "client-provider-test")
+		response := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(response)
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/settings/public", nil)
+		handler.GetPublicSettings(ctx)
+		require.Equal(t, http.StatusOK, response.Code)
+		var envelope struct {
+			Data map[string]any `json:"data"` // public browser settings
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &envelope))
+		want := "tokenrouter"
+		if value == "my_gateway-2" {
+			want = value
+		}
+		require.Equal(t, want, envelope.Data["client_provider_id"])
+		injection, err := service.GetPublicSettingsForInjection(t.Context())
+		require.NoError(t, err)
+		encoded, err := json.Marshal(injection)
+		require.NoError(t, err)
+		var fields map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &fields))
+		require.Equal(t, want, fields["client_provider_id"])
 	}
 }

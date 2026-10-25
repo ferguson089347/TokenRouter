@@ -737,6 +737,7 @@ export interface SystemSettings {
   site_logo: string // Configured site logo.
   site_subtitle: string // Configured site subtitle.
   api_base_url: string // API base URL.
+  client_provider_id: string // Exported client provider identifier.
   contact_info: string // Configured contact info.
   doc_url: string // Configured doc url.
   home_content: string // Configured home content.
@@ -1098,6 +1099,7 @@ export interface UpdateSettingsRequest {
   site_logo?: string // Requested site logo.
   site_subtitle?: string // Requested site subtitle.
   api_base_url?: string // API base URL.
+  client_provider_id?: string // Exported client provider identifier.
   contact_info?: string // Requested contact info.
   doc_url?: string // Requested doc url.
   home_content?: string // Requested home content.

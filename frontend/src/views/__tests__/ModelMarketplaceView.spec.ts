@@ -6,7 +6,7 @@ import Pagination from '@/components/common/Pagination.vue'
 import { modelIconData } from '@/utils/modelIconData'
 import type { MarketplaceGroup, MarketplaceModelPricing } from '@/api/marketplace.types'
 
-// ModelMarketplaceView.spec.ts exercises public model cards, filters, group disclosures, and
+// ModelMarketplaceView.spec.ts exercises public model cards, filters, group navigation, and
 // bounded pagination with catalog fixtures. It checks copied identifiers, capability
 // metadata, discount explanations, and pricing selection through mounted components while
 // replacing layout and network collaborators.
@@ -192,10 +192,10 @@ function marketplaceModel(
   }
 }
 
-// mountMarketplace opens fixture groups for model-content assertions unless disabled.
-// Tests of the initial folded state pass false, while pricing and capability
-// tests reach their cards through the visible group controls.
-async function mountMarketplace(expandGroups = true) {
+// mountMarketplace mounts the selected group directory with controlled network
+// and layout dependencies. Awaiting pending promises exposes the initial catalog
+// or retains a pending loader for scenarios that hold the response.
+async function mountMarketplace() {
   const wrapper = mount(ModelMarketplaceView, {
     global: {
       stubs: {
@@ -211,12 +211,6 @@ async function mountMarketplace(expandGroups = true) {
     },
   })
   await flushPromises()
-  if (expandGroups) {
-    for (const toggle of wrapper.findAll('[data-testid="marketplace-group-toggle"]')) {
-      await toggle.trigger('click')
-    }
-    await flushPromises()
-  }
   return wrapper
 }
 
@@ -236,6 +230,8 @@ describe('ModelMarketplaceView', () => {
     copyToClipboard.mockClear()
   })
 
+  // Pending catalog requests retain the navigation skeleton instead of showing empty results.
+  // Resolving the response replaces placeholders with navigation and one selected directory.
   it('取数期间保留模型卡片占位，不提前显示空状态', async () => {
     let resolveModels!: (value: MarketplaceGroup[]) => void
     getMarketplaceModels.mockImplementationOnce(
@@ -251,54 +247,60 @@ describe('ModelMarketplaceView', () => {
     resolveModels(marketplaceFixture())
     await flushPromises()
     expect(wrapper.find('[data-testid="marketplace-skeleton"]').exists()).toBe(false)
-    expect(wrapper.findAll('[data-testid="marketplace-group-section"]')).toHaveLength(4)
+    expect(wrapper.findAll('[data-testid="marketplace-group-select"]')).toHaveLength(4)
+    expect(wrapper.findAll('[data-testid="marketplace-group-section"]')).toHaveLength(1)
     wrapper.unmount()
   })
 
-  // A fresh visit shows group summaries with every model list folded.
-  // Opening one group exposes its cards while neighboring groups remain folded.
-  it('starts groups folded and opens each model list independently', async () => {
-    const wrapper = await mountMarketplace(false)
-    const toggles = wrapper.findAll('[data-testid="marketplace-group-toggle"]')
-    const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
-    expect(toggles).toHaveLength(4)
-    expect(toggles.every((toggle) => toggle.attributes('aria-expanded') === 'false')).toBe(true)
-    expect(wrapper.findAll('article')).toHaveLength(0)
-    expect(toggles[0].text()).toContain('marketplace.expandModels')
-    await toggles[0].trigger('click')
-    await flushPromises()
-    expect(toggles[0].attributes('aria-expanded')).toBe('true')
-    expect(sections[0].findAll('article')).toHaveLength(2)
-    expect(sections[1].findAll('article')).toHaveLength(0)
-    expect(toggles[1].attributes('aria-expanded')).toBe('false')
-    expect(toggles[0].text()).toContain('marketplace.collapseModels')
-    await toggles[0].trigger('click')
-    expect(toggles[0].attributes('aria-expanded')).toBe('false')
-    expect(sections[0].get('.motion-collapse').attributes('aria-hidden')).toBe('true')
+  // A fresh visit selects the first group and immediately exposes its models.
+  // Choosing another navigation entry replaces the directory while keeping every group reachable.
+  it('selects one group and shows its models without expansion', async () => {
+    const fixture = marketplaceFixture()
+    fixture[1].models = [marketplaceModel('pro-model', 'Pro Model', tokenPricing)]
+    getMarketplaceModels.mockResolvedValueOnce(fixture)
+    const wrapper = await mountMarketplace()
+    const choices = wrapper.findAll('[data-testid="marketplace-group-select"]')
+    expect(choices).toHaveLength(4)
+    expect(choices[0].attributes('aria-current')).toBe('true')
+    expect(wrapper.findAll('article')).toHaveLength(2)
+    await choices[1].trigger('click')
+    expect(choices[1].attributes('aria-current')).toBe('true')
+    expect(choices[0].attributes('aria-current')).toBeUndefined()
+    expect(
+      wrapper.get('[data-testid="marketplace-group-section"]').attributes('data-group-id'),
+    ).toBe('2')
+    expect(wrapper.get('article').text()).toContain('Pro Model')
+    expect(wrapper.text()).not.toContain('Legacy Unpriced')
+    expect(wrapper.find('[data-testid="marketplace-group-toggle"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  // Large groups render a bounded page, and folding keeps those card instances.
-  // Searching still inspects models beyond that page and returns to its first result.
-  it('pages large groups, retains folded cards, and searches all models', async () => {
+  // Large groups render twelve cards at a time and retain their own page on navigation.
+  // Search still finds off-page models, and changing filters resets model page positions.
+  it('pages the selected group and searches its complete catalog', async () => {
     const models = Array.from({ length: 25 }, (_, index) =>
       marketplaceModel(`model-${index}`, `Model ${index}`, tokenPricing),
     )
-    getMarketplaceModels.mockResolvedValueOnce([marketplaceGroup(1, 'Large', models)])
-    const wrapper = await mountMarketplace(false)
-    const toggle = wrapper.get('[data-testid="marketplace-group-toggle"]')
-    await toggle.trigger('click')
-    await flushPromises()
+    getMarketplaceModels.mockResolvedValueOnce([
+      marketplaceGroup(1, 'Large', models),
+      marketplaceGroup(2, 'Other', [marketplaceModel('other', 'Other Model', tokenPricing)]),
+    ])
+    const wrapper = await mountMarketplace()
     expect(wrapper.findAll('article')).toHaveLength(12)
     expect(wrapper.findAll('article')[0].text()).toContain('Model 0')
     wrapper.getComponent(Pagination).vm.$emit('update:page', 3)
     await flushPromises()
     expect(wrapper.findAll('article')).toHaveLength(1)
-    const lastCard = wrapper.get('article').element
     expect(wrapper.get('article').text()).toContain('Model 24')
-    await toggle.trigger('click')
-    await toggle.trigger('click')
-    expect(wrapper.get('article').element).toBe(lastCard)
+    await wrapper
+      .get('[data-testid="marketplace-group-select"][data-group-id="2"]')
+      .trigger('click')
+    expect(wrapper.get('article').text()).toContain('Other Model')
+    await wrapper
+      .get('[data-testid="marketplace-group-select"][data-group-id="1"]')
+      .trigger('click')
+    expect(wrapper.getComponent(Pagination).props('page')).toBe(3)
+    expect(wrapper.get('article').text()).toContain('Model 24')
     await wrapper.get('[data-testid="marketplace-search"]').setValue('model-24')
     await flushPromises()
     expect(wrapper.findAll('article')).toHaveLength(1)
@@ -311,13 +313,40 @@ describe('ModelMarketplaceView', () => {
     wrapper.unmount()
   })
 
-  it('renders the catalog as separate group sections', async () => {
+  // Search can remove the selected group while other groups still match.
+  // The detail pane follows the first result, empty results show the shared empty state,
+  // and clearing search restores the requested group identity.
+  it('reconciles selection when filtering or refreshing removes a group', async () => {
     const wrapper = await mountMarketplace()
-
-    expect(wrapper.findAll('[data-testid="marketplace-group-section"]')).toHaveLength(4)
+    await wrapper
+      .get('[data-testid="marketplace-group-select"][data-group-id="2"]')
+      .trigger('click')
+    await wrapper.get('[data-testid="marketplace-search"]').setValue('Plus 2')
+    expect(
+      wrapper.get('[data-testid="marketplace-group-section"]').attributes('data-group-id'),
+    ).toBe('3')
+    await wrapper.get('[data-testid="marketplace-search"]').setValue('no matching group')
+    expect(wrapper.find('[data-testid="marketplace-group-section"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('marketplace.emptyTitle')
+    await wrapper.get('[data-testid="marketplace-search"]').setValue('')
+    expect(
+      wrapper.get('[data-testid="marketplace-group-section"]').attributes('data-group-id'),
+    ).toBe('2')
+    getMarketplaceModels.mockResolvedValueOnce([marketplaceFixture()[2]])
+    window.dispatchEvent(new Event('locale-changed'))
+    await flushPromises()
+    expect(
+      wrapper.get('[data-testid="marketplace-group-section"]').attributes('data-group-id'),
+    ).toBe('3')
+    expect(wrapper.get('[data-testid="marketplace-group-select"]').attributes('aria-current')).toBe(
+      'true',
+    )
+    wrapper.unmount()
   })
 
-  it('用户侧不展示分组容量，并将可用率状态条靠右放置', async () => {
+  // Public group details omit internal capacity even when availability information is supplied.
+  // Selecting the initial group keeps its availability summary visible above the models.
+  it('用户侧不展示分组容量，选中分组显示可用率摘要', async () => {
     const fixture = marketplaceFixture()
     fixture[0] = {
       ...fixture[0],
@@ -335,11 +364,12 @@ describe('ModelMarketplaceView', () => {
     const wrapper = await mountMarketplace()
 
     expect(wrapper.findAll('[data-testid="group-capacity"]')).toHaveLength(0)
-    expect(wrapper.get('[data-testid="marketplace-group-availability"]').classes()).toContain(
-      'xl:w-[560px]',
-    )
+    expect(wrapper.get('[data-testid="marketplace-group-availability"]').exists()).toBe(true)
+    wrapper.unmount()
   })
 
+  // Only valid discounted ratios produce the selected group discount badge.
+  // Navigating between groups preserves visibility rules and the explanations available through either pointer or touch interaction.
   it('分组头部用最高优惠标签替换模型数标签，无有效折扣的分组不渲染', async () => {
     const fixture = marketplaceFixture()
     // Ratios at or above one represent ordinary pricing; missing ratios mean the backend supplied no official-price comparison.
@@ -348,26 +378,35 @@ describe('ModelMarketplaceView', () => {
     getMarketplaceModels.mockResolvedValue(fixture)
 
     const wrapper = await mountMarketplace()
-    const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
-
-    // Group one has an official-price ratio of one tenth, so its displayed maximum discount is ninety percent.
-    expect(sections[0].text()).toContain('marketplace.maxDiscountOff 90')
-    expect(sections[0].text()).not.toContain('marketplace.modelsStat')
-    expect(sections[1].text()).not.toContain('marketplace.maxDiscountOff')
-    expect(sections[2].text()).not.toContain('marketplace.maxDiscountOff')
-    expect(sections[3].text()).toContain('marketplace.maxDiscountOff 60')
+    const section = () => wrapper.get('[data-testid="marketplace-group-section"]')
+    expect(section().text()).toContain('marketplace.maxDiscountOff 90')
+    expect(section().text()).not.toContain('marketplace.modelsStat')
+    for (const groupID of [2, 3]) {
+      await wrapper
+        .get(`[data-testid="marketplace-group-select"][data-group-id="${groupID}"]`)
+        .trigger('click')
+      expect(section().text()).not.toContain('marketplace.maxDiscountOff')
+    }
+    await wrapper
+      .get('[data-testid="marketplace-group-select"][data-group-id="4"]')
+      .trigger('click')
+    expect(section().text()).toContain('marketplace.maxDiscountOff 60')
+    await wrapper
+      .get('[data-testid="marketplace-group-select"][data-group-id="1"]')
+      .trigger('click')
 
     // A mobile click opens the discount explanation through the same tooltip used for pointer hover.
-    await sections[0].get('[data-testid="group-max-discount-tag"]').trigger('click')
+    await section().get('[data-testid="group-max-discount-tag"]').trigger('click')
     await nextTick()
     expect(
       visibleTooltips().some((el) => el.textContent?.includes('marketplace.maxDiscountHint')),
     ).toBe(true)
-    await sections[0].get('[data-testid="group-rate-multiplier-tag"]').trigger('click')
+    await section().get('[data-testid="group-rate-multiplier-tag"]').trigger('click')
     await nextTick()
     expect(
       visibleTooltips().some((el) => el.textContent?.includes('marketplace.rateMultiplierHint')),
     ).toBe(true)
+    wrapper.unmount()
   })
 
   // Four groups use every combination of the two display flags, including absent flags.
@@ -380,14 +419,21 @@ describe('ModelMarketplaceView', () => {
     getMarketplaceModels.mockResolvedValue(fixture)
 
     const wrapper = await mountMarketplace()
-    const sections = wrapper.findAll('[data-testid="marketplace-group-section"]')
-    expect(
-      sections.map((section) => section.find('[data-testid="group-max-discount-tag"]').exists()),
-    ).toEqual([false, true, false, true])
-    expect(
-      sections.map((section) => section.find('[data-testid="group-rate-multiplier-tag"]').exists()),
-    ).toEqual([true, false, false, true])
-    for (const section of sections) {
+    for (const [index, group] of fixture.entries()) {
+      await wrapper
+        .get(`[data-testid="marketplace-group-select"][data-group-id="${group.id}"]`)
+        .trigger('click')
+      const section = wrapper.get('[data-testid="marketplace-group-section"]')
+      expect(section.find('[data-testid="group-max-discount-tag"]').exists()).toBe(
+        [false, true, false, true][index],
+      )
+      expect(section.find('[data-testid="group-rate-multiplier-tag"]').exists()).toBe(
+        [true, false, false, true][index],
+      )
+      const choice = wrapper.get(
+        `[data-testid="marketplace-group-select"][data-group-id="${group.id}"]`,
+      )
+      expect(choice.text().includes(`x${group.rate_multiplier}`)).toBe(!group.hide_rate_multiplier)
       expect(section.text()).toContain('GPT 5.5')
     }
     wrapper.unmount()

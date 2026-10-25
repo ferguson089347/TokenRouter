@@ -321,6 +321,25 @@
         />
         <p class="input-hint">{{ t('admin.settings.site.apiBaseUrlHint') }}</p>
       </div>
+      <div>
+        <label for="client-provider-id" class="input-label">{{
+          t('admin.settings.site.clientProviderId')
+        }}</label>
+        <input
+          id="client-provider-id"
+          v-model="form.client_provider_id"
+          type="text"
+          class="input font-mono text-sm"
+          placeholder="tokenrouter"
+          maxlength="64"
+          spellcheck="false"
+          autocapitalize="none"
+          aria-describedby="client-provider-id-hint"
+        />
+        <p id="client-provider-id-hint" class="input-hint">{{
+          t('admin.settings.site.clientProviderIdHint')
+        }}</p>
+      </div>
       <div class="grid gap-4 md:grid-cols-2">
         <div>
           <LocalizedEditor

@@ -186,6 +186,7 @@ type UpdateSettingsRequest struct {
 	SiteLogo            string                 `json:"site_logo"`              // site logo reference text
 	SiteSubtitle        string                 `json:"site_subtitle"`          // source site subtitle text
 	APIBaseURL          string                 `json:"api_base_url"`           // displayed gateway API address
+	ClientProviderID    string                 `json:"client_provider_id"`     // exported client provider identifier
 	ContactInfo         string                 `json:"contact_info"`           // source administrator contact text
 	DocURL              string                 `json:"doc_url"`                // source documentation destination text
 	HomeContent         string                 `json:"home_content"`           // source custom homepage content

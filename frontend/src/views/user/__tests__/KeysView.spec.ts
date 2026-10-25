@@ -532,6 +532,16 @@ describe('user KeysView column settings', () => {
     expect(wrapper.find('.mb-6').exists()).toBe(false)
   })
 
+  // Public branding configures the client setup dialog opened from a key row.
+  // The configured namespace and localized site name reach that dialog alongside the selected key.
+  it('passes configured client branding to Use Key', async () => {
+    getPublicSettings.mockResolvedValue({ site_name: 'MoonUp', client_provider_id: 'moonup_api' })
+    const wrapper = await mountView()
+    const modal = wrapper.getComponent({ name: 'UseKeyModal' })
+    expect(modal.props('providerId')).toBe('moonup_api')
+    expect(modal.props('providerName')).toBe('MoonUp')
+  })
+
   // An ordinary active key appears in the table. The test protects three primary row actions
   // while less frequent operations remain available through the overflow menu.
   it('keeps only edit, status and more as primary row actions', async () => {

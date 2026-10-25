@@ -47,6 +47,22 @@ const create = (group: Group | null = mixedGroup) =>
     },
   })
 describe('按客户端能力配置 Key', () => {
+  // The key page supplies current public branding to an already mounted setup dialog.
+  // Switching clients and replacing those settings updates both names and all namespace references.
+  it('使用后台配置生成当前客户端配置并响应设置更新', async () => {
+    const wrapper = create()
+    await wrapper.setProps({ providerId: 'moonup', providerName: 'MoonUp' })
+    await wrapper.findAll('[role="tab"]')[1].trigger('click')
+    expect(wrapper.get('pre').text()).toContain('model_provider = "moonup"')
+    expect(wrapper.get('pre').text()).toContain('name = "MoonUp"')
+    await wrapper.setProps({ providerId: 'next_gateway', providerName: 'Next Gateway' })
+    expect(wrapper.get('pre').text()).toContain('[model_providers.next_gateway]')
+    await wrapper.findAll('[role="tab"]')[4].trigger('click')
+    const config = JSON.parse(wrapper.get('pre').text())
+    expect(config.model).toBe('next_gateway/gpt-custom')
+    expect(config.provider.next_gateway.name).toBe('Next Gateway')
+  })
+
   // A key without a bound group opens the setup modal. The test protects the group-selection
   // explanation and prevents generation of configuration from absent capabilities.
   it('未绑定分组时提示选组，不生成配置', () => {

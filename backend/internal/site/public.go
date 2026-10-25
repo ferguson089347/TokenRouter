@@ -40,6 +40,7 @@ const (
 	// Public display keys identify values copied by InputSource's allowlist and
 	// interpreted here; credentials used by authentication conversion have a broader read list.
 	SettingKeyAPIBaseURL                          = "api_base_url"
+	SettingKeyClientProviderID                    = "client_provider_id"
 	SettingKeyProviderQuotaNotifyEnabled          = "provider_quota_notify_enabled"
 	SettingKeyAffiliateEnabled                    = "affiliate_enabled"
 	SettingKeyAliyunCaptchaEnabled                = "aliyun_captcha_enabled"
@@ -294,6 +295,7 @@ func (s *PublicService) GetPublicSettings(ctx context.Context) (*PublicSettings,
 		SiteLogo:                    settings[SettingKeySiteLogo],
 		SiteSubtitle:                settings[SettingKeySiteSubtitle],
 		APIBaseURL:                  settings[SettingKeyAPIBaseURL],
+		ClientProviderID:            clientProviderIDOrDefault(settings[SettingKeyClientProviderID]),
 		ContactInfo:                 settings[SettingKeyContactInfo],
 		DocURL:                      settings[SettingKeyDocURL],
 		HomeContent:                 settings[SettingKeyHomeContent],
@@ -614,6 +616,7 @@ func (s *PublicService) GetPublicSettingsForInjection(ctx context.Context) (any,
 		SiteLogo                            string                       `json:"site_logo,omitempty"`                     // branding image location
 		SiteSubtitle                        string                       `json:"site_subtitle,omitempty"`                 // resolved branding subtitle
 		APIBaseURL                          string                       `json:"api_base_url,omitempty"`                  // advertised API base
+		ClientProviderID                    string                       `json:"client_provider_id"`                      // exported client provider identifier
 		ContactInfo                         string                       `json:"contact_info,omitempty"`                  // resolved contact details
 		DocURL                              string                       `json:"doc_url,omitempty"`                       // resolved documentation link
 		HomeContent                         string                       `json:"home_content,omitempty"`                  // resolved homepage content
@@ -704,6 +707,7 @@ func (s *PublicService) GetPublicSettingsForInjection(ctx context.Context) (any,
 		SiteLogo:                            settings.SiteLogo,
 		SiteSubtitle:                        settings.SiteSubtitle,
 		APIBaseURL:                          settings.APIBaseURL,
+		ClientProviderID:                    settings.ClientProviderID,
 		ContactInfo:                         settings.ContactInfo,
 		DocURL:                              settings.DocURL,
 		HomeContent:                         settings.HomeContent,
@@ -983,5 +987,5 @@ func ParseTablePreferences(defaultPageSizeRaw, optionsRaw string) (int, []int) {
 // InputSource copies these keys from its larger storage batch before returning
 // Values, retaining public copy while credential settings stay inputs to authentication conversion.
 func PublicValueKeys() []string {
-	return []string{"balance_unit_name_localized", "oidc_connect_provider_name_localized", "balance_low_notify_recharge_url_localized", SettingKeySiteTexts, SettingKeyDefaultLocale, SettingKeyAPIBaseURL, SettingKeyProviderQuotaNotifyEnabled, SettingKeyAffiliateEnabled, SettingKeyAliyunCaptchaEnabled, SettingKeyAliyunCaptchaPrefix, SettingKeyAliyunCaptchaSceneID, SettingKeyAllowUserViewErrorRequests, SettingKeyBackendModeEnabled, SettingKeyBalanceIconSVG, SettingKeyBalanceLowNotifyEnabled, SettingKeyBalanceLowNotifyRechargeURL, SettingKeyBalanceLowNotifyThreshold, SettingKeyBalanceUnitName, SettingKeyBalanceUnitSymbol, SettingKeyContactInfo, SettingKeyTicketEnabled, SettingKeyIntelligenceEnabled, SettingKeyCreativeEnabled, SettingKeyCustomEndpoints, SettingKeyCustomMenuItems, SettingKeyDocURL, SettingKeyEmailVerifyEnabled, SettingKeyFooterLinks, SettingKeyFooterText, SettingKeyForceEmailOnThirdPartySignup, SettingKeyHideCcsImportButton, SettingKeyHomeContent, SettingKeyHomeFeaturedModels, SettingKeyInvitationCodeEnabled, SettingKeyLoginAgreementDocuments, SettingKeyLoginAgreementEnabled, SettingKeyLoginAgreementMode, SettingKeyLoginAgreementUpdatedAt, SettingKeyPasswordResetEnabled, SettingKeyPromoCodeEnabled, SettingKeySubscriptionEntryEnabled, SettingKeyPurchaseSubscriptionEnabled, SettingKeyPurchaseSubscriptionURL, SettingKeyRegistrationEmailDomainQuotaEnabled, SettingKeyRegistrationEnabled, SettingKeyRiskControlEnabled, SettingKeySiteLogo, SettingKeySiteName, SettingKeySiteSubtitle, SettingKeyTableDefaultPageSize, SettingKeyTablePageSizeOptions, SettingKeyTencentCaptchaAppID, SettingKeyTencentCaptchaEnabled, SettingKeyTotpEnabled, SettingKeyTurnstileEnabled, SettingKeyTurnstileSiteKey, SettingKeyUserEmailChangeEnabled, SettingPaymentEnabled}
+	return []string{"balance_unit_name_localized", "oidc_connect_provider_name_localized", "balance_low_notify_recharge_url_localized", SettingKeySiteTexts, SettingKeyDefaultLocale, SettingKeyAPIBaseURL, SettingKeyClientProviderID, SettingKeyProviderQuotaNotifyEnabled, SettingKeyAffiliateEnabled, SettingKeyAliyunCaptchaEnabled, SettingKeyAliyunCaptchaPrefix, SettingKeyAliyunCaptchaSceneID, SettingKeyAllowUserViewErrorRequests, SettingKeyBackendModeEnabled, SettingKeyBalanceIconSVG, SettingKeyBalanceLowNotifyEnabled, SettingKeyBalanceLowNotifyRechargeURL, SettingKeyBalanceLowNotifyThreshold, SettingKeyBalanceUnitName, SettingKeyBalanceUnitSymbol, SettingKeyContactInfo, SettingKeyTicketEnabled, SettingKeyIntelligenceEnabled, SettingKeyCreativeEnabled, SettingKeyCustomEndpoints, SettingKeyCustomMenuItems, SettingKeyDocURL, SettingKeyEmailVerifyEnabled, SettingKeyFooterLinks, SettingKeyFooterText, SettingKeyForceEmailOnThirdPartySignup, SettingKeyHideCcsImportButton, SettingKeyHomeContent, SettingKeyHomeFeaturedModels, SettingKeyInvitationCodeEnabled, SettingKeyLoginAgreementDocuments, SettingKeyLoginAgreementEnabled, SettingKeyLoginAgreementMode, SettingKeyLoginAgreementUpdatedAt, SettingKeyPasswordResetEnabled, SettingKeyPromoCodeEnabled, SettingKeySubscriptionEntryEnabled, SettingKeyPurchaseSubscriptionEnabled, SettingKeyPurchaseSubscriptionURL, SettingKeyRegistrationEmailDomainQuotaEnabled, SettingKeyRegistrationEnabled, SettingKeyRiskControlEnabled, SettingKeySiteLogo, SettingKeySiteName, SettingKeySiteSubtitle, SettingKeyTableDefaultPageSize, SettingKeyTablePageSizeOptions, SettingKeyTencentCaptchaAppID, SettingKeyTencentCaptchaEnabled, SettingKeyTotpEnabled, SettingKeyTurnstileEnabled, SettingKeyTurnstileSiteKey, SettingKeyUserEmailChangeEnabled, SettingPaymentEnabled}
 }

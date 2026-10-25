@@ -170,6 +170,8 @@ import {
 // capability changes, while reopening resets shell and authentication switches. Generated
 // content uses the configured base URL or page origin, and successful copies display a per-
 // file confirmation whose timer belongs to this modal instance.
+// Provider references use the configured namespace, while their visible names
+// follow the site name supplied by the settings response for the current language.
 
 // The parent supplies the selected key secret, API base, and group capabilities used to
 // build client setup files for the visible modal.
@@ -177,6 +179,12 @@ const props = defineProps<{
   show: boolean // Setup modal visibility.
   apiKey: string // Selected API-key secret.
   baseUrl: string // Configured API base URL.
+  // providerId names the configured client namespace. Missing or blank values
+  // select tokenrouter when buildClientConfig creates Codex or OpenCode files.
+  providerId?: string // Configured client namespace.
+  // providerName supplies the localized site display name. Missing or blank
+  // values select TokenRouter when the client provider definition is generated.
+  providerName?: string // Localized provider display name.
   group?: Group | null // Selected group capability record.
   compositeGroups?: ApiKeyCompositeGroup[] // Composite key group bindings.
 }>()
@@ -234,6 +242,8 @@ const files = computed(() =>
         model: selectedModel.value,
         baseUrl: props.baseUrl || window.location.origin,
         apiKey: props.apiKey,
+        providerID: props.providerId,
+        providerName: props.providerName,
         shell: shell.value,
         attributes: props.group?.model_attributes?.[selectedModel.value],
         directAuth: directAuth.value,

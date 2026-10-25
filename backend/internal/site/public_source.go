@@ -103,6 +103,7 @@ func PublicInputKeys() []string {
 		"site_logo",
 		"site_subtitle",
 		"api_base_url",
+		SettingKeyClientProviderID,
 		"contact_info",
 		"doc_url",
 		"home_content",

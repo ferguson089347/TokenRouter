@@ -28,6 +28,7 @@ export function buildGeneralSettingsPayload(
     | 'default_locale'
     | 'site_logo'
     | 'api_base_url'
+    | 'client_provider_id'
     | 'backend_mode_enabled'
     | 'hide_ccs_import_button'
     | 'table_default_page_size'
@@ -59,6 +60,7 @@ export function buildGeneralSettingsPayload(
   | 'default_locale'
   | 'site_logo'
   | 'api_base_url'
+  | 'client_provider_id'
   | 'backend_mode_enabled'
   | 'hide_ccs_import_button'
   | 'table_default_page_size'
@@ -98,6 +100,8 @@ export function buildGeneralSettingsPayload(
     site_logo: form.site_logo,
 
     api_base_url: form.api_base_url,
+
+    client_provider_id: form.client_provider_id,
 
     backend_mode_enabled: form.backend_mode_enabled,
 

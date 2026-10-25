@@ -626,6 +626,7 @@ const baseSettingsResponse = {
   site_subtitle_zh: '',
   site_subtitle_en: '',
   api_base_url: '',
+  client_provider_id: 'tokenrouter',
   contact_info: '',
   doc_url: '',
   home_content: '',
@@ -992,6 +993,36 @@ describe('admin SettingsView payment visible method controls', () => {
     })
     fetchPublicSettings.mockResolvedValue(undefined)
     adminSettingsFetch.mockResolvedValue(undefined)
+  })
+
+  // The administrator loads an existing provider namespace and saves a replacement.
+  // The bulk request receives its normalized value, while malformed input blocks persistence.
+  it('loads and saves the client provider ID with validation', async () => {
+    getSettings.mockResolvedValue({
+      ...baseSettingsResponse,
+      client_provider_id: 'existing_gateway',
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    expect((wrapper.get('#client-provider-id').element as HTMLInputElement).value).toBe(
+      'existing_gateway',
+    )
+    await wrapper.get('#client-provider-id').setValue('bad/model')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('admin.settings.site.clientProviderIdError')
+    await wrapper.get('#client-provider-id').setValue('  moonup_api-2  ')
+    await saveFromSaveBar(wrapper)
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ client_provider_id: 'moonup_api-2' }),
+    )
+    updateSettings.mockClear()
+    await wrapper.get('#client-provider-id').setValue('')
+    await saveFromSaveBar(wrapper)
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ client_provider_id: 'tokenrouter' }),
+    )
   })
 
   // Saving a dirty bulk field crosses four asynchronous persistence and refresh

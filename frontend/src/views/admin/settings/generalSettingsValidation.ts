@@ -1,5 +1,6 @@
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
+import { normalizeClientProviderID } from '@/utils/clientConfig'
 import {
   tablePageSizeMin,
   tablePageSizeMax,
@@ -16,11 +17,11 @@ import type { useGeneralSettings } from './useGeneralSettings'
 import type { SettingsForm } from './settingsState'
 
 /**
- * generalSettingsValidation.ts validates pagination, ranking, balance display,
- * and optional-link values before the administrator bulk update. Pagination and
- * ranking errors stop the display phase before its accepted values replace the
- * shared draft. After those checks succeed, balance text, conversion rates, and
- * marketplace observation intervals are normalized for the domain serializer.
+ * generalSettingsValidation.ts validates client provider IDs, pagination,
+ * ranking, balance display, and optional links before administrator updates.
+ * Identifier and numeric errors stop the display phase before accepted values
+ * replace the shared draft. Balance text, conversion rates, and marketplace
+ * observation intervals are normalized for the domain serializer.
  *
  * The payload coordinator invokes display normalization early and optional URL
  * cleanup after identity capability validation. Keeping those operations separate
@@ -38,6 +39,7 @@ export function createGeneralSettingsValidation(
   form: Pick<
     SettingsForm,
     | 'table_default_page_size'
+    | 'client_provider_id'
     | 'usage_ranking_limit'
     | 'table_page_size_options'
     | 'balance_unit_name'
@@ -68,15 +70,19 @@ export function createGeneralSettingsValidation(
   } = actions
 
   /**
-   * normalizeDisplaySettings validates pagination and ranking limits, then updates
-   * the display draft and its bounded availability intervals. Invalid page size,
-   * page-size options, or ranking count reports the first matching error and returns
-   * false before those draft display values are assigned. Accepted values become
-   * the shared draft used by domain serializers. The selected ranking metric is
-   * made visible, balance text receives defaults, and nonnegative conversion rates
-   * and clamped time intervals are retained for the save attempt.
+   * normalizeDisplaySettings validates the provider ID, pagination, and ranking
+   * limits before updating the display draft. Invalid input reports the first
+   * error and returns false before these display values are assigned. Accepted
+   * values enter the draft used by domain serializers. The selected ranking
+   * metric becomes visible, balance text receives defaults, and nonnegative
+   * conversion rates and clamped time intervals remain available for the save.
    */
   function normalizeDisplaySettings(): boolean {
+    const providerID = normalizeClientProviderID(form.client_provider_id)
+    if (!providerID) {
+      appStore.showError(t('admin.settings.site.clientProviderIdError'))
+      return false
+    }
     // Page size and ranking limits use whole counts accepted by their controls.
     // Validate all three inputs before replacing the related draft display values.
     const normalizedTableDefaultPageSize = Math.floor(Number(form.table_default_page_size))
@@ -124,6 +130,8 @@ export function createGeneralSettingsValidation(
       )
       return false
     }
+
+    form.client_provider_id = providerID
 
     form.table_default_page_size = normalizedTableDefaultPageSize
 

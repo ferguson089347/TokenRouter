@@ -17,6 +17,7 @@ import "github.com/TokenFlux/TokenRouter/internal/site"
 func (s *Snapshot) SiteAdminSettings() site.AdminSettings {
 	return site.AdminSettings{
 		APIBaseURL:                  s.APIBaseURL,
+		ClientProviderID:            s.ClientProviderID,
 		ContactInfo:                 s.ContactInfo,
 		CustomEndpoints:             s.CustomEndpoints,
 		CustomMenuItems:             s.CustomMenuItems,
@@ -50,6 +51,7 @@ func (s *Snapshot) SiteAdminSettings() site.AdminSettings {
 // representation before the caller changes it.
 func (s *Snapshot) ApplySiteAdminSettings(value site.AdminSettings) {
 	s.APIBaseURL = value.APIBaseURL
+	s.ClientProviderID = value.ClientProviderID
 	s.ContactInfo = value.ContactInfo
 	s.CustomEndpoints = value.CustomEndpoints
 	s.CustomMenuItems = value.CustomMenuItems
@@ -82,6 +84,7 @@ func (s *Snapshot) ApplySiteAdminSettings(value site.AdminSettings) {
 // copy of their nested localization values.
 func (s *Snapshot) ApplySiteAdminReadSettings(value *site.AdminReadSettings) {
 	s.APIBaseURL = value.APIBaseURL
+	s.ClientProviderID = value.ClientProviderID
 	s.ContactInfo = value.ContactInfo
 	s.CustomEndpoints = value.CustomEndpoints
 	s.CustomMenuItems = value.CustomMenuItems

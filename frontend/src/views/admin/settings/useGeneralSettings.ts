@@ -31,6 +31,7 @@ import { tablePageSizeMin, tablePageSizeMax } from './settingsDefaults'
 export type GeneralSettingsForm = Pick<
   SettingsForm,
   | 'api_base_url'
+  | 'client_provider_id'
   | 'backend_mode_enabled'
   | 'balance_icon_svg'
   | 'balance_unit_symbol'

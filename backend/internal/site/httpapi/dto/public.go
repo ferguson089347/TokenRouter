@@ -60,6 +60,7 @@ type (
 		SiteLogo                    string                   `json:"site_logo"`                       // branding image location
 		SiteSubtitle                string                   `json:"site_subtitle"`                   // resolved branding subtitle
 		APIBaseURL                  string                   `json:"api_base_url"`                    // advertised API base
+		ClientProviderID            string                   `json:"client_provider_id"`              // exported client provider identifier
 		ContactInfo                 string                   `json:"contact_info"`                    // resolved contact details
 		DocURL                      string                   `json:"doc_url"`                         // resolved documentation link
 		HomeContent                 string                   `json:"home_content"`                    // resolved homepage content
