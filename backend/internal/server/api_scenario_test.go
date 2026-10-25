@@ -52,9 +52,9 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/usage/httpapi/ports"
 )
 
-// Public panel responses expose selected user fields while administrator
-// responses carry management details and configured-state flags. These cases
-// cross identity/httpapi/session_handler.go, apikey/httpapi/key_handler.go,
+// api_scenario_test.go checks public responses exposing selected user fields.
+// Administrator responses carry management details and configured-state flags.
+// These cases cross identity/httpapi/session_handler.go, apikey/httpapi/key_handler.go,
 // usage/httpapi/usage_handler.go, billing/httpapi/subscription_handler.go,
 // billing/httpapi/admin_subscription_handler.go,
 // billing/httpapi/redeem_handler.go, settings/httpapi/composite_get.go, and
@@ -1259,6 +1259,7 @@ func TestAPIContracts(t *testing.T) {
 						"site_logo": "",
 						"site_subtitle": "Subtitle",
 						"api_base_url": "https://api.example.com",
+						"client_provider_id": "tokenrouter",
 						"api_key_acl_trust_forwarded_ip": false,
 					"forwarded_client_ip_headers": [],
 					"contact_info": "support",
@@ -1660,6 +1661,7 @@ func TestAPIContracts(t *testing.T) {
 						"site_logo": "",
 						"site_subtitle": "Subscription to API Conversion Platform",
 					"api_base_url": "",
+					"client_provider_id": "tokenrouter",
 					"api_key_acl_trust_forwarded_ip": false,
 					"forwarded_client_ip_headers": [],
 					"contact_info": "",
