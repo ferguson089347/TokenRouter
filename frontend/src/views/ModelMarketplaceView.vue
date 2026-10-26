@@ -167,80 +167,18 @@
           </div>
         </div>
 
-        <div v-else class="grid min-w-0 items-start gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-          <aside
-            class="card min-w-0 overflow-hidden lg:sticky lg:top-[calc(var(--header-h)+1rem)]"
-            data-testid="marketplace-group-navigation"
-          >
-            <!-- Sticky navigation leaves one spacing unit below the fixed application header. -->
-            <div
-              class="flex items-center justify-between border-b border-gray-100 px-4 py-3 text-xs text-gray-500 dark:border-dark-700 dark:text-dark-400"
-            >
-              <span>{{ t('marketplace.allGroups') }}</span>
-              <span class="tabular-nums">{{ filteredGroups.length }}</span>
-            </div>
-            <nav
-              :aria-label="t('marketplace.groupNavigation')"
-              class="flex gap-2 overflow-x-auto p-2 lg:max-h-[calc(100dvh-var(--header-h)-6rem)] lg:flex-col lg:overflow-y-auto"
-            >
-              <!-- The selected directory combines a neutral fill, side marker, and check so its identity remains visible across both themes. -->
-              <button
-                v-for="candidate in filteredGroups"
-                :key="candidate.id"
-                type="button"
-                :data-group-id="candidate.id"
-                data-testid="marketplace-group-select"
-                :aria-current="activeGroup?.id === candidate.id ? 'true' : undefined"
-                aria-controls="marketplace-selected-group"
-                class="relative w-60 shrink-0 rounded-control border p-3 text-left transition-colors lg:w-full"
-                :class="
-                  activeGroup?.id === candidate.id
-                    ? 'border-gray-300 bg-gray-100 text-gray-950 dark:border-dark-500 dark:bg-dark-700 dark:text-white'
-                    : 'border-transparent text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:text-dark-200 dark:hover:bg-dark-800 dark:hover:text-white'
-                "
-                @click="activeGroupID = candidate.id"
-              >
-                <span
-                  v-if="activeGroup?.id === candidate.id"
-                  aria-hidden="true"
-                  class="pointer-events-none absolute bottom-3 left-0 top-3 w-1 rounded-full bg-gray-900 dark:bg-white"
-                />
-                <span class="flex min-w-0 items-start gap-2">
-                  <ProviderIcon :brand="groupBrandSource(candidate)" size="18px" class="mt-0.5" />
-                  <span class="min-w-0 break-words text-sm font-medium">{{ candidate.name }}</span>
-                </span>
-                <span
-                  class="mt-2 flex items-center justify-between gap-2 pl-6 text-xs text-gray-500 dark:text-dark-400"
-                >
-                  <span class="flex items-center gap-2">
-                    <span
-                      v-if="activeGroup?.id === candidate.id"
-                      aria-hidden="true"
-                      class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white dark:bg-white dark:text-dark-900"
-                    >
-                      <Icon name="check" size="xs" :animate-on-hover="false" />
-                    </span>
-                    <span>{{
-                      t('marketplace.groupModelCount', { count: candidate.model_count })
-                    }}</span>
-                  </span>
-                  <span v-if="!candidate.hide_rate_multiplier" class="tabular-nums">{{
-                    formatMultiplier(candidate.rate_multiplier)
-                  }}</span>
-                </span>
-              </button>
-            </nav>
-          </aside>
+        <div v-else class="min-w-0 space-y-4">
           <section
-            v-for="group in activeGroup ? [activeGroup] : []"
+            v-for="group in filteredGroups"
             :key="group.id"
-            id="marketplace-selected-group"
             :data-group-id="group.id"
             data-testid="marketplace-group-section"
-            class="min-w-0 space-y-4"
-            aria-labelledby="marketplace-selected-group-title"
+            class="card min-w-0 overflow-hidden"
+            :aria-labelledby="`marketplace-group-title-${group.id}`"
           >
-            <div class="card space-y-4 p-4 md:p-5">
+            <div
+              class="flex flex-col gap-4 p-4 md:p-6 xl:flex-row xl:items-center xl:justify-between"
+            >
               <div class="min-w-0 flex-1 space-y-3">
                 <div class="flex items-start gap-3">
                   <span
@@ -250,7 +188,7 @@
                   </span>
                   <div class="min-w-0">
                     <h2
-                      id="marketplace-selected-group-title"
+                      :id="`marketplace-group-title-${group.id}`"
                       class="text-lg font-semibold text-gray-950 dark:text-white"
                       >{{ group.name }}</h2
                     >
@@ -308,83 +246,118 @@
               </div>
               <div
                 v-if="group.availability"
-                class="flex w-full justify-end border-t border-gray-100 pt-4 dark:border-dark-700"
+                class="w-full xl:w-2/5 xl:shrink-0"
                 data-testid="marketplace-group-availability"
               >
-                <!-- The selected group keeps its complete availability summary above the model directory. -->
-                <GroupAvailabilityBar
-                  :availability="group.availability"
-                  class="min-w-0 sm:max-w-lg"
-                />
+                <GroupAvailabilityBar :availability="group.availability" class="min-w-0" />
               </div>
             </div>
 
-            <div
-              id="marketplace-model-directory"
-              class="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-dark-400 [scroll-margin-top:calc(var(--header-h)+1rem)]"
+            <!-- Paging returns to this entry with one spacing unit below the fixed application header so the next model page starts in view. -->
+            <button
+              :id="`marketplace-group-toggle-${group.id}`"
+              type="button"
+              class="flex min-h-11 w-full items-center justify-center gap-2 border-t border-gray-100 px-4 py-2 text-sm font-medium text-primary-600 transition-colors hover:bg-gray-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500/50 dark:border-dark-700 dark:text-primary-300 dark:hover:bg-dark-800 dark:hover:text-primary-200 [scroll-margin-top:calc(var(--header-h)+1rem)]"
+              data-testid="marketplace-group-toggle"
+              :aria-expanded="groupExpansion.get(group.id) === true"
+              :aria-controls="`marketplace-group-models-${group.id}`"
+              @click="toggleGroupModels(group.id)"
             >
-              <h3>{{ t('marketplace.modelsAndPricing') }}</h3>
-              <span>{{ t('marketplace.groupModelCount', { count: group.model_count }) }}</span>
-            </div>
-            <div class="grid min-w-0 grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
-              <!-- Render one selected group and a bounded page so navigation does not mount every model in the directory. -->
-              <article
-                v-for="model in group.pageModels"
-                :key="`${group.id}-${model.id}`"
-                class="group min-w-0 max-w-full rounded-surface border border-gray-100 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-sm dark:border-dark-700 dark:bg-dark-950/80 dark:hover:border-primary-500/50"
+              <span class="sr-only">{{ group.name }}: </span>
+              <span>{{
+                t(
+                  groupExpansion.get(group.id) === true
+                    ? 'marketplace.collapseModels'
+                    : 'marketplace.expandModels',
+                  { count: group.model_count },
+                )
+              }}</span>
+              <Icon
+                name="chevronDown"
+                size="sm"
+                class="transition-transform duration-normal"
+                :class="{ 'rotate-180': groupExpansion.get(group.id) === true }"
+                :animate-on-hover="false"
+              />
+            </button>
+
+            <Collapse
+              :id="`marketplace-group-models-${group.id}`"
+              :open="groupExpansion.get(group.id) === true"
+              role="region"
+              :aria-labelledby="`marketplace-group-toggle-${group.id}`"
+            >
+              <!-- First expansion mounts this group's bounded model page; retaining it on close keeps pricing selections available when reopened. -->
+              <div
+                v-if="groupExpansion.has(group.id)"
+                class="border-t border-gray-100 dark:border-dark-700"
               >
-                <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                  <div class="flex min-w-0 flex-1 basis-32 items-center">
-                    <h3
-                      class="min-w-0 truncate text-base font-semibold text-gray-950 dark:text-white"
-                      >{{ model.display_name }}</h3
-                    >
-                    <!-- The information button groups attributes and protocols beside the model name, leaving card space for prices. -->
-                    <ModelAttributeDetails
-                      v-if="model.attributes || marketplaceProtocols(model.protocols).length > 0"
-                      :model="model"
-                      class="shrink-0"
-                    />
-                  </div>
-                  <ModelCapabilityTags :model="model" />
-                </div>
-                <!-- The model ID gets its own row so capability tags can share the title row. -->
-                <ModelIdLabel :model-id="model.id" class="mt-1" />
-
-                <!-- Price summaries use a borderless list of the quoted billing units. -->
-                <div class="mt-4">
-                  <template v-if="compactPricingRows(model.pricing).length > 0">
-                    <dl class="space-y-2">
-                      <div
-                        v-for="row in compactPricingRows(model.pricing)"
-                        :key="row.key"
-                        class="flex items-baseline justify-between gap-3 text-sm"
-                      >
-                        <dt class="shrink-0 text-gray-500 dark:text-dark-400">{{ row.label }}</dt>
-                        <dd
-                          class="min-w-0 break-words text-right font-medium tabular-nums [overflow-wrap:anywhere] text-gray-900 dark:text-white"
-                          >{{ row.value }}</dd
+                <div
+                  class="grid min-w-0 grid-cols-1 items-start gap-4 p-4 md:grid-cols-2 md:p-6 lg:grid-cols-3"
+                >
+                  <article
+                    v-for="model in group.pageModels"
+                    :key="`${group.id}-${model.id}`"
+                    class="group min-w-0 max-w-full rounded-surface border border-gray-100 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-sm dark:border-dark-700 dark:bg-dark-950/80 dark:hover:border-primary-500/50"
+                  >
+                    <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                      <div class="flex min-w-0 flex-1 basis-32 items-center">
+                        <h3
+                          class="min-w-0 truncate text-base font-semibold text-gray-950 dark:text-white"
+                          >{{ model.display_name }}</h3
                         >
+                        <!-- The information button groups attributes and protocols beside the model name, leaving card space for prices. -->
+                        <ModelAttributeDetails
+                          v-if="
+                            model.attributes || marketplaceProtocols(model.protocols).length > 0
+                          "
+                          :model="model"
+                          class="shrink-0"
+                        />
                       </div>
-                    </dl>
-                  </template>
-                  <p v-else class="text-sm text-gray-400 dark:text-dark-500">
-                    {{ t('marketplace.pricingUnavailable') }}
-                  </p>
+                      <ModelCapabilityTags :model="model" />
+                    </div>
+                    <!-- The model ID gets its own row so capability tags can share the title row. -->
+                    <ModelIdLabel :model-id="model.id" class="mt-1" />
 
-                  <!-- ModelPricingPanel manages detailed prices, context ranges, and fast-mode selection inside its card. -->
-                  <ModelPricingPanel :model="model" />
+                    <!-- Price summaries use a borderless list of the quoted billing units. -->
+                    <div class="mt-4">
+                      <template v-if="compactPricingRows(model.pricing).length > 0">
+                        <dl class="space-y-2">
+                          <div
+                            v-for="row in compactPricingRows(model.pricing)"
+                            :key="row.key"
+                            class="flex items-baseline justify-between gap-3 text-sm"
+                          >
+                            <dt class="shrink-0 text-gray-500 dark:text-dark-400">{{
+                              row.label
+                            }}</dt>
+                            <dd
+                              class="min-w-0 break-words text-right font-medium tabular-nums [overflow-wrap:anywhere] text-gray-900 dark:text-white"
+                              >{{ row.value }}</dd
+                            >
+                          </div>
+                        </dl>
+                      </template>
+                      <p v-else class="text-sm text-gray-400 dark:text-dark-500">
+                        {{ t('marketplace.pricingUnavailable') }}
+                      </p>
+
+                      <!-- ModelPricingPanel manages detailed prices, context ranges, and fast-mode selection inside its card. -->
+                      <ModelPricingPanel :model="model" />
+                    </div>
+                  </article>
                 </div>
-              </article>
-            </div>
-            <Pagination
-              v-if="group.model_count > MODEL_PAGE_SIZE"
-              :total="group.model_count"
-              :page="group.page"
-              :page-size="MODEL_PAGE_SIZE"
-              :show-page-size-selector="false"
-              @update:page="changeGroupPage(group.id, $event)"
-            />
+                <Pagination
+                  v-if="group.model_count > MODEL_PAGE_SIZE"
+                  :total="group.model_count"
+                  :page="group.page"
+                  :page-size="MODEL_PAGE_SIZE"
+                  :show-page-size-selector="false"
+                  @update:page="changeGroupPage(group.id, $event)"
+                />
+              </div>
+            </Collapse>
           </section>
         </div>
       </div>
@@ -415,6 +388,7 @@ import Select from '@/components/common/Select.vue'
 import FilterDropdown from '@/components/common/FilterDropdown.vue'
 import FilterField from '@/components/common/FilterField.vue'
 import ModelIdLabel from '@/components/common/ModelIdLabel.vue'
+import Collapse from '@/components/common/Collapse.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 import { initTheme, useTheme } from '@/composables/useTheme'
@@ -442,19 +416,19 @@ import { useAppStore, useAuthStore } from '@/stores'
 // protocols, with route differences shown after both sections. Video summaries
 // show the backend's group-scaled per-second quotes and retain free dimensions.
 //
-// Search and brand, pricing, and group filters determine navigation entries and
-// their matching models. One selected group supplies the summary and twelve-model
-// page; the first matching group appears when selection is absent or filtered out.
-// Selection stores group identity separately from the filter, keeping other groups
-// reachable. Each group retains its page during navigation, while changed filters
-// reset pages before a new catalog is presented. Model details unmount when their
-// group leaves selection, and full-directory filtering includes off-page models.
+// Search and brand, pricing, and group filters determine the summaries shown in
+// one vertical list. Groups start collapsed and open independently. The first
+// expansion mounts twelve models at most; closing a rendered group retains its
+// current page and pricing controls. Changed filters reset model pages, while
+// expansion choices remain associated with group IDs. Filtering searches each
+// complete model directory, including models outside the current page. Paging
+// returns to that group's disclosure entry below the fixed application header.
 
-// MODEL_PAGE_SIZE bounds rendering to twelve cards for the selected group, keeping
-// large groups responsive when visitors select them on slower devices.
+// MODEL_PAGE_SIZE bounds rendering to twelve cards in each expanded group,
+// keeping large directories responsive when visitors first open their models.
 const MODEL_PAGE_SIZE = 12
 
-// VisibleMarketplaceGroup contains matching models and the selected navigation page.
+// VisibleMarketplaceGroup contains matching models and one bounded page per group.
 type VisibleMarketplaceGroup = MarketplaceGroup & {
   page: number // current model page
   pageModels: MarketplaceGroup['models'] // visible page records
@@ -482,9 +456,9 @@ const search = ref('')
 const selectedBrand = ref<string | 'all'>('all')
 const selectedPricingMode = ref<PricingFilter>('all')
 const selectedGroupId = ref<number | 'all'>('all')
-// activeGroupID retains the requested navigation identity independently of filters.
-// activeGroup selects the first match when this identity is absent from results.
-const activeGroupID = ref<number | null>(null)
+// groupExpansion records groups opened during this visit. Absent entries defer
+// model mounting; false entries retain a rendered group's controls while closed.
+const groupExpansion = ref(new Map<number, boolean>())
 // groupPages stores independent model pages; filter changes reset these positions
 // so a new result set starts with its first matching models.
 const groupPages = ref<Record<number, number>>({})
@@ -638,21 +612,19 @@ const filteredGroups = computed<VisibleMarketplaceGroup[]>(() => {
 
 const hasMarketplaceResults = computed(() => filteredGroups.value.length > 0)
 
-// activeGroup resolves one matching group for the detail pane. A filtered-out
-// selection uses the first matching group, while clearing filters can restore
-// the requested group identity and its independently retained model page.
-const activeGroup = computed(
-  () =>
-    filteredGroups.value.find((group) => group.id === activeGroupID.value) ??
-    filteredGroups.value[0],
-)
+// toggleGroupModels changes one group's model visibility independently of others.
+// The first opening records the group ID so its model controls stay mounted
+// during later closes while the group remains in the filtered list.
+function toggleGroupModels(groupId: number): void {
+  groupExpansion.value.set(groupId, !groupExpansion.value.get(groupId))
+}
 
-// changeGroupPage selects a model page and brings its directory heading into view.
-// Each group's page survives navigation, and the heading's scroll margin leaves
-// room for the fixed application header before the first visible model card.
+// changeGroupPage selects a model page and brings its group's entry into view.
+// Each group keeps its own page, and the entry's scroll margin leaves room for
+// the fixed application header before the first visible model card.
 function changeGroupPage(groupId: number, page: number): void {
   groupPages.value[groupId] = page
-  document.getElementById('marketplace-model-directory')?.scrollIntoView({ block: 'start' })
+  document.getElementById(`marketplace-group-toggle-${groupId}`)?.scrollIntoView({ block: 'start' })
 }
 
 function hasPositiveValue(value?: number | null): value is number {

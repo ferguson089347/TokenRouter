@@ -1,5 +1,5 @@
 <template>
-  <div class="flex w-full min-w-0 items-center gap-2" :title="tooltip">
+  <div class="flex w-full min-w-0 items-center justify-end gap-2" :title="tooltip">
     <div
       class="grid h-8 min-w-0 flex-1 items-center overflow-hidden"
       :style="barGridStyle"
@@ -35,7 +35,9 @@ import type {
 // GroupAvailabilityBar.vue renders a group's reported availability over a fixed
 // number of time buckets. Missing earlier buckets appear as empty cells, and
 // longer histories retain their newest entries. Summary labels distinguish
-// unavailable measurements from a measured zero success rate.
+// unavailable measurements from a measured zero success rate. Sparse histories
+// keep their bars together beside the summary; dense histories fit the space
+// available within the group's responsive layout.
 
 // props accepts the optional server aggregate; missing data still produces the
 // default window and empty cells so neighboring groups retain comparable geometry.
@@ -75,18 +77,8 @@ const normalizedBuckets = computed<MarketplaceGroupAvailabilityDay[]>(() => {
   ]
 })
 
-// Grid gaps and cell widths become smaller as bucket density grows, allowing
-// the history to share the available row width with its fixed summary label.
-const barGridStyle = computed(() => ({
-  gap:
-    normalizedBuckets.value.length > 360
-      ? '0'
-      : normalizedBuckets.value.length > 180
-        ? '1px'
-        : '2px',
-  gridTemplateColumns: `repeat(${normalizedBuckets.value.length}, minmax(0, 1fr))`,
-}))
-
+// bucketWidth limits sparse bars so separate observations stay visible, while
+// dense histories fill each available column within the responsive chart.
 const bucketWidth = computed(() => {
   const count = normalizedBuckets.value.length
   if (count <= 30) {
@@ -99,6 +91,23 @@ const bucketWidth = computed(() => {
     return '4px'
   }
   return '100%'
+})
+
+// barGridStyle reduces gaps as histories become denser and caps sparse charts
+// at their combined bar widths, keeping the chart beside its fixed summary.
+const barGridStyle = computed(() => {
+  const count = normalizedBuckets.value.length
+  // Reduce separation for denser histories so every observation remains visible.
+  const gap = count > 360 ? '0' : count > 180 ? '1px' : '2px'
+
+  return {
+    gap,
+    gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))`,
+    // Sparse histories otherwise spread fixed-width bars across fractional tracks.
+    // Cap their combined width so neighboring observations keep the declared gap.
+    maxWidth:
+      count <= 180 ? `calc(${count} * ${bucketWidth.value} + ${count - 1} * ${gap})` : undefined,
+  }
 })
 
 // Summary labels use the aggregate rate rather than averaging the visible cells;
