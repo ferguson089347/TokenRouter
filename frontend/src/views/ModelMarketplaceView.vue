@@ -183,6 +183,7 @@
               :aria-label="t('marketplace.groupNavigation')"
               class="flex gap-2 overflow-x-auto p-2 lg:max-h-[calc(100dvh-var(--header-h)-6rem)] lg:flex-col lg:overflow-y-auto"
             >
+              <!-- The selected directory combines a neutral fill, side marker, and check so its identity remains visible across both themes. -->
               <button
                 v-for="candidate in filteredGroups"
                 :key="candidate.id"
@@ -191,14 +192,19 @@
                 data-testid="marketplace-group-select"
                 :aria-current="activeGroup?.id === candidate.id ? 'true' : undefined"
                 aria-controls="marketplace-selected-group"
-                class="w-60 shrink-0 rounded-control border p-3 text-left transition-colors lg:w-full"
+                class="relative w-60 shrink-0 rounded-control border p-3 text-left transition-colors lg:w-full"
                 :class="
                   activeGroup?.id === candidate.id
-                    ? 'border-gray-200 bg-primary-500/8 text-primary-500 dark:border-dark-600'
-                    : 'border-transparent text-gray-700 hover:bg-gray-50 hover:text-primary-500 dark:text-dark-200 dark:hover:bg-dark-800'
+                    ? 'border-gray-300 bg-gray-100 text-gray-950 dark:border-dark-500 dark:bg-dark-700 dark:text-white'
+                    : 'border-transparent text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:text-dark-200 dark:hover:bg-dark-800 dark:hover:text-white'
                 "
                 @click="activeGroupID = candidate.id"
               >
+                <span
+                  v-if="activeGroup?.id === candidate.id"
+                  aria-hidden="true"
+                  class="pointer-events-none absolute bottom-3 left-0 top-3 w-1 rounded-full bg-gray-900 dark:bg-white"
+                />
                 <span class="flex min-w-0 items-start gap-2">
                   <ProviderIcon :brand="groupBrandSource(candidate)" size="18px" class="mt-0.5" />
                   <span class="min-w-0 break-words text-sm font-medium">{{ candidate.name }}</span>
@@ -206,9 +212,18 @@
                 <span
                   class="mt-2 flex items-center justify-between gap-2 pl-6 text-xs text-gray-500 dark:text-dark-400"
                 >
-                  <span>{{
-                    t('marketplace.groupModelCount', { count: candidate.model_count })
-                  }}</span>
+                  <span class="flex items-center gap-2">
+                    <span
+                      v-if="activeGroup?.id === candidate.id"
+                      aria-hidden="true"
+                      class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white dark:bg-white dark:text-dark-900"
+                    >
+                      <Icon name="check" size="xs" :animate-on-hover="false" />
+                    </span>
+                    <span>{{
+                      t('marketplace.groupModelCount', { count: candidate.model_count })
+                    }}</span>
+                  </span>
                   <span v-if="!candidate.hide_rate_multiplier" class="tabular-nums">{{
                     formatMultiplier(candidate.rate_multiplier)
                   }}</span>
