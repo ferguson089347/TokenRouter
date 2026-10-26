@@ -283,13 +283,14 @@ func (h MessagesErrorOutput) GeminiExhausted(c *gin.Context, failoverErr *forwar
 		return
 	}
 
+	CopyFailoverRetryAfter(c, failoverErr.ResponseHeaders)
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
 
 	// A matching Gemini rule owns final status and message selection; returning
 	// from this branch prevents default mapping from overwriting its chosen response.
 	if h.Rules != nil && len(responseBody) > 0 {
-		if rule := h.Rules.MatchRule(capability.PlatformGemini, statusCode, responseBody); rule != nil {
+		if rule := h.Rules.MatchRule(failoverErr.ProviderPlatform(capability.PlatformGemini), statusCode, responseBody); rule != nil {
 			respCode := statusCode
 			if !rule.PassthroughCode && rule.ResponseCode != nil {
 				respCode = *rule.ResponseCode

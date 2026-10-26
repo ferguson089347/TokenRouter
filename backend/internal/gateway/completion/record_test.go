@@ -43,6 +43,11 @@ type recordModels struct{}
 // recordPriceCatalog supplies known prices for settlement and log-order tests.
 type recordPriceCatalog struct{}
 
+// recordTTLStats retains usage supplied to differential cache-lifetime pricing.
+type recordTTLStats struct {
+	tokens pricing.UsageTokens // observed disjoint pricing buckets
+}
+
 // Apply counts and retains one financial command before returning the configured
 // fixture result. A cancelled context returns its error; otherwise the synthetic
 // result carries Applied=true and the command's balance amount alongside the configured error.
@@ -237,4 +242,37 @@ func TestRecordCyberPreservesZeroUsage(t *testing.T) {
 	require.NotEmpty(t, logs.rows)
 	require.Zero(t, logs.rows[0].ActualCost)
 	require.Equal(t, RequestTypeCyberBlocked, logs.rows[0].RequestType)
+}
+
+// ResolveProviderStats captures token evidence and applies distinct fixture TTL
+// rates. A returned cost pointer selects provider statistics for settlement;
+// calls run serially so tests can inspect the retained buckets after recording.
+func (s *recordTTLStats) ResolveProviderStats(_ context.Context, input billing.ProviderStatsCostInput) *float64 {
+	s.tokens = input.Tokens
+	cost := pricing.ComputeCacheCreationCost(&pricing.ModelPricing{SupportsCacheBreakdown: true, CacheCreation5mPrice: 1e-6, CacheCreation1hPrice: 2e-6}, input.Tokens, 0, 1)
+	return &cost
+}
+
+// TestRecordProviderStatisticsRetainCacheLifetimes submits a native Messages
+// observation with separate cache-write lifetimes to the recorder. Provider
+// statistics must price those disjoint buckets, and the persisted row must
+// retain the lifetimes with their distinct TTL cost.
+func TestRecordProviderStatisticsRetainCacheLifetimes(t *testing.T) {
+	recorder, _, logs, input, _ := recordFixture()
+	stats := &recordTTLStats{}
+	recorder.stats = stats
+	groupID := int64(1)
+	input.APIKey.GroupID = &groupID
+	input.Result.NativeUsage = true
+	input.Result.Usage = TokenUsage{InputTokens: 100, OutputTokens: 10, CacheReadInputTokens: 30, CacheCreationInputTokens: 12, CacheCreation5mTokens: 5, CacheCreation1hTokens: 7}
+	require.NoError(t, recorder.Record(t.Context(), input, true))
+	require.Equal(t, pricing.UsageTokens{InputTokens: 100, OutputTokens: 10, CacheReadTokens: 30, CacheCreationTokens: 12, CacheCreation5mTokens: 5, CacheCreation1hTokens: 7}, stats.tokens)
+	require.Len(t, logs.rows, 1)
+	row := logs.rows[0]
+	require.Equal(t, 100, row.InputTokens)
+	require.Equal(t, 5, row.CacheCreation5mTokens)
+	require.Equal(t, 7, row.CacheCreation1hTokens)
+	require.NotNil(t, row.ProviderStatsCost)
+	// Five tokens at one and seven at two microdollars cost nineteen microdollars.
+	require.InDelta(t, 19e-6, *row.ProviderStatsCost, 1e-12)
 }

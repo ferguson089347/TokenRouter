@@ -18,7 +18,6 @@ import (
 	protocolbridge "github.com/TokenFlux/TokenRouter/internal/protocol/bridge"
 	protocolopenai "github.com/TokenFlux/TokenRouter/internal/protocol/openai"
 	providercore "github.com/TokenFlux/TokenRouter/internal/provider"
-	provideradapter "github.com/TokenFlux/TokenRouter/internal/provider/provider"
 	"github.com/TokenFlux/TokenRouter/internal/routing/capability"
 	"github.com/TokenFlux/TokenRouter/internal/upstream"
 	gemininative "github.com/TokenFlux/TokenRouter/internal/upstream/gemini"
@@ -196,7 +195,7 @@ func (s *Gemini) forwardClaudeBodyAsOpenAICompat(
 	// Resolve the provider wire model before capability filtering so OpenAI
 	// controls from the original body are applied to the same Gemini target
 	// sent upstream.
-	mappedModel := providercore.ResolveForwardMappedModel(gatewayprovider.ExecutionRecord(provider), req.Model, provideradapter.ModelDefaults())
+	mappedModel := gatewayprovider.ExecutionModelPolicy(provider).UpstreamModel(ctx, req.Model)
 
 	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(claudeBody)
 	if err != nil {
@@ -228,6 +227,7 @@ func (s *Gemini) forwardClaudeBodyAsOpenAICompat(
 		geminiReq,
 		clientStream,
 		useUpstreamStream,
+		c.GetHeader,
 	)
 
 	options := s.geminiExchangeOptions(c, ctx, provider, mappedModel, geminiExchangeOpenAI, protocol)
@@ -274,8 +274,8 @@ func (s *Gemini) forwardClaudeBodyAsOpenAICompat(
 			} else {
 				reasoningEffort = protocolforward.ExtractEffort(originalBody, true, capability.NormalizeRecordedOpenAIEffortForModel, mappedModel)
 			}
-			// Supply a display effort when a CN model enables
-			// thinking without an explicit effort.
+			// Supply a display effort when a Kimi, Zhipu, or DeepSeek model
+			// enables thinking without an explicit effort.
 			reasoningEffort = gatewayprovider.ApplyThinkingEnabledFallback(reasoningEffort, originalBody, mappedModel)
 
 			if resp.StatusCode >= 400 {
@@ -283,7 +283,7 @@ func (s *Gemini) forwardClaudeBodyAsOpenAICompat(
 				decision := s.applyGeminiUpstreamErrorPolicy(ctx, provider, resp.StatusCode, resp.Header, respBody, mappedModel)
 				evBody := gemininative.UnwrapIfNeeded(provider.Record.Type == capability.ProviderTypeOAuth, respBody)
 				if decision.Policy == providercore.ErrorPolicyCustomSkipped || decision.Policy == providercore.ErrorPolicyPoolBypassed {
-					if failoverErr := s.skippedErrorPolicyFailoverError(c, provider, resp.StatusCode, respBody, requestID); failoverErr != nil {
+					if failoverErr := s.skippedErrorPolicyFailoverError(c, provider, resp.StatusCode, resp.Header, respBody, requestID); failoverErr != nil {
 						return nil, failoverErr
 					}
 					if decision.Policy == providercore.ErrorPolicyCustomSkipped {
@@ -299,7 +299,7 @@ func (s *Gemini) forwardClaudeBodyAsOpenAICompat(
 				}
 
 				msg400 := strings.ToLower(strings.TrimSpace(upstream.ExtractErrorMessage(respBody)))
-				googleConfigError := resp.StatusCode == http.StatusBadRequest && upstream.IsGoogleProjectConfigError(msg400)
+				googleConfigError := isGoogleAccount(provider) && resp.StatusCode == http.StatusBadRequest && upstream.IsGoogleProjectConfigError(msg400)
 				if decision.ShouldFailover(gatewayprovider.ExecutionErrorPolicy(provider), resp.StatusCode, googleConfigError || s.shouldFailoverGeminiUpstreamError(resp.StatusCode)) {
 					upstreamMsg := logredact.SanitizeUpstreamQueries(strings.TrimSpace(upstream.ExtractErrorMessage(evBody)))
 					c.Observe(ops.OpsUpstreamErrorEvent{
@@ -312,9 +312,11 @@ func (s *Gemini) forwardClaudeBodyAsOpenAICompat(
 						Message:            upstreamMsg,
 					})
 					return nil, &protocolforward.UpstreamFailoverError{
-						StatusCode: resp.StatusCode,
-
-						ResponseBody: evBody,
+						Platform:               provider.Record.Platform,
+						StatusCode:             resp.StatusCode,
+						ResponseHeaders:        resp.Header.Clone(),
+						SameProviderRetryDelay: relayRetryDelay(provider, resp.Header),
+						ResponseBody:           evBody,
 
 						RetryableOnSameProvider: decision.RetryableOnSameProvider(gatewayprovider.ExecutionErrorPolicy(provider), resp.StatusCode),
 					}
@@ -370,8 +372,9 @@ func (s *Gemini) buildGeminiChatCompletionsUpstreamRequestFunc(
 	geminiReq []byte,
 	clientStream bool,
 	useUpstreamStream bool,
+	read func(string) string,
 ) (func(context.Context) (*http.Request, string, error), string) {
-	plan := s.geminiRequestPlan(provider, mappedModel, "", false, clientStream, useUpstreamStream, false)
+	plan := s.geminiRequestPlan(provider, mappedModel, "", false, clientStream, useUpstreamStream, false, read)
 	return func(ctx context.Context) (*http.Request, string, error) {
 		return gemininative.BuildRequest(ctx, geminiReq, plan)
 	}, "x-request-id"

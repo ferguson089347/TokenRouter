@@ -1278,7 +1278,7 @@ function handleToolbarRefresh() {
 
                 <div class="space-y-3">
                   <div v-for="(item, idx) in diagnosisReport" :key="idx" class="flex gap-3">
-                    <div class="mt-0.5 shrink-0">
+                    <div class="shrink-0">
                       <Icon
                         name="xCircle"
                         size="sm"

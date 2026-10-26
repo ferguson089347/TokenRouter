@@ -145,7 +145,7 @@ func (s Probe) selectProtocolTarget(ctx context.Context, due routing.GroupAvaila
 		}
 		candidate, ok := plan.ResolveCandidate(gatewayprovider.ExecutionSnapshot(selected))
 		route := provider.TestProtocolRoute{ClientProtocol: candidate.ClientProtocol, UpstreamProtocol: candidate.UpstreamProtocol}
-		if ok && route.SupportsProvider(gatewayprovider.ExecutionSnapshot(selected)) {
+		if ok && route.SupportsProvider(gatewayprovider.ExecutionSnapshot(selected), plan.Models().GroupMappedModel) {
 			return routing.GroupProbeTarget{
 				Attributes: routing.ModelAttributesFromContext(ctx),
 				GroupID:    due.GroupID, ProviderID: selected.Record.ID,

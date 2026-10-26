@@ -28,7 +28,7 @@ Gemini 正式支持：
 
 Code Assist 和 Google One 需要有效的 project；AI Studio 的 project 可选，并使用所选的 tier。第三方 API Key 保持 `type=apikey` 和兼容 Gemini 的请求格式，但需要配置非 Google 官方域名的 Base URL；它没有 Google 官方的提供商等级，所以不写 `tier_id`，也不参与本地模拟的 RPD、RPM 预检和用量窗口。本地配额预检由 app 构造一个 `provider.GeminiPrecheck`，直接绑定给执行方，按洛杉矶时间的日界读取 usage 批量数据和缓存。
 
-第三方上游实际返回 `429` 时，都使用通用冷却，不按 Google 日配额的重置规则解析。OAuth refresh 会重试，并兼容历史的 client 元数据；token provider 在过期前提前刷新，并用并发锁防止同一提供商重复刷新。其他导入类型没有 Gemini 的正式转发实现，见[上游提供商能力矩阵](upstream_provider_matrix.md)。
+Gemini 平台的第三方上游实际返回 `429` 时，使用配置的通用冷却，不按 Google 日配额的重置规则解析。OpenCode 等非 Google 账户的提供商只复用 Gemini 报文处理，不适用 Google 的项目配置换号、countTokens 估算兜底和本地重试；健康观察使用共享错误策略及 Retry-After，同一提供商重试最多等待 8 秒。普通重试由外层提供商预算控制，协议签名修复单独有界执行。OAuth refresh 会重试，并兼容历史的 client 元数据；token provider 在过期前提前刷新，并用并发锁防止同一提供商重复刷新。其他导入类型没有 Gemini 的正式转发实现，见[上游提供商能力矩阵](upstream_provider_matrix.md)。
 
 <a id="gemini_protocol_dispatch"></a>
 ## 协议分派

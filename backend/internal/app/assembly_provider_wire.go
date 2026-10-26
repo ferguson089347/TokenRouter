@@ -86,7 +86,7 @@ var providerAssemblyProviders = wire.NewSet(
 	providerhttp.NewArchiveHandler,
 	provideProviderImportProbes,
 	provideGrokOAuthWithImports,
-	provideCNUsageMonitor,
+	provideUsageMonitor,
 	provideBalanceAlertMonitor,
 	provideProviderTestHTTP,
 	provideUpstreamUsageHTTP,

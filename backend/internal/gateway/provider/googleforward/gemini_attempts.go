@@ -25,7 +25,6 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/protocol/bridge"
 	"github.com/TokenFlux/TokenRouter/internal/protocol/gemini"
 	providercore "github.com/TokenFlux/TokenRouter/internal/provider"
-	provideradapter "github.com/TokenFlux/TokenRouter/internal/provider/provider"
 	"github.com/TokenFlux/TokenRouter/internal/routing/capability"
 	"github.com/TokenFlux/TokenRouter/internal/upstream"
 	gemininative "github.com/TokenFlux/TokenRouter/internal/upstream/gemini"
@@ -53,6 +52,10 @@ import (
 // values.
 const (
 	geminiMaxRetries = 5 // same-provider retry count cap
+
+	// maxRelayRetryDelay caps a relay's Retry-After wait before the next
+	// same-provider attempt; it matches the OpenAI 429 retry cap.
+	maxRelayRetryDelay = 8 * time.Second
 
 	geminiAppliedTempPolicyHeader = "X-TokenRouter-Internal-Temp-Policy-Applied" // applied temporary-policy marker
 
@@ -141,7 +144,7 @@ func (s *Gemini) Forward(ctx context.Context, output Output, provider *gatewaypr
 	// Resolve provider mapping before conversion capabilities and request
 	// planning so OAuth, API key, and service-account attempts send the
 	// same selected wire model.
-	mappedModel := providercore.ResolveForwardMappedModel(gatewayprovider.ExecutionRecord(provider), req.Model, provideradapter.ModelDefaults())
+	mappedModel := gatewayprovider.ExecutionModelPolicy(provider).UpstreamModel(ctx, req.Model)
 
 	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(body)
 	if err != nil {
@@ -176,7 +179,7 @@ func (s *Gemini) Forward(ctx context.Context, output Output, provider *gatewaypr
 	if provider.Record.Type == capability.ProviderTypeOAuth && !req.Stream && strings.TrimSpace(provider.View().GetCredential("project_id")) != "" {
 		useUpstreamStream = true
 	}
-	plan := s.geminiRequestPlan(provider, mappedModel, "", false, req.Stream, useUpstreamStream, false)
+	plan := s.geminiRequestPlan(provider, mappedModel, "", false, req.Stream, useUpstreamStream, false, c.GetHeader)
 	buildReq := func(ctx context.Context) (*http.Request, string, error) {
 		return gemininative.BuildRequest(ctx, geminiReq, plan)
 	}
@@ -231,7 +234,7 @@ func (s *Gemini) Forward(ctx context.Context, output Output, provider *gatewaypr
 					upstreamReqID = resp.Header.Get("x-goog-request-id")
 				}
 				if decision.Policy == providercore.ErrorPolicyCustomSkipped || decision.Policy == providercore.ErrorPolicyPoolBypassed {
-					if failoverErr := s.skippedErrorPolicyFailoverError(c, provider, resp.StatusCode, respBody, upstreamReqID); failoverErr != nil {
+					if failoverErr := s.skippedErrorPolicyFailoverError(c, provider, resp.StatusCode, resp.Header, respBody, upstreamReqID); failoverErr != nil {
 						return nil, failoverErr
 					}
 					if decision.Policy == providercore.ErrorPolicyCustomSkipped {
@@ -246,7 +249,7 @@ func (s *Gemini) Forward(ctx context.Context, output Output, provider *gatewaypr
 					return nil, c.GeminiMappedError(provider, http.StatusInternalServerError, upstreamReqID, genericBody)
 				}
 				msg400 := strings.ToLower(strings.TrimSpace(upstream.ExtractErrorMessage(respBody)))
-				googleConfigError := resp.StatusCode == http.StatusBadRequest && upstream.IsGoogleProjectConfigError(msg400)
+				googleConfigError := isGoogleAccount(provider) && resp.StatusCode == http.StatusBadRequest && upstream.IsGoogleProjectConfigError(msg400)
 				defaultFailover := googleConfigError || s.shouldFailoverGeminiUpstreamError(resp.StatusCode)
 				if decision.ShouldFailover(gatewayprovider.ExecutionErrorPolicy(provider), resp.StatusCode, defaultFailover) {
 					upstreamMsg := strings.TrimSpace(upstream.ExtractErrorMessage(respBody))
@@ -273,9 +276,11 @@ func (s *Gemini) Forward(ctx context.Context, output Output, provider *gatewaypr
 						log.Printf("[Gemini] status=400 google_config_error failover=true upstream_message=%q provider=%d", upstreamMsg, provider.Record.ID)
 					}
 					return nil, &forwardcore.UpstreamFailoverError{
-						StatusCode: resp.StatusCode,
-
-						ResponseBody: respBody,
+						Platform:               provider.Record.Platform,
+						StatusCode:             resp.StatusCode,
+						ResponseHeaders:        resp.Header.Clone(),
+						SameProviderRetryDelay: relayRetryDelay(provider, resp.Header),
+						ResponseBody:           respBody,
 
 						RetryableOnSameProvider: decision.RetryableOnSameProvider(gatewayprovider.ExecutionErrorPolicy(provider), resp.StatusCode),
 					}
@@ -382,7 +387,7 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 
 	// Resolve the group-mapped model through provider mappings for every
 	// credential type.
-	mappedModel := providercore.ResolveForwardMappedModel(gatewayprovider.ExecutionRecord(provider), originalModel, provideradapter.ModelDefaults())
+	mappedModel := gatewayprovider.ExecutionModelPolicy(provider).UpstreamModel(ctx, originalModel)
 	attributes, err := gatewayprovider.ResolveModelAttributes(ctx, provider, mappedModel, s.Attributes, "gemini_generate_content")
 	if err != nil {
 		return nil, err
@@ -414,7 +419,7 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 	default:
 		return nil, c.GoogleError(http.StatusBadGateway, "Unsupported provider type: "+provider.Record.Type)
 	}
-	plan := s.geminiRequestPlan(provider, mappedModel, upstreamAction, true, stream, useUpstreamStream, forceAIStudio)
+	plan := s.geminiRequestPlan(provider, mappedModel, upstreamAction, true, stream, useUpstreamStream, forceAIStudio, c.GetHeader)
 	buildReq := func(ctx context.Context) (*http.Request, string, error) {
 		return gemininative.BuildRequest(ctx, body, plan)
 	}
@@ -425,7 +430,7 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 	options.Do = func(req *http.Request) (*http.Response, error) {
 		return s.Transport.Do(req, proxyURL, provider.Record.ID, provider.Record.Concurrency)
 	}
-	options.CountFallback = action == "countTokens"
+	options.CountFallback = action == "countTokens" && isGoogleAccount(provider)
 	options.EstimateCount = func() int { return gemininative.EstimateGeminiCountTokens(body) }
 	var requestID string
 	var compatibilityResult *forwardcore.MessagesResult
@@ -477,7 +482,7 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 
 				decision := s.applyGeminiUpstreamErrorPolicy(ctx, provider, resp.StatusCode, resp.Header, respBody, mappedModel)
 				if decision.Policy == providercore.ErrorPolicyCustomSkipped || decision.Policy == providercore.ErrorPolicyPoolBypassed {
-					if failoverErr := s.skippedErrorPolicyFailoverError(c, provider, resp.StatusCode, respBody, requestID); failoverErr != nil {
+					if failoverErr := s.skippedErrorPolicyFailoverError(c, provider, resp.StatusCode, resp.Header, respBody, requestID); failoverErr != nil {
 						return nil, failoverErr
 					}
 					if decision.Policy == providercore.ErrorPolicyCustomSkipped {
@@ -492,7 +497,7 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 					return nil, fmt.Errorf("gemini upstream error: %d (not in custom error codes)", resp.StatusCode)
 				}
 				msg400 := strings.ToLower(strings.TrimSpace(upstream.ExtractErrorMessage(respBody)))
-				googleConfigError := resp.StatusCode == http.StatusBadRequest && upstream.IsGoogleProjectConfigError(msg400)
+				googleConfigError := isGoogleAccount(provider) && resp.StatusCode == http.StatusBadRequest && upstream.IsGoogleProjectConfigError(msg400)
 				defaultFailover := googleConfigError || s.shouldFailoverGeminiUpstreamError(resp.StatusCode)
 				if decision.ShouldFailover(gatewayprovider.ExecutionErrorPolicy(provider), resp.StatusCode, defaultFailover) {
 					evBody := gemininative.UnwrapIfNeeded(isOAuth, respBody)
@@ -520,9 +525,11 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 						log.Printf("[Gemini] status=400 google_config_error failover=true upstream_message=%q provider=%d", upstreamMsg, provider.Record.ID)
 					}
 					return nil, &forwardcore.UpstreamFailoverError{
-						StatusCode: resp.StatusCode,
-
-						ResponseBody: evBody,
+						Platform:               provider.Record.Platform,
+						StatusCode:             resp.StatusCode,
+						ResponseHeaders:        resp.Header.Clone(),
+						SameProviderRetryDelay: relayRetryDelay(provider, resp.Header),
+						ResponseBody:           evBody,
 
 						RetryableOnSameProvider: decision.RetryableOnSameProvider(gatewayprovider.ExecutionErrorPolicy(provider), resp.StatusCode),
 					}
@@ -586,7 +593,10 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 
 // checkErrorPolicyInLoop inspects failures before another Gemini retry and
 // returns a readable response body afterward. Success statuses and missing
-// Health return the original response unchanged.
+// Health return the original response unchanged. Providers other than Google
+// accounts also keep ordinary responses unchanged unless pool or custom-code
+// policy needs evaluation; their final shared health observer orders
+// Retry-After before temporary rules.
 //
 // For inspected failures, captured bytes replace the closed source reader and
 // headers are cloned into the replacement response. A temporary rule adds the
@@ -596,7 +606,7 @@ func (s *Gemini) ForwardNative(ctx context.Context, output Output, provider *gat
 func (s *Gemini) checkErrorPolicyInLoop(
 	ctx context.Context, provider *gatewayprovider.ExecutionProvider, resp *http.Response, mappedModel string,
 ) (matched bool, rebuilt *http.Response) {
-	if resp.StatusCode < 400 || s.Health == nil {
+	if resp.StatusCode < 400 || s.Health == nil || (!isGoogleAccount(provider) && !provider.View().IsPoolMode() && !provider.View().IsCustomErrorCodesEnabled()) {
 		return false, resp
 	}
 	// Retain the inspected prefix before closing the network reader, then
@@ -663,7 +673,7 @@ func (s *Gemini) shouldFailoverGeminiUpstreamError(statusCode int) bool {
 // qualifies despite skipped health handling. Other statuses return nil; pool
 // mode supplies same-provider replay permission only for configured retryable
 // statuses.
-func (s *Gemini) skippedErrorPolicyFailoverError(c *attempt, provider *gatewayprovider.ExecutionProvider, statusCode int, respBody []byte, upstreamRequestID string) *forwardcore.UpstreamFailoverError {
+func (s *Gemini) skippedErrorPolicyFailoverError(c *attempt, provider *gatewayprovider.ExecutionProvider, statusCode int, headers http.Header, respBody []byte, upstreamRequestID string) *forwardcore.UpstreamFailoverError {
 	if !s.shouldFailoverGeminiUpstreamError(statusCode) {
 		return nil
 	}
@@ -679,9 +689,11 @@ func (s *Gemini) skippedErrorPolicyFailoverError(c *attempt, provider *gatewaypr
 		Detail:             s.upstreamErrorDetail(respBody),
 	})
 	return &forwardcore.UpstreamFailoverError{
-		StatusCode: statusCode,
-
-		ResponseBody: respBody,
+		Platform:               provider.Record.Platform,
+		StatusCode:             statusCode,
+		ResponseHeaders:        headers.Clone(),
+		SameProviderRetryDelay: relayRetryDelay(provider, headers),
+		ResponseBody:           respBody,
 
 		RetryableOnSameProvider: provider.View().IsPoolMode() && provider.View().IsPoolModeRetryableStatus(statusCode),
 	}
@@ -764,6 +776,12 @@ func (s *Gemini) applyGeminiUpstreamErrorPolicy(
 		decision.StopScheduling = true
 		return decision
 	}
+	if !isGoogleAccount(provider) && s.Health != nil {
+		// Shared provider health owns quota and retry evidence for providers that
+		// only borrow the Gemini encoding. Return its decision directly so Google
+		// quota observation cannot write a second deadline for this attempt.
+		return s.Health.ApplyUpstreamError(ctx, gatewayprovider.ExecutionRecord(provider), gatewayprovider.HealthObservationFromContext(ctx, statusCode, headers, body, nil))
+	}
 	if s.Health != nil {
 		decision.Policy = s.Health.ApplyExplicitErrorPolicy(ctx, gatewayprovider.ExecutionRecord(provider), gatewayprovider.HealthObservationFromContext(ctx, statusCode, nil, body, []string{mappedModel}))
 		decision.StopScheduling = decision.Policy == providercore.ErrorPolicyCustomMatched || decision.Policy == providercore.ErrorPolicyTempUnscheduled
@@ -831,8 +849,42 @@ func (s *Gemini) extractImageInputSize(body []byte) string {
 // decisions.
 func (s *Gemini) observeHealth(ctx context.Context, target *gatewayprovider.ExecutionProvider, status int, headers http.Header, body []byte) {
 	record := gatewayprovider.ExecutionRecord(target)
-	updated := s.Errors.Observe(ctx, record, status, headers, body, gatewayprovider.HealthObservationFromContext(ctx, status, headers, body, nil))
+	observation := gatewayprovider.HealthObservationFromContext(ctx, status, headers, body, nil)
+	// Google quota classification applies only to Google accounts. A relay that
+	// borrows the Gemini encoding records Retry-After and administrator rules
+	// through shared provider health instead.
+	if target != nil && !isGoogleAccount(target) {
+		if s.Health != nil {
+			s.Health.ApplyUpstreamError(ctx, record, observation)
+		}
+		return
+	}
+	updated := s.Errors.Observe(ctx, record, status, headers, body, observation)
 	if target != nil && updated != nil {
 		target.Record.Credentials, target.Record.Extra = updated.Credentials, updated.Extra
 	}
+}
+
+// isGoogleAccount reports whether the target is a Google Gemini account, whose
+// project-configuration failover, count fallback, quota observation, and local
+// retry rules apply. A compatible relay that routes a model through Gemini
+// encoding borrows only the wire format and uses shared provider policy.
+func isGoogleAccount(value *gatewayprovider.ExecutionProvider) bool {
+	return value.Record.Platform == capability.PlatformGemini
+}
+
+// relayRetryDelay returns the same-provider wait a relay requests through
+// Retry-After, capped at maxRelayRetryDelay so one response cannot hold a
+// pooled request open for the provider's whole cooldown. Google accounts and
+// responses without a future deadline return zero, keeping shared retry timing.
+func relayRetryDelay(value *gatewayprovider.ExecutionProvider, headers http.Header) time.Duration {
+	if value == nil || isGoogleAccount(value) {
+		return 0
+	}
+	now := time.Now()
+	reset := upstream.RetryAfterResetTime(headers, now)
+	if reset == nil {
+		return 0
+	}
+	return min(reset.Sub(now), maxRelayRetryDelay)
 }

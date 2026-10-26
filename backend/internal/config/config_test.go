@@ -787,15 +787,32 @@ func TestLoadDefaultIdempotencyConfig(t *testing.T) {
 	}
 }
 
-// TestLoadDefaultBatchImageQueueDisabled reads batch worker queue settings
-// after default loading. The queue flag must remain false, protecting the
-// deployment default that leaves that queue disabled.
-func TestLoadDefaultBatchImageQueueDisabled(t *testing.T) {
-	resetViperWithJWTSecret(t)
-
-	cfg, err := Load()
-	require.NoError(t, err)
-	require.False(t, cfg.BatchImage.QueueEnabled)
+// TestLoadBatchImageRetiredSettings supplies obsolete flags and unused limits
+// through both supported configuration sources. Loading ignores those values
+// while retaining the active queue defaults and validating configured Vertex storage.
+func TestLoadBatchImageRetiredSettings(t *testing.T) {
+	for _, enabled := range []string{"false", "true"} {
+		t.Run(enabled, func(t *testing.T) {
+			resetViperWithJWTSecret(t)
+			configFile := filepath.Join(t.TempDir(), "config.yaml")
+			content := "batch_image:\n  enabled: " + enabled + "\n  queue_enabled: " + enabled + "\n  vertex_enabled: " + enabled + "\n  max_items_per_job_trial: -1\n  output_retention_max_days: -1\n  idempotency_key_prefix: unused\n  vertex_input_retention_hours: -1\n  vertex_output_retention_hours: -1\n"
+			require.NoError(t, os.WriteFile(configFile, []byte(content), 0o600))
+			t.Setenv("CONFIG_FILE", configFile)
+			t.Setenv("BATCH_IMAGE_ENABLED", enabled)
+			t.Setenv("BATCH_IMAGE_QUEUE_ENABLED", enabled)
+			t.Setenv("BATCH_IMAGE_VERTEX_ENABLED", enabled)
+			cfg, err := Load()
+			require.NoError(t, err)
+			require.NotEmpty(t, cfg.BatchImage.QueueReadyKey)
+			require.Positive(t, cfg.BatchImage.JobLockTTLSeconds)
+			require.Empty(t, cfg.BatchImage.VertexManagedGCSBucket)
+			cfg.BatchImage.VertexManagedGCSBucket = "gs://invalid-bucket"
+			require.ErrorContains(t, cfg.Validate(), "batch_image.vertex_managed_gcs_bucket")
+			cfg.BatchImage.VertexManagedGCSBucket = "managed-bucket"
+			cfg.BatchImage.VertexManagedGCSPrefix = "shared-prefix"
+			require.ErrorContains(t, cfg.Validate(), "batch_image.vertex_managed_gcs_prefix")
+		})
+	}
 }
 
 // TestLoadIdempotencyConfigFromEnv overrides missing-key observation and

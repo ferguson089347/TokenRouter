@@ -88,7 +88,10 @@ type Result struct {
 	// response identifier.
 	RequestID, ResponseID string
 	Headers               http.Header       // borrowed upstream response headers
-	Usage                 wire.ForwardUsage // observed token quantities
+	Usage                 wire.ForwardUsage // inclusive OpenAI token quantities
+	// NativeUsage holds normalized uncached input and cache buckets from Messages.
+	// Completion prefers these complete observations, including cache TTL and speed.
+	NativeUsage *protocol.TokenUsage
 	// Model is the client response model; BillingModel is the charge model;
 	// UpstreamModel is the request model; UpstreamResponseServiceTier is the
 	// vendor-observed tier.

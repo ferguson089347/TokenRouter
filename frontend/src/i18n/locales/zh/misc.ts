@@ -709,6 +709,9 @@ export default {
       INVALID_STATUS: '当前订单状态不允许此操作',
       BALANCE_NOT_ENOUGH: '退款金额超过余额',
       REFUND_AMOUNT_EXCEEDED: '退款金额超过充值金额',
+      REFUND_RECOVERY_REQUIRED:
+        '退款结果尚未确认，请先在支付平台核实，再处理本地记录。请勿再次提交退款。',
+      REFUND_QUERY_UNSUPPORTED: '此支付渠道不支持退款状态查询，请在支付平台后台核实退款结果。',
       REFUND_FAILED: '退款失败',
       BILLING_INFO_REQUIRED: '请填写账单信息',
       BILLING_NAME_REQUIRED: '请填写账单抬头',
@@ -869,6 +872,7 @@ export default {
       groupId: '分组 ID',
       planGroups: '适用分组',
       planGroupsGlobalHint: '不选择分组时，该套餐适用于所有分组',
+      planGroupsRemoved: '已从套餐中移除 {count} 个已删除的分组，保存后生效。',
       subscriptionRateMultiplier: '订阅倍率',
       subscriptionRateMultiplierRequired: '所选分组的订阅倍率必须大于 0',
       features: '功能特性',

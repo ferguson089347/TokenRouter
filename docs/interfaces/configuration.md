@@ -81,6 +81,8 @@
 
 以下配置已经退役，加载器忽略它们，不做校验，也不影响运行：
 
+- `batch_image.enabled`、`batch_image.queue_enabled`、`batch_image.vertex_enabled` 及对应环境变量。批量图片按统一协议许可接受请求，后台任务自动运行；升级影响见[批量图片配置统一](../operations/upgrade_notes.md#batch_image_protocol_admission)。
+- `batch_image.max_items_per_job_trial`、`batch_image.output_retention_max_days`、`batch_image.idempotency_key_prefix`、`batch_image.vertex_input_retention_hours`、`batch_image.vertex_output_retention_hours` 及对应环境变量。作业输入、输出留存分别使用 `input_retention_after_terminal_hours` 和 `output_retention_after_terminal_hours`。
 - `subscription_maintenance.worker_count`、`subscription_maintenance.queue_size` 和对应的环境变量；订阅维护队列不会启动。
 - `gateway.openai_ws.fallback_cooldown_seconds` 和 `GATEWAY_OPENAI_WS_FALLBACK_COOLDOWN_SECONDS`；WS 请求失败时不会通过这个配置回退到 HTTP，重试退避、重试预算和连接池预热冷却各有自己的配置。
 - `pricing.hash_url`、`pricing.update_interval_hours`。
@@ -98,7 +100,9 @@
 
 创作台（Creative Studio）属于启动时的进程配置 `creative`：功能和队列开关、临时数据 TTL（`transient_ttl_seconds`，默认 1800 秒）、上传和 prompt 限制（`max_asset_bytes` 默认 32 MiB，`max_total_input_bytes` 默认 64 MiB 且不小于单文件上限，`max_prompt_chars` 默认 8000）、上游执行参数（`execute_timeout_seconds`、`max_execute_attempts`），以及 `creative:queue:*` 的队列键和 TTL，都在启动时校验，修改后需要重启。
 
-创作台每个任务固定生成一张图片，预占价格按所选尺寸的单价计算。和 `batch_image` 不同，创作台的 `enabled` 和 `queue_enabled` 默认开启；临时存储和队列依赖 Redis，Redis 不可用时拒绝创建任务。完整的键清单见 `deploy/config.example.yaml` 和[创作台](../domains/creative_studio.md)。
+创作台每个任务固定生成一张图片，预占价格按所选尺寸的单价计算。创作台的 `enabled` 和 `queue_enabled` 默认开启；临时存储和队列依赖 Redis，Redis 不可用时拒绝创建任务。完整的键清单见 `deploy/config.example.yaml` 和[创作台](../domains/creative_studio.md)。
+
+批量图片的请求准入由分组和提供商统一协议配置控制，worker、恢复和清理随应用启动。`batch_image` 保留请求、下载、留存、队列和 Vertex 存储参数；未配置 GCS 存储桶时，Vertex 不参与新建作业选择。填写存储桶后，启动时校验名称、区域和作业前缀。
 
 两类任务的生产核心，由 app 在构造时传入各自固定的 Options，配置来源相同，业务核心不读取完整的 config。批量图片的 provider registry 同时用于提交、轮询、下载和清理。任务运行时停止后无法再次启动；动态扩容创作 worker 也不会重新打开已经停止的运行时。
 

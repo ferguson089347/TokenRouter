@@ -280,6 +280,7 @@ backend/
 │   │   ├── jev/                                          Jev SystemOne 单次上游请求
 │   │   ├── kimi/                                        Kimi 模型、用量及错误识别
 │   │   ├── ollama/                                      Ollama Cloud 会话用量与兼容请求
+│   │   ├── opencode/                                    OpenCode 认证、会话头和 Go 用量查询
 │   │   ├── openai/                                      OpenAI/Codex 认证、请求、媒体与连接资源
 │   │   │   ├── liveattestation/                         Darwin 本机认证，其他平台返回不支持
 │   │   │   └── ws/                                      Responses 握手、连接池与参数更新

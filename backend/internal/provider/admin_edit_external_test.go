@@ -274,11 +274,11 @@ func TestAdminServiceBulkUpdateProvidersRejectsForcedTextRouteWithoutWorkload(t 
 	require.Empty(t, repo.bulkUpdateIDs)
 }
 
-// TestAdminServiceBulkUpdateProvidersRejectsInvalidCNProviderCombination
+// TestAdminServiceBulkUpdateProvidersRejectsInvalidKimiZhipuDeepSeekCombination
 // changes DeepSeek from payg to coding mode in a credential batch. Validation
 // rejects that platform/mode combination before the fixture records any bulk
 // write.
-func TestAdminServiceBulkUpdateProvidersRejectsInvalidCNProviderCombination(t *testing.T) {
+func TestAdminServiceBulkUpdateProvidersRejectsInvalidKimiZhipuDeepSeekCombination(t *testing.T) {
 	repo := &providerRepoStubForBulkUpdate{
 		getByIDsProviders: []*providercore.Record{{
 			ID:       9,
@@ -591,14 +591,14 @@ func TestBulkResponsesWSConnectionModeValidation(t *testing.T) {
 	}
 }
 
-// TestCNProviderBulkProtocolValidationBeforeWrite requests Responses for Kimi
-// and Zhipu in one batch. Validation rejects Zhipu's unsupported protocol
+// TestKimiZhipuDeepSeekBulkProtocolValidationBeforeWrite requests Responses for
+// Kimi and Zhipu in one batch. Validation rejects Zhipu's unsupported protocol
 // before storage and retains each source's legacy adaptive selection.
-func TestCNProviderBulkProtocolValidationBeforeWrite(t *testing.T) {
+func TestKimiZhipuDeepSeekBulkProtocolValidationBeforeWrite(t *testing.T) {
 	t.Parallel()
 	repo := &providerServiceTestRepo{providers: map[int64]*providercore.Record{
-		1: {ID: 1, Platform: capability.PlatformKimi, Type: capability.ProviderTypeAPIKey, Credentials: cnProviderTestCredentials(capability.PlatformKimi, providercore.ProviderModePayG, providercore.APIProtocolAdaptive)},
-		2: {ID: 2, Platform: capability.PlatformZhipu, Type: capability.ProviderTypeAPIKey, Credentials: cnProviderTestCredentials(capability.PlatformZhipu, providercore.ProviderModePayG, providercore.APIProtocolAdaptive)},
+		1: {ID: 1, Platform: capability.PlatformKimi, Type: capability.ProviderTypeAPIKey, Credentials: textAPIKeyTestCredentials(capability.PlatformKimi, providercore.ProviderModePayG, providercore.APIProtocolAdaptive)},
+		2: {ID: 2, Platform: capability.PlatformZhipu, Type: capability.ProviderTypeAPIKey, Credentials: textAPIKeyTestCredentials(capability.PlatformZhipu, providercore.ProviderModePayG, providercore.APIProtocolAdaptive)},
 	}}
 	svc := newProviderEditorForTest(repo)
 	_, err := svc.BulkUpdateProviders(context.Background(), &providercore.BulkUpdateProvidersInput{

@@ -80,7 +80,7 @@ func TransformRequest(ctx context.Context, prepared *Prelude, profile Profile, p
 	reqModel, promptCacheKey := requestView.Model, requestView.PromptCacheKey
 	canonicalImageIntentBody := prepared.CanonicalImageIntentBody
 	codexImageGenerationExplicitToolPolicy := prepared.ImageToolPolicy
-	isCodexCLI, compactPath, compatMessagesBridge, nativeCNResponses := prepared.CodexCLI, prepared.Compact, prepared.MessagesBridge, profile.NativeCN
+	isCodexCLI, compactPath, compatMessagesBridge, statelessResponses := prepared.CodexCLI, prepared.Compact, prepared.MessagesBridge, profile.StatelessResponses
 	wsDecision := prepared.Transport
 	bodyModified := false
 	clientPromptCacheKey := promptCacheKey
@@ -181,9 +181,9 @@ func TransformRequest(ctx context.Context, prepared *Prelude, profile Profile, p
 	instructions := gjson.GetBytes(body, "instructions")
 	instructionsEmpty := !instructions.Exists() || instructions.Type != gjson.String || strings.TrimSpace(instructions.String()) == ""
 	// Synthesize missing usable instructions for this Codex route before queued
-	// edits are adopted; Messages bridges and native CN requests use their own
-	// instruction preparation.
-	if instructionsEmpty && profile.UsesCodex && !compatMessagesBridge && !nativeCNResponses {
+	// edits are adopted; Messages bridges and Kimi and DeepSeek requests use
+	// their own instruction preparation.
+	if instructionsEmpty && profile.UsesCodex && !compatMessagesBridge && !statelessResponses {
 		markPatchSet("instructions", openai.DefaultCodexSynthInstructions(reqModel))
 	}
 
@@ -421,12 +421,12 @@ func TransformRequest(ctx context.Context, prepared *Prelude, profile Profile, p
 
 	if !isCodexCLI {
 		maxOutputTokens := gjson.GetBytes(body, "max_output_tokens")
-		// Translate the Responses output cap for Anthropic, retain it for OpenAI and
-		// DeepSeek, and remove it on other platform routes before final
+		// Translate the Responses output cap for Anthropic, retain it for OpenAI,
+		// DeepSeek, and OpenCode, and remove it on other platform routes before final
 		// serialization.
 		if maxOutputTokens.Exists() {
 			switch profile.Platform {
-			case "openai", "deepseek":
+			case "openai", "deepseek", "opencode":
 				// Send the Responses output limit first; bounded HTTP retries remove it if the upstream rejects it.
 			case "anthropic":
 				decoded, decodeErr := ensureReqBody()
@@ -470,10 +470,9 @@ func TransformRequest(ctx context.Context, prepared *Prelude, profile Profile, p
 			}
 		}
 	}
-	// Continuation references remain for WSv2 and OpenAI API Key execution; other
-	// selected compatibility paths drop that server-side reference while retaining
-	// the supplied input bytes.
-	if wsDecision.Transport != "responses_websockets_v2" && (!profile.OpenAI || !profile.APIKey) && gjson.GetBytes(body, "previous_response_id").Exists() {
+	// Native HTTP continuation and WSv2 retain their upstream response reference.
+	// Converted and stateless compatibility routes rely on the supplied input history.
+	if wsDecision.Transport != "responses_websockets_v2" && !profile.HTTPContinuation && gjson.GetBytes(body, "previous_response_id").Exists() {
 		markPatchDelete("previous_response_id")
 	}
 	// Remove empty image placeholders on the decoded path before tier resolution;

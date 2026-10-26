@@ -2494,13 +2494,13 @@ func newHTTPReadersFixture(repo settings.Repository, _ *responsesFixtureOptions)
 
 // newHTTPHealthFixture passes store/cache/readers into the shared health
 // observer constructor. Optional fixture configuration replaces unauthorized,
-// overload and CN cooldown values in the supplied health options; other option
-// values stay supplied for that observer.
+// overload and Kimi, Zhipu, and DeepSeek cooldown values in the supplied health
+// options; other option values stay supplied for that observer.
 func newHTTPHealthFixture(store gatewayprovider.ExecutionProviderStore, options *responsesFixtureOptions, cache providercore.TempUnschedCache, health providercore.HealthOptions, readers *gatewayprovider.RuntimeReaders) *provideradapter.UpstreamHealth {
 	if options != nil {
 		health.UnauthorizedCooldownMinutes = options.Health.UnauthorizedCooldownMinutes
 		health.OverloadMinutes = options.Health.OverloadMinutes
-		health.CNIntervalMinutes = options.Health.CNIntervalMinutes
+		health.UsageMonitorIntervalMinutes = options.Health.UsageMonitorIntervalMinutes
 	}
 	return gatewaytestkit.NewHealthObserver(gatewaytestkit.HealthInput{Store: store, Cache: cache, Options: health, Readers: readers})
 }

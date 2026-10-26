@@ -50,6 +50,9 @@ type (
 	// behavior for one request.
 	RequestPlan struct {
 		Mode CredentialMode // selected upstream credential family
+		// ApplyHeaders runs after protocol authentication. Compatible providers use
+		// it to install their required authentication and client conversation headers.
+		ApplyHeaders func(http.Header)
 		// Model identifies the upstream model; Action selects its API operation.
 		Model, Action string
 		// Native retains Action and UpstreamStream directly. Compatibility uses
@@ -179,6 +182,9 @@ func BuildRequest(ctx context.Context, body []byte, plan RequestPlan) (*http.Req
 	}
 	if wrapped {
 		req.Header.Set("User-Agent", codeassist.GeminiCLIUserAgent)
+	}
+	if plan.ApplyHeaders != nil {
+		plan.ApplyHeaders(req.Header)
 	}
 	return req, "x-request-id", nil
 }

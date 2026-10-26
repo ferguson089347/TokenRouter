@@ -83,7 +83,7 @@ func (s *Admin) UpdateProvider(ctx context.Context, id int64, input *UpdateProvi
 		input = &copy
 	}
 	var computeResetAt, normalizeWindowAt *time.Time
-	previousCNUsageIdentity := CNUsageMonitorIdentityFingerprint(provider)
+	previousUsageMonitorIdentity := UsageMonitorIdentityFingerprint(provider)
 	originalQoderSite, originalQoderSiteErr := s.options.Credentials.Site(provider)
 	originalQoderPAT := strings.TrimSpace(provider.GetCredential("pat"))
 	normalizedExtra, shouldReplaceExtra := NormalizeDeprecatedProviderExtraUpdate(input.Extra)
@@ -204,7 +204,7 @@ func (s *Admin) UpdateProvider(ctx context.Context, id int64, input *UpdateProvi
 		delete(normalizedExtra, OllamaCloudUsageSessionExtraKey)
 		delete(normalizedExtra, OllamaCloudUsageAutoRefreshExtraKey)
 		delete(normalizedExtra, OllamaCloudUsageSnapshotExtraKey)
-		delete(normalizedExtra, CNUsageMonitorSnapshotExtraKey)
+		delete(normalizedExtra, UsageMonitorSnapshotExtraKey)
 		// Retain the initial managed observations for prospective validation.
 		// The configuration writer later substitutes the latest billing and
 		// maintenance values under lock.
@@ -220,7 +220,7 @@ func (s *Admin) UpdateProvider(ctx context.Context, id int64, input *UpdateProvi
 			OllamaCloudUsageSessionExtraKey,
 			OllamaCloudUsageAutoRefreshExtraKey,
 			OllamaCloudUsageSnapshotExtraKey,
-			CNUsageMonitorSnapshotExtraKey,
+			UsageMonitorSnapshotExtraKey,
 		} {
 			if v, ok := provider.Extra[key]; ok {
 				normalizedExtra[key] = v
@@ -290,7 +290,7 @@ func (s *Admin) UpdateProvider(ctx context.Context, id int64, input *UpdateProvi
 	// unified set, so saved modern fields cannot override an older client's
 	// requested protocol change.
 	ApplyLegacyProtocolPatch(provider, input.Credentials, input.Extra)
-	if err := NormalizeCNProviderCredentials(provider, false); err != nil {
+	if err := NormalizeTextEndpointCredentials(provider, false); err != nil {
 		return nil, err
 	}
 	if err := NormalizeOpenAIAPIKeyConfiguration(provider); err != nil {
@@ -377,11 +377,11 @@ func (s *Admin) UpdateProvider(ctx context.Context, id int64, input *UpdateProvi
 		}
 	}
 	s.attachProxyForValidation(ctx, provider)
-	// CN monitor observations belong to one usage identity. A credential or
+	// usage monitor observations belong to one usage identity. A credential or
 	// configuration identity change invalidates that snapshot before
 	// prospective validation.
-	if previousCNUsageIdentity != CNUsageMonitorIdentityFingerprint(provider) && provider.Extra != nil {
-		delete(provider.Extra, CNUsageMonitorSnapshotExtraKey)
+	if previousUsageMonitorIdentity != UsageMonitorIdentityFingerprint(provider) && provider.Extra != nil {
+		delete(provider.Extra, UsageMonitorSnapshotExtraKey)
 	}
 	if err := s.options.Credentials.ValidateEdit(ctx, provider, deferQoderPATValidation); err != nil {
 		return nil, err
@@ -468,7 +468,7 @@ func (s *Admin) UpdateProviderExtra(ctx context.Context, id int64, updates map[s
 	delete(updates, OllamaCloudUsageSessionExtraKey)
 	delete(updates, OllamaCloudUsageAutoRefreshExtraKey)
 	delete(updates, OllamaCloudUsageSnapshotExtraKey)
-	delete(updates, CNUsageMonitorSnapshotExtraKey)
+	delete(updates, UsageMonitorSnapshotExtraKey)
 	if HasOpenAIConfigurationPatch(nil, updates) {
 		provider, err := s.providerRepo.GetByID(ctx, id)
 		if err != nil {
@@ -537,7 +537,7 @@ func (s *Admin) BulkUpdateProviders(ctx context.Context, input *BulkUpdateProvid
 	delete(input.Extra, OllamaCloudUsageSessionExtraKey)
 	delete(input.Extra, OllamaCloudUsageAutoRefreshExtraKey)
 	delete(input.Extra, OllamaCloudUsageSnapshotExtraKey)
-	delete(input.Extra, CNUsageMonitorSnapshotExtraKey)
+	delete(input.Extra, UsageMonitorSnapshotExtraKey)
 
 	if len(input.ProviderIDs) == 0 && input.Filters != nil {
 		providerIDs, err := s.resolveBulkUpdateTargetIDs(ctx, input.Filters)
@@ -680,7 +680,7 @@ func (s *Admin) BulkUpdateProviders(ctx context.Context, input *BulkUpdateProvid
 				prospective.Credentials = make(map[string]any, len(input.Credentials))
 			}
 			maps.Copy(prospective.Credentials, input.Credentials)
-			if err := NormalizeCNProviderCredentials(&prospective, false); err != nil {
+			if err := NormalizeTextEndpointCredentials(&prospective, false); err != nil {
 				return nil, err
 			}
 			prospective.Extra = maps.Clone(provider.Extra)

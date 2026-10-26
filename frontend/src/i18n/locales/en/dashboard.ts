@@ -66,8 +66,6 @@ export default {
     quickActions: 'Quick Actions',
     createApiKey: 'Create API Key',
     generateNewKey: 'Generate a new API key',
-    batchImageAgent: 'Batch Image Assistant',
-    batchImageAgentDesc: 'Copy instructions for an agent',
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
     purchasePlanOrRecharge: 'Purchase a plan or add balance',

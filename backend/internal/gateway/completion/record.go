@@ -129,13 +129,16 @@ func (s *Recorder) RecordAnthropic(ctx context.Context, input *Input, opts *Pric
 		s.applyProviderStatsCost(ctx, usageLog,
 			provider.ID, *apiKey.GroupID, result.UpstreamModel, requestedModel, input.GroupMappedModel,
 			// Native input excludes both cache buckets, so statistics receive those buckets
-			// separately; OpenAI recording constructs the analogous disjoint ordinary input.
+			// separately, including cache-write lifetimes for distinct provider statistics
+			// rates; OpenAI recording constructs the analogous disjoint ordinary input.
 			UsageTokens{
-				InputTokens:         result.Usage.InputTokens,
-				OutputTokens:        result.Usage.OutputTokens,
-				CacheCreationTokens: result.Usage.CacheCreationInputTokens,
-				CacheReadTokens:     result.Usage.CacheReadInputTokens,
-				ImageOutputTokens:   result.Usage.ImageOutputTokens,
+				InputTokens:           result.Usage.InputTokens,
+				OutputTokens:          result.Usage.OutputTokens,
+				CacheCreationTokens:   result.Usage.CacheCreationInputTokens,
+				CacheCreation5mTokens: result.Usage.CacheCreation5mTokens,
+				CacheCreation1hTokens: result.Usage.CacheCreation1hTokens,
+				CacheReadTokens:       result.Usage.CacheReadInputTokens,
+				ImageOutputTokens:     result.Usage.ImageOutputTokens,
 			},
 		)
 	}
@@ -297,7 +300,7 @@ func (s *Recorder) RecordOpenAI(ctx context.Context, input *Input) error {
 	if result == nil {
 		return errors.New("openai usage result is nil")
 	}
-	if s.health != nil && input.Provider != nil && (input.Provider.OpenAI || input.Provider.CNProvider) {
+	if s.health != nil && input.Provider != nil && input.Provider.ResetForbiddenCounterOnSuccess {
 		s.health.ResetOpenAI403Counter(ctx, input.Provider.ID)
 	}
 	apiKey, user, provider, subscription := s.keyWithBillingSettings(ctx, input.APIKey), input.User, input.Provider, input.Subscription
@@ -357,7 +360,7 @@ func (s *Recorder) RecordOpenAI(ctx context.Context, input *Input) error {
 	var err error
 	billingModel := OpenAIUsageBillingModel(result, input.PricingUsageFields)
 	billingModels := s.models.Candidates(billingModel, result.BillingModel, input.GroupMappedModel, input.OriginalModel, result.UpstreamModel, result.Model)
-	billingModels = s.FilterCNProviderBillingModelCandidates(ctx, provider, apiKey, billingModels)
+	billingModels = s.FilterCompatibleClaudeBillingCandidates(ctx, provider, apiKey, billingModels)
 	serviceTier := ""
 	if result.ServiceTier != nil {
 		serviceTier = strings.TrimSpace(*result.ServiceTier)

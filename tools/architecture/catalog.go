@@ -130,7 +130,7 @@ internal/routing/httpapi/dto internal/routing/modelmap internal/scheduler intern
 internal/server/httpx internal/settings internal/upstream internal/upstream/anthropic
 internal/upstream/anthropic/oauth internal/upstream/antigravity internal/upstream/bedrock
 internal/upstream/deepseek internal/upstream/gemini internal/upstream/gemini/codeassist
-internal/upstream/grok internal/upstream/jev internal/upstream/kimi internal/upstream/ollama internal/upstream/openai
+internal/upstream/grok internal/upstream/jev internal/upstream/kimi internal/upstream/ollama internal/upstream/opencode internal/upstream/openai
 internal/upstream/qoder internal/upstream/usagecontract internal/upstream/usageprovider
 internal/upstream/usageview internal/upstream/vertex internal/upstream/zhipu internal/usage`, Tests: `internal/modelcatalog/testkit internal/config internal/gateway internal/gateway/forward internal/gateway/media
 internal/gateway/provider/modelidentity internal/gateway/requeststate internal/gateway/session
@@ -187,7 +187,7 @@ internal/routing/modelmap internal/scheduler internal/scheduler/policy internal/
 internal/search internal/search/contract internal/server/clientip internal/server/httpx
 internal/settings internal/upstream internal/upstream/anthropic internal/upstream/antigravity
 internal/upstream/bedrock internal/upstream/gemini internal/upstream/gemini/codeassist
-internal/upstream/grok internal/upstream/jev internal/upstream/ollama internal/upstream/openai
+internal/upstream/grok internal/upstream/jev internal/upstream/ollama internal/upstream/opencode internal/upstream/openai
 internal/upstream/openai/liveattestation internal/upstream/openai/ws/... internal/upstream/qoder
 internal/upstream/vertex internal/usage`, Tests: `internal/modelcatalog/testkit internal/billing/provider internal/config internal/moderation/provider internal/routing/testkit
 internal/scheduler/rediscache/codec internal/search/provider internal/server/middleware
@@ -356,7 +356,8 @@ internal/routing/httpapi/dto internal/usage internal/usage/httpapi/dto`, Tests: 
 	}
 
 	platformDependencies = map[string]dependencySet{
-		"internal/upstream/jev": {Production: "internal/infra/httpclient/... internal/protocol internal/protocol/systemone internal/upstream internal/upstream/jev/...", Tests: ""},
+		"internal/upstream/opencode": {Production: "internal/upstream/opencode/... internal/upstream/internal/usageclient internal/upstream/usagecontract internal/upstream/usageview", Tests: ""},
+		"internal/upstream/jev":      {Production: "internal/infra/httpclient/... internal/protocol internal/protocol/systemone internal/upstream internal/upstream/jev/...", Tests: ""},
 		"internal/upstream/anthropic": {Production: `internal/gateway/clientmeta internal/infra/httpclient/... internal/infra/telemetry/... internal/pkg/
 internal/protocol internal/protocol/anthropic internal/routing/capability internal/routing/modelmap
 internal/upstream internal/upstream/anthropic/...`, Tests: "internal/testutil/rediscontainer"},

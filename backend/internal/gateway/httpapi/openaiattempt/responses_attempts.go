@@ -31,9 +31,9 @@ import (
 // their retry and completion outcomes.
 // Responses attempts retain canonical request input while providers, resource
 // callbacks, and observed results change through a serial text loop. A selected
-// HTTP continuation target needs API-key credentials; unsuitable credentials
-// return a skip result with their acquisition released, allowing another
-// provider to receive the intact continuation input.
+// HTTP continuation target needs eligible native Responses API-key credentials.
+// Unsuitable routes release acquired capacity and return a skip result; the
+// selector keeps an immutable continuation bound to its originating provider.
 //
 // Forwarding releases provider capacity before recording Cyber effects and
 // exposing its outcome. Adjusted output size distinguishes registered
@@ -148,11 +148,12 @@ type responsesAttemptBridge struct {
 // target is retained for acquisition, forwarding, scheduling observations, and
 // cleanup.
 //
-// HTTP previous_response_id requires an OpenAI API-key provider in this
-// adapter. Other selected credentials release any selection callback and return
-// a classified Skip outcome so the loop can try another provider with
-// continuation input intact. Eligible targets receive a retained pool-session
-// seed and selected-provider observations.
+// HTTP previous_response_id requires an eligible native Responses API-key
+// route. Other selected routes release any selection callback and return
+// a classified Skip outcome. Selection retains the originating provider for
+// immutable HTTP continuations, so a rejected binding cannot send its response
+// reference through another credential. Eligible targets receive a retained
+// pool-session seed and selected-provider observations.
 func (b *responsesAttemptBridge) Select(excluded map[int64]struct{}) (textflow.ResponseSelection, error) {
 	b.reqLog.Debug("openai.provider_selecting", zap.Int("excluded_provider_count", len(excluded)))
 	var scheduleDecision scheduler.PlatformDecision
@@ -192,12 +193,9 @@ func (b *responsesAttemptBridge) Select(excluded map[int64]struct{}) (textflow.R
 		zap.Float64("load_skew", scheduleDecision.LoadSkew),
 	)
 	b.provider = b.selection.Provider
-	if b.previousResponseID != "" && !b.provider.View().IsOpenAIApiKey() {
-		// This HTTP continuation adapter requires an OpenAI API-key
-		// target. Release the rejected selection before returning Skip
-		// so another target receives the continuation input retained
-		// for this request.
-
+	if b.previousResponseID != "" && !gatewaycapture.ExecutionProtocolTarget(b.provider).SupportsHTTPResponsesContinuation() {
+		// Continuation references require an eligible native Responses route.
+		// Release the rejected target so failed admission cannot retain provider capacity.
 		if b.selection.ReleaseFunc != nil {
 			b.selection.ReleaseFunc()
 			b.selection.ReleaseFunc = nil
@@ -208,7 +206,7 @@ func (b *responsesAttemptBridge) Select(excluded map[int64]struct{}) (textflow.R
 			Scope:            forwardcore.GatewayFailureScopeRequest,
 			Reason:           forwardcore.OpenAIHTTPContinuationUnsupportedReason,
 			ClientStatusCode: http.StatusBadRequest,
-			ClientMessage:    "previous_response_id requires an OpenAI API-key provider for HTTP requests",
+			ClientMessage:    "previous_response_id requires a native Responses API-key provider for HTTP requests",
 		}
 		b.reqLog.Debug("openai.provider_skipped_http_continuation_unsupported",
 			zap.Int64("provider_id", b.provider.Record.ID),

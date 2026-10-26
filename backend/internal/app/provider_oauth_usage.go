@@ -35,19 +35,19 @@ import (
 // provider_oauth_usage.go assembles platform usage queries, local usage
 // statistics, and periodic quota monitors. Provider usage presentation combines
 // platform queries with local statistics and shared display caching. OAuth
-// queries register service activity shutdown, CN and Ollama monitors receive
+// queries register service activity shutdown, API-key and Ollama monitors receive
 // singleton coordination, and platform adapters keep credential preparation,
 // TLS, and destination policy attached to application resources.
 
-// provideCNUsageMonitor binds stored providers and upstream queries with
+// provideUsageMonitor binds stored providers and upstream queries with
 // instance-specific singleton coordination. Nil cfg starts from its half-unit
 // balance threshold input; configured intervals and budgets are converted to
 // durations, and SQL advisory acquisition is attached only when db is present.
-func provideCNUsageMonitor(store *providerpostgres.ProviderStore, queries *provider.UpstreamUsageService, cfg *config.Config, leader provider.CNMonitorLeader, db *sql.DB) *provider.CNUsageMonitor {
-	// The default reported-balance cutoff gates CN monitor temporary provider pauses.
-	options := provider.CNMonitorOptions{Now: time.Now, InstanceID: uuid.NewString(), BalanceThreshold: 0.5, Leader: leader, Warn: slog.Warn, Debug: slog.Debug}
+func provideUsageMonitor(store *providerpostgres.ProviderStore, queries *provider.UpstreamUsageService, cfg *config.Config, leader provider.LeaderLocker, db *sql.DB) *provider.UsageMonitor {
+	// The default reported-balance cutoff gates usage monitor temporary provider pauses.
+	options := provider.UsageMonitorOptions{Now: time.Now, InstanceID: uuid.NewString(), BalanceThreshold: 0.5, Leader: leader, Warn: slog.Warn, Debug: slog.Debug}
 	if cfg != nil {
-		v := cfg.Gateway.CNProviders
+		v := cfg.Gateway.UsageMonitor
 		options.Enabled = v.MonitorEnabled
 		// Monitor intervals use configured minutes; probe and round budgets use
 		// seconds. Convert them together before the monitor normalizes its runtime options.
@@ -64,7 +64,7 @@ func provideCNUsageMonitor(store *providerpostgres.ProviderStore, queries *provi
 			return postgresinfra.TryAcquireDBAdvisoryLock(ctx, db, postgresinfra.HashAdvisoryLockID(key))
 		}
 	}
-	return provider.NewCNUsageMonitor(store, queries, options)
+	return provider.NewUsageMonitor(store, queries, options)
 }
 
 // provideOAuthUsageStats binds local provider statistics and display cache to
@@ -181,7 +181,7 @@ func geminiQuotaLocation() *time.Location {
 // and optional upstream execution. It supplies one instance identity and
 // singleton lease callback, adding SQL advisory capability when available; the
 // service owns its query and periodic lifetime.
-func provideOllamaUsage(store *providerpostgres.ProviderStore, upstream httpclient.UpstreamTransport, settings *provider.RuntimeSettings, cipher identity.SecretEncryptor, cfg *config.Config, leader provider.CNMonitorLeader, db *sql.DB) *provider.OllamaCloudUsageService {
+func provideOllamaUsage(store *providerpostgres.ProviderStore, upstream httpclient.UpstreamTransport, settings *provider.RuntimeSettings, cipher identity.SecretEncryptor, cfg *config.Config, leader provider.LeaderLocker, db *sql.DB) *provider.OllamaCloudUsageService {
 	var do func(*http.Request, string, int64, int) (*http.Response, error)
 	if upstream != nil {
 		do = upstream.Do

@@ -327,17 +327,11 @@ type IdempotencyConfig struct {
 	CleanupBatchSize int `mapstructure:"cleanup_batch_size"`
 }
 
-// BatchImageConfig holds deployment inputs for batch image access, storage,
+// BatchImageConfig holds deployment inputs for batch image limits, storage,
 // queueing, and cleanup.
 type BatchImageConfig struct {
-	// batch image API availability switch
-	Enabled bool `mapstructure:"enabled"`
 	// ordinary job item count limit
 	MaxItemsPerJobDefault int `mapstructure:"max_items_per_job_default"`
-	// MaxItemsPerJobTrial is parsed and defaulted by this loader. Current batch
-	// application construction does not pass this field to PublicOptions, so it
-	// has no named runtime reader there.
-	MaxItemsPerJobTrial int `mapstructure:"max_items_per_job_trial"`
 	// total output image count limit
 	MaxOutputImagesPerJob int `mapstructure:"max_output_images_per_job"`
 	// per-item output image count limit
@@ -366,16 +360,10 @@ type BatchImageConfig struct {
 	InputRetentionAfterTerminalHours int `mapstructure:"input_retention_after_terminal_hours"`
 	// terminal job output retention hours
 	OutputRetentionAfterTerminalHours int `mapstructure:"output_retention_after_terminal_hours"`
-	// OutputRetentionMaxDays is decoded and defaulted by this loader. Current
-	// batch application cleanup options do not reference this field, so its parsed
-	// day value does not control that cleanup.
-	OutputRetentionMaxDays int `mapstructure:"output_retention_max_days"`
 	// batch cleanup polling minutes
 	CleanupIntervalMinutes int `mapstructure:"cleanup_interval_minutes"`
 	// cleanup job batch size
 	CleanupBatchSize int `mapstructure:"cleanup_batch_size"`
-	// batch queue worker availability switch
-	QueueEnabled bool `mapstructure:"queue_enabled"`
 	// Redis ready-queue key name
 	QueueReadyKey string `mapstructure:"queue_ready_key"`
 	// Redis delayed-queue key name
@@ -386,8 +374,6 @@ type BatchImageConfig struct {
 	InflightKeyPrefix string `mapstructure:"inflight_key_prefix"`
 	// Redis job-lock key prefix
 	LockKeyPrefix string `mapstructure:"lock_key_prefix"`
-	// Redis submission idempotency prefix
-	IdempotencyKeyPrefix string `mapstructure:"idempotency_key_prefix"`
 	// active-task marker lifetime seconds
 	InflightTTLSeconds int `mapstructure:"inflight_ttl_seconds"`
 	// job-lock lifetime in seconds
@@ -408,8 +394,6 @@ type BatchImageConfig struct {
 	DelayedMoveLimit int `mapstructure:"delayed_move_limit"`
 	// active-task recovery batch count
 	RecoverLimit int `mapstructure:"recover_limit"`
-	// Vertex batch adapter availability switch
-	VertexEnabled bool `mapstructure:"vertex_enabled"`
 	// Vertex batch project identifier
 	VertexProjectID string `mapstructure:"vertex_project_id"`
 	// Vertex batch region identifier
@@ -422,10 +406,6 @@ type BatchImageConfig struct {
 	// {batch_id} while Vertex is enabled. That placeholder separates objects
 	// belonging to different batch jobs in the managed bucket.
 	VertexManagedGCSPrefix string `mapstructure:"vertex_managed_gcs_prefix"`
-	// managed input retention hours
-	VertexInputRetentionHours int `mapstructure:"vertex_input_retention_hours"`
-	// managed output retention hours
-	VertexOutputRetentionHours int `mapstructure:"vertex_output_retention_hours"`
 	// Vertex batch endpoint override URL
 	VertexBatchPredictionBaseURL string `mapstructure:"vertex_batch_prediction_base_url"`
 	// Cloud Storage endpoint override URL
@@ -969,8 +949,10 @@ type GatewayConfig struct {
 	// Grok configures Grok/xAI scheduling and the free-tier quota gate.
 	Grok GatewayGrokConfig `mapstructure:"grok"`
 
-	// CNProviders configures usage monitoring for Chinese OpenAI-compatible suppliers.
-	CNProviders GatewayCNProvidersConfig `mapstructure:"cn_providers"`
+	// UsageMonitor configures balance and quota polling for Kimi, Zhipu, and
+	// DeepSeek. The mapstructure key keeps existing deployment configuration
+	// valid.
+	UsageMonitor GatewayUsageMonitorConfig `mapstructure:"cn_providers"`
 }
 
 // GatewayGrokConfig supplies Grok password authorization and its free-tier
@@ -1001,11 +983,10 @@ type GatewayGrokConfig struct {
 	FreeQuotaStatsCacheSeconds int `mapstructure:"free_quota_stats_cache_seconds"`
 }
 
-// GatewayCNProvidersConfig configures periodic balance and quota probes for
-// Chinese suppliers.
-// Disabled by default; when enabled it probes active API-key providers. Manual
-// queries run independently.
-type GatewayCNProvidersConfig struct {
+// GatewayUsageMonitorConfig configures periodic balance and quota probes for
+// Kimi, Zhipu, and DeepSeek API-key providers. Disabled by default; when
+// enabled it probes active API-key providers. Manual queries run independently.
+type GatewayUsageMonitorConfig struct {
 	// MonitorEnabled selects periodic supplier probes, while the deployment
 	// default leaves that monitor disabled. Administrator-initiated usage queries
 	// remain separate from this background availability choice.
@@ -2638,9 +2619,7 @@ func setDefaults() {
 	viper.SetDefault("redis.enable_tls", false)
 
 	// Batch Image queue
-	viper.SetDefault("batch_image.enabled", false)
 	viper.SetDefault("batch_image.max_items_per_job_default", 200)
-	viper.SetDefault("batch_image.max_items_per_job_trial", 50)
 	viper.SetDefault("batch_image.max_output_images_per_job", 200)
 	viper.SetDefault("batch_image.max_output_images_per_item", 4)
 	viper.SetDefault("batch_image.max_prompt_chars_per_item", 8000)
@@ -2654,16 +2633,13 @@ func setDefaults() {
 	viper.SetDefault("batch_image.max_download_concurrency_per_user", 1)
 	viper.SetDefault("batch_image.input_retention_after_terminal_hours", 24)
 	viper.SetDefault("batch_image.output_retention_after_terminal_hours", 72)
-	viper.SetDefault("batch_image.output_retention_max_days", 7)
 	viper.SetDefault("batch_image.cleanup_interval_minutes", 30)
 	viper.SetDefault("batch_image.cleanup_batch_size", 100)
-	viper.SetDefault("batch_image.queue_enabled", false)
 	viper.SetDefault("batch_image.queue_ready_key", "batch_image:queue:ready")
 	viper.SetDefault("batch_image.queue_delayed_key", "batch_image:queue:delayed")
 	viper.SetDefault("batch_image.queue_active_key", "batch_image:queue:active")
 	viper.SetDefault("batch_image.inflight_key_prefix", "batch_image:queue:inflight:")
 	viper.SetDefault("batch_image.lock_key_prefix", "batch_image:queue:lock:")
-	viper.SetDefault("batch_image.idempotency_key_prefix", "batch_image:queue:idem:")
 	viper.SetDefault("batch_image.inflight_ttl_seconds", 604800)
 	viper.SetDefault("batch_image.job_lock_ttl_seconds", 300)
 	viper.SetDefault("batch_image.default_requeue_delay_seconds", 30)
@@ -2674,13 +2650,10 @@ func setDefaults() {
 	viper.SetDefault("batch_image.recovery_interval_seconds", 300)
 	viper.SetDefault("batch_image.delayed_move_limit", 100)
 	viper.SetDefault("batch_image.recover_limit", 100)
-	viper.SetDefault("batch_image.vertex_enabled", false)
 	viper.SetDefault("batch_image.vertex_project_id", "")
 	viper.SetDefault("batch_image.vertex_location", "global")
 	viper.SetDefault("batch_image.vertex_managed_gcs_bucket", "")
 	viper.SetDefault("batch_image.vertex_managed_gcs_prefix", "batch-image/{env}/{batch_id}")
-	viper.SetDefault("batch_image.vertex_input_retention_hours", 24)
-	viper.SetDefault("batch_image.vertex_output_retention_hours", 72)
 	viper.SetDefault("batch_image.vertex_batch_prediction_base_url", "")
 	viper.SetDefault("batch_image.vertex_gcs_base_url", "")
 
@@ -3400,62 +3373,54 @@ func (c *Config) Validate() error {
 	if c.Redis.MinIdleConns > c.Redis.PoolSize {
 		return fmt.Errorf("redis.min_idle_conns cannot exceed redis.pool_size")
 	}
-	if c.BatchImage.QueueEnabled {
-		if strings.TrimSpace(c.BatchImage.QueueReadyKey) == "" {
-			return fmt.Errorf("batch_image.queue_ready_key must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.QueueDelayedKey) == "" {
-			return fmt.Errorf("batch_image.queue_delayed_key must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.QueueActiveKey) == "" {
-			return fmt.Errorf("batch_image.queue_active_key must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.InflightKeyPrefix) == "" {
-			return fmt.Errorf("batch_image.inflight_key_prefix must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.LockKeyPrefix) == "" {
-			return fmt.Errorf("batch_image.lock_key_prefix must not be empty")
-		}
-		if c.BatchImage.InflightTTLSeconds <= 0 {
-			return fmt.Errorf("batch_image.inflight_ttl_seconds must be positive")
-		}
-		if c.BatchImage.JobLockTTLSeconds <= 0 {
-			return fmt.Errorf("batch_image.job_lock_ttl_seconds must be positive")
-		}
-		if c.BatchImage.StaleActiveAfterSeconds <= 0 {
-			return fmt.Errorf("batch_image.stale_active_after_seconds must be positive")
-		}
-		if c.BatchImage.DelayedMoveLimit <= 0 {
-			return fmt.Errorf("batch_image.delayed_move_limit must be positive")
-		}
-		if c.BatchImage.RecoverLimit <= 0 {
-			return fmt.Errorf("batch_image.recover_limit must be positive")
-		}
+	// Batch workers start with the application, so queue settings must support
+	// processing and recovery even when every group currently closes new submissions.
+	if strings.TrimSpace(c.BatchImage.QueueReadyKey) == "" {
+		return fmt.Errorf("batch_image.queue_ready_key must not be empty")
 	}
+	if strings.TrimSpace(c.BatchImage.QueueDelayedKey) == "" {
+		return fmt.Errorf("batch_image.queue_delayed_key must not be empty")
+	}
+	if strings.TrimSpace(c.BatchImage.QueueActiveKey) == "" {
+		return fmt.Errorf("batch_image.queue_active_key must not be empty")
+	}
+	if strings.TrimSpace(c.BatchImage.InflightKeyPrefix) == "" {
+		return fmt.Errorf("batch_image.inflight_key_prefix must not be empty")
+	}
+	if strings.TrimSpace(c.BatchImage.LockKeyPrefix) == "" {
+		return fmt.Errorf("batch_image.lock_key_prefix must not be empty")
+	}
+	if c.BatchImage.InflightTTLSeconds <= 0 {
+		return fmt.Errorf("batch_image.inflight_ttl_seconds must be positive")
+	}
+	if c.BatchImage.JobLockTTLSeconds <= 0 {
+		return fmt.Errorf("batch_image.job_lock_ttl_seconds must be positive")
+	}
+	if c.BatchImage.StaleActiveAfterSeconds <= 0 {
+		return fmt.Errorf("batch_image.stale_active_after_seconds must be positive")
+	}
+	if c.BatchImage.DelayedMoveLimit <= 0 {
+		return fmt.Errorf("batch_image.delayed_move_limit must be positive")
+	}
+	if c.BatchImage.RecoverLimit <= 0 {
+		return fmt.Errorf("batch_image.recover_limit must be positive")
+	}
+
 	// Managed Vertex objects require a bucket name and a batch-specific prefix.
 	// Validate the per-batch identity placeholder before these settings are passed
 	// to the managed batch adapter.
-	if c.BatchImage.VertexEnabled {
-		if strings.TrimSpace(c.BatchImage.VertexManagedGCSBucket) == "" {
-			return fmt.Errorf("batch_image.vertex_managed_gcs_bucket must not be empty when vertex is enabled")
-		}
+	if strings.TrimSpace(c.BatchImage.VertexManagedGCSBucket) != "" {
 		if strings.Contains(c.BatchImage.VertexManagedGCSBucket, "://") {
 			return fmt.Errorf("batch_image.vertex_managed_gcs_bucket must be a bucket name, not a URI")
 		}
 		if strings.TrimSpace(c.BatchImage.VertexLocation) == "" {
-			return fmt.Errorf("batch_image.vertex_location must not be empty when vertex is enabled")
+			return fmt.Errorf("batch_image.vertex_location must not be empty when a Vertex bucket is configured")
 		}
 		if strings.TrimSpace(c.BatchImage.VertexManagedGCSPrefix) == "" {
-			return fmt.Errorf("batch_image.vertex_managed_gcs_prefix must not be empty when vertex is enabled")
+			return fmt.Errorf("batch_image.vertex_managed_gcs_prefix must not be empty when a Vertex bucket is configured")
 		}
 		if !strings.Contains(c.BatchImage.VertexManagedGCSPrefix, "{batch_id}") {
 			return fmt.Errorf("batch_image.vertex_managed_gcs_prefix must contain {batch_id}")
-		}
-		if c.BatchImage.VertexInputRetentionHours <= 0 {
-			return fmt.Errorf("batch_image.vertex_input_retention_hours must be positive")
-		}
-		if c.BatchImage.VertexOutputRetentionHours <= 0 {
-			return fmt.Errorf("batch_image.vertex_output_retention_hours must be positive")
 		}
 	}
 	// Creative input limits are checked when its API is enabled, while queue

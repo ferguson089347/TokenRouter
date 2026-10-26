@@ -166,7 +166,7 @@ func (s *GeminiOutput) GeminiMappedError(provider *gatewayprovider.ExecutionProv
 
 	if status, errType, errMsg, matched := ApplyErrorPassthroughRule(
 		c,
-		capability.PlatformGemini,
+		provider.Record.Platform,
 		upstreamStatus,
 		body,
 		http.StatusBadGateway,
@@ -338,8 +338,8 @@ func (s *GeminiOutput) GoogleError(status int, message string) error {
 
 // GeminiOpenAICompatMappedError records Gemini upstream diagnostics and
 // chooses an OpenAI-compatible client error. A nonnil provider additionally
-// contributes an Ops event; rule matching and body interpretation use the
-// Gemini platform regardless of provider metadata. Administrator response
+// contributes an Ops event and supplies the rule-matching platform. Missing
+// provider metadata uses Gemini as the platform default. Administrator response
 // rules take precedence over built-in message and status selection.
 //
 // Google error fields seed the compatible category and selected status
@@ -358,7 +358,9 @@ func (s *GeminiOutput) GeminiOpenAICompatMappedError(
 
 	upstreamMsg := logredact.SanitizeUpstreamQueries(strings.TrimSpace(upstream.ExtractErrorMessage(body)))
 	SetOpsUpstreamError(c, upstreamStatus, upstreamMsg, "")
+	platform := capability.PlatformGemini
 	if provider != nil {
+		platform = provider.Record.Platform
 		AppendOpsUpstreamError(c, ops.OpsUpstreamErrorEvent{
 			Platform: provider.Record.Platform,
 
@@ -378,7 +380,7 @@ func (s *GeminiOutput) GeminiOpenAICompatMappedError(
 
 	if status, errType, errMsg, matched := ApplyErrorPassthroughRule(
 		c,
-		capability.PlatformGemini,
+		platform,
 		upstreamStatus,
 		body,
 		http.StatusBadGateway,

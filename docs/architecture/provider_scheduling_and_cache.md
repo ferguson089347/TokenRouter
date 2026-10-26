@@ -103,7 +103,7 @@ OpenAI 兼容选择、诊断和 WS 复核共用 `ModelPolicy.SupportsCompatibleR
 <a id="scheduler_snapshot_consistency"></a>
 ## 快照一致性
 
-跨平台分组的调度 Redis 快照命名空间是 `sched:v5:`。完整和轻量两种提供商快照都带有 `upstream_protocols`、认证方式和 `responses_ws_connection_mode`，分组认证快照（版本 49）带有准入集合、转换映射和 Responses 图片策略。协议候选过滤在评分前执行，每次换号、fresh 复核和数据库复核时重新检查；转发目标只保存在本次的提供商副本里，共享缓存保持原样。
+跨平台分组的调度 Redis 快照命名空间是 `sched:v5:`。OpenCode 的完整和轻量快照保留模式、已接受目录及人工模型协议覆盖，候选过滤按最终映射模型解析原生协议。解析结果把最终模型和协议一起交给执行方，自动探针同样检查模型协议的启用状态。完整和轻量两种提供商快照都带有 `upstream_protocols`、认证方式和 `responses_ws_connection_mode`，分组认证快照（版本 49）带有准入集合、转换映射和 Responses 图片策略。协议候选过滤在评分前执行，每次换号、fresh 复核和数据库复核时重新检查；转发目标只保存在本次的提供商副本里，共享缓存保持原样。
 
 调度事件的格式、去重编码和 SQL 读写在 `scheduler` 和 `scheduler/postgres`。同一事务里写入的事件，提交后尽力发布。`scheduler.SnapshotService` 负责重建、事件消费和受限回退，网关读取和生命周期都直接绑定这个实例。`scheduler/rediscache` 负责 `sched:v5` 的快照发布、epoch 和 tombstone，bucket 锁继续使用 `sched:v4:lock:`，其中 `codec.ProviderCodec` 负责完整和轻量提供商的存储格式和字段过滤，使用 Provider 的字段名，并区分 nil 和空集合。
 

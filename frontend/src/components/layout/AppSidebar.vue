@@ -212,7 +212,6 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import { sanitizeSvg } from '@/utils/sanitize'
-import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 
 // AppSidebar.vue renders user and administrator navigation with the shared icon
 // and menu styles. Role checks and public feature settings determine available
@@ -240,7 +239,7 @@ interface NavItem {
   children?: NavItem[] // Nested navigation entries
 }
 
-// Translation, routing, role, settings, onboarding, and batch-image access state
+// Translation, routing, role, settings, and onboarding state
 // determine which destinations the sidebar renders for the current account.
 const { t } = useI18n()
 
@@ -249,7 +248,6 @@ const appStore = useAppStore()
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
-const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
 
 // Sidebar width and mobile visibility come from shared application state, allowing the
 // header toggle and layout offsets to follow the same values.
@@ -274,9 +272,6 @@ const sidebarNavRef = ref<HTMLElement | null>(null)
 // route activity, while a recorded false keeps even the active group collapsed.
 const groupExpandOverrides = ref<Map<string, boolean>>(new Map())
 
-// flagBatchImageAccess reports whether the shared access check permits batch-image
-// navigation.
-const flagBatchImageAccess = () => canUseBatchImage.value
 // flagIntelligenceAccess reports whether quality checks are enabled in confirmed public settings.
 const flagIntelligenceAccess = () => appStore.cachedPublicSettings?.intelligence_enabled === true
 // flagTicketAccess checks the confirmed public switch before showing support navigation.
@@ -315,12 +310,6 @@ const userNavItems = computed((): NavItem[] => {
     },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
-    {
-      path: '/batch-image',
-      label: t('nav.batchImage'),
-      icon: 'batchImage' as const,
-      featureFlag: flagBatchImageAccess,
-    },
     {
       path: '/creative',
       label: t('nav.creative'),
@@ -406,12 +395,6 @@ const personalNavItems = computed((): NavItem[] => {
     },
     { path: '/keys', label: t('nav.apiKeys'), icon: 'key' as const },
     { path: '/team', label: t('nav.team'), icon: 'users' as const, featureFlag: flagTeamAccess },
-    {
-      path: '/batch-image',
-      label: t('nav.batchImage'),
-      icon: 'batchImage' as const,
-      featureFlag: flagBatchImageAccess,
-    },
     {
       path: '/creative',
       label: t('nav.creative'),
@@ -717,10 +700,9 @@ watch(
   { immediate: true },
 )
 
-// Mount refreshes batch-image eligibility and administrator settings, then restores any
+// Mount refreshes administrator settings, then restores any
 // saved sidebar scroll position after Vue has rendered the navigation container.
 onMounted(() => {
-  void refreshBatchImageAccess()
   if (isAdmin.value) {
     adminSettingsStore.fetch()
   }

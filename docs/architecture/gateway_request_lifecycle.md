@@ -152,7 +152,7 @@ client_model
 
 `routing.RoutePlan` 保存本次的最终分组、入口协议和从 Key 到分组的模型链，handler 把它传给后续的候选解析。模型链快照还保存分组白名单的 `RestrictModels`、`RestrictionModelSource` 和单独的计费模型来源，转换为 `GroupMappingResult` 时全部带上。候选仍然按当前提供商快照和最终分组复核协议；提供商映射在使用时才读取，attempt 的结果只属于当前请求。分组发生回退时要重新授权，平台请求改写和响应模型恢复仍由执行链负责。
 
-`requeststate.AttemptRoute` 记录本次的候选结果和协议，`RoutingState.ResolveAttempt` 在 fresh 复核或数据库复核后重新解析。这个状态只存在于请求中，提供商的持久记录不保存它。协议相关的地址和 CN 适配规则由 `provider.ProtocolTarget` 根据协议和提供商记录计算。执行适配层使用的 `ExecutionProvider` 由提供商记录和本次路线组成；模型映射在调用时读取，上一次尝试的结果不会写回共享的提供商缓存。
+`requeststate.AttemptRoute` 记录本次的候选结果和协议，`RoutingState.ResolveAttempt` 在 fresh 复核或数据库复核后重新解析。这个状态只存在于请求中，提供商的持久记录不保存它。协议相关的地址和 Kimi、Zhipu、DeepSeek 的适配规则由 `provider.ProtocolTarget` 根据协议和提供商记录计算。执行适配层使用的 `ExecutionProvider` 由提供商记录和本次路线组成；模型映射在调用时读取，上一次尝试的结果不会写回共享的提供商缓存。
 
 候选协议快照、协议准入和模型冷却判断，都由 `gateway/provider.ModelPolicy` 根据提供商记录和本次 `AttemptRoute` 计算。选择和诊断按"协议、提供商状态、模型窗口"的顺序检查。原始窗口是否在冷却、允许 overages 时是否可调度、剩余时间，这三项分别计算。模型目录和候选协议复核使用同一份快照，动态模型映射在需要时才读取。
 
@@ -188,7 +188,7 @@ Codex 身份和指纹的请求内状态只由 HTTP 适配层持有。提供商�
 
 ### 计数与辅助入口
 
-Messages 的 `count_tokens` 由 app 直接构造 HTTP Handler。HTTP 只持有受控的计数目标和去掉凭据的提供商快照，选择和平台执行由 app 连接。流程是先做资金预检，再无槽选择，按实际提供商的平台执行计数，每次尝试都从原始报文重新做分组映射。Anthropic 和 OpenAI 使用已有的执行器，Gemini 在 OAuth scope 不足时回退，Grok 和 CN 平台在本地计数；Qoder、Antigravity 和 Bedrock 返回不支持。Responses 的 `input_tokens` 同样不占提供商槽。计数既不提交费用，也不完成任务。文本入口和计数入口共用兼容指标的采样计数器。
+Messages 的 `count_tokens` 由 app 直接构造 HTTP Handler。HTTP 只持有受控的计数目标和去掉凭据的提供商快照，选择和平台执行由 app 连接。流程是先做资金预检，再无槽选择，按实际提供商的平台执行计数，每次尝试都从原始报文重新做分组映射。Anthropic 和 OpenAI 使用已有的执行器，Gemini 在 OAuth scope 不足时回退，Grok、Kimi、Zhipu、DeepSeek 在本地计数；Qoder、Antigravity 和 Bedrock 返回不支持。Responses 的 `input_tokens` 同样不占提供商槽。计数既不提交费用，也不完成任务。文本入口和计数入口共用兼容指标的采样计数器。
 
 OpenAI 兼容计数、Grok 本地估算和 Responses 输入 token 预检，由 app 单独构造的 `OpenAITokensHandler` 处理，绑定同一个请求生命周期屏障。计数先做分组路由规划，再检查资金，然后做一次无槽选择。Responses 预检先检查资金，再做分组路由规划，选择器交来的每个提供商槽都会释放。Grok 本地估算完全在本地完成，跳过资金检查、选号和上游请求。这些入口不生成请求，所以也没有完成提交接口。计数执行绑定 `OpenAIAuxiliary`，路由计划和选择分别使用 `RoutePlanner` 和 `Compatible`；提供商目标只在受控的转发方法内部携带凭据。
 
