@@ -290,6 +290,8 @@ base URL 模式只在提供商没有保存手动端点时生效，可以选 CLI 
 
 支付配置只在 `payment.ConfigService` 实现，实例读取和批量用量查询在 `payment/postgres`，provider factory、加密键和 `PAYMENT_RESUME_SIGNING_KEY` 由 app 提供。热刷新整体读取失败时保留旧的注册表；首次读取失败时允许之后重试。配置键、缺省值、旧的密文和续接回退密钥都保持兼容；订阅套餐通过 billing 读取。
 
+EPUSDT / GMPay 实例使用 `provider_key=epusdt` 和 `supported_types=epusdt`，配置字段为 `apiBase`（HTTPS）、`pid`、`secretKey`、`currency`（CNY 或 USD，默认 CNY）和 `notifyUrl`。保存时固定为托管收银台模式 `popup`，自动退款设置会被拒绝；密钥在管理查询中省略。完整支付规则见 [GMPay 加密货币支付](../domains/payments_and_entitlements.md#epusdt_payments)。
+
 备份的 Options 只接收数据库名、本地根目录、时钟、日志和加密配置标记，完整的连接凭据只传给归档的技术适配层；S3 凭据按运行时设置读取。
 
 ## 前端变量

@@ -178,6 +178,13 @@ func ValidateProviderSnapshotMetadata(order *Order, providerKey string, metadata
 				return fmt.Errorf("alipay app_id mismatch: expected %s, got %s", expected, actual)
 			}
 		}
+	case TypeEPUSDT:
+		if metadata["pid"] == "" || metadata["pid"] != snapshot.MerchantID {
+			return fmt.Errorf("epusdt merchant PID does not match the order")
+		}
+		if metadata["currency"] == "" || !strings.EqualFold(metadata["currency"], snapshot.Currency) {
+			return fmt.Errorf("epusdt fiat currency does not match the order")
+		}
 	case TypeEasyPay:
 		if expected := strings.TrimSpace(snapshot.MerchantID); expected != "" {
 			actual := strings.TrimSpace(metadata["pid"])

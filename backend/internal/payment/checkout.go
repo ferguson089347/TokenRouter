@@ -45,9 +45,9 @@ import (
 // retains validated billing information; other providers discard it.
 // OAuth-required output returns before local creation. Otherwise the store
 // commits the draft before InvokeProvider initiates payment and persists its
-// response. Any invocation or response-persistence error triggers best-effort
-// FailCheckout, whose PostgreSQL update is unconditional on prior status; the
-// original error remains visible.
+// response. Unconfirmed GMPay initiation retains its pending order and returns
+// its identity for recovery. Other invocation errors trigger best-effort
+// FailCheckout, retaining the original error for the caller.
 func (s *Checkout) CreateOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error) {
 	req.Locale = locale.Negotiate(req.Locale, locale.FromContext(ctx))
 	ctx = locale.WithLanguage(ctx, req.Locale)
@@ -155,6 +155,18 @@ func (s *Checkout) CreateOrder(ctx context.Context, req CreateOrderRequest) (*Cr
 	}
 	resp, err := s.InvokeProvider(ctx, order, req, cfg, limitAmount, payAmountStr, payAmount, plan, sel)
 	if err != nil {
+		appErr := new(infraerrors.ApplicationError)
+		if errors.As(err, &appErr) && appErr.Reason == CodePaymentCreateUnconfirmed {
+			// GMPay may have committed a checkout before its response was lost. Keep
+			// this merchant number pending so a later signed callback can complete it.
+			return nil, appErr.WithMetadata(map[string]string{
+				"order_id": strconv.FormatInt(order.ID, 10), "out_trade_no": order.OutTradeNo,
+				"amount":     strconv.FormatFloat(order.Amount, 'f', -1, 64),
+				"pay_amount": strconv.FormatFloat(order.PayAmount, 'f', -1, 64),
+				"currency":   ProviderConfigCurrency(sel.ProviderKey, sel.Config),
+				"expires_at": order.ExpiresAt.Format(time.RFC3339),
+			})
+		}
 		// Provider initiation or response persistence failed after local creation.
 		// Attempt FAILED marking and discard its error, retaining the original
 		// failure even when upstream payment has already progressed.
@@ -218,8 +230,8 @@ func (s *Checkout) CreateOrderInTx(ctx context.Context, req CreateOrderRequest, 
 // merchant/currency values are added to a newly allocated map.
 //
 // Official WeChat app identity follows the payer/OpenID mode, Alipay stores
-// appId, EasyPay stores pid, and Airwallex stores accountId. Stripe/Airwallex
-// currency comes from selected configuration, while WeChat records CNY. Secret
+// appId, EasyPay/GMPay store pid, and Airwallex stores accountId. Currency for
+// GMPay, Stripe and Airwallex comes from selected configuration; WeChat records CNY. Secret
 // credentials remain outside this snapshot and are read from current instance
 // configuration during provider construction. A map containing only
 // schema_version is discarded as no usable binding data.
@@ -261,12 +273,12 @@ func BuildPaymentOrderProviderSnapshot(sel *InstanceSelection, req CreateOrderRe
 			snapshot["merchant_app_id"] = merchantAppID
 		}
 	}
-	if providerKey == TypeEasyPay {
+	if providerKey == TypeEasyPay || providerKey == TypeEPUSDT {
 		if merchantID := strings.TrimSpace(sel.Config["pid"]); merchantID != "" {
 			snapshot["merchant_id"] = merchantID
 		}
 	}
-	if providerKey == TypeStripe {
+	if providerKey == TypeStripe || providerKey == TypeEPUSDT {
 		snapshot["currency"] = ProviderConfigCurrency(providerKey, sel.Config)
 	}
 	if providerKey == TypeAirwallex {
@@ -469,6 +481,11 @@ func (s *Checkout) InvokeProvider(ctx context.Context, order *Order, req CreateO
 	SanitizeCreatePaymentResponseDetails(pr)
 	order, err = s.PersistCreatePaymentResponse(ctx, order.ID, sel, pr)
 	if err != nil {
+		if sel.ProviderKey == TypeEPUSDT {
+			// The cashier already exists even if its detail write failed. Preserve the
+			// pending merchant order for a later signed callback instead of failure marking.
+			return nil, infraerrors.ServiceUnavailable(CodePaymentCreateUnconfirmed, "payment details could not be saved")
+		}
 		return nil, err
 	}
 	s.runtime.Audit(ctx, order.ID, "ORDER_CREATED", fmt.Sprintf("user:%d", req.UserID), map[string]any{

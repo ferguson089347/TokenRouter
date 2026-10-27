@@ -596,6 +596,7 @@
   "POST /api/v1/payment/webhook/airwallex",
   "POST /api/v1/payment/webhook/alipay",
   "POST /api/v1/payment/webhook/easypay",
+  "POST /api/v1/payment/webhook/epusdt",
   "POST /api/v1/payment/webhook/stripe",
   "POST /api/v1/payment/webhook/wxpay",
   "POST /api/v1/redeem",

@@ -82,6 +82,13 @@ func (h *PaymentWebhookHandler) EasyPayNotify(c *gin.Context) {
 	h.handleNotify(c, payment.TypeEasyPay)
 }
 
+// EPUSDTNotify authenticates GMPay JSON through the common callback dispatcher.
+// Successful handling returns the gateway's plain-text success acknowledgement;
+// order identity and merchant checks precede payment confirmation and fulfillment.
+func (h *PaymentWebhookHandler) EPUSDTNotify(c *gin.Context) {
+	h.handleNotify(c, payment.TypeEPUSDT)
+}
+
 // AlipayNotify delegates the official Alipay callback to common body reading
 // and candidate verification. Verified notification handling follows before
 // its plain-text success acknowledgement; errors retain the shared status
@@ -235,7 +242,8 @@ func WebhookShouldAcknowledgeWebhookProviderLookupError(err error) bool {
 // the notification's identity.
 //
 // EasyPay/Alipay read out_trade_no, Stripe reads object metadata orderId, and
-// Airwallex reads its nested merchant_order_id. These representations select
+// Airwallex reads its nested merchant_order_id, and GMPay reads order_id.
+// These representations select
 // candidate accounts before authentication; no returned value authorizes
 // fulfillment on its own. Trimming is applied to the JSON hints, while form
 // extraction returns the parsed first value.
@@ -245,6 +253,13 @@ func WebhookExtractOutTradeNo(rawBody, providerKey string) string {
 		values, err := url.ParseQuery(rawBody)
 		if err == nil {
 			return values.Get("out_trade_no")
+		}
+	case payment.TypeEPUSDT:
+		var payload struct {
+			OrderID string `json:"order_id"` // unsigned merchant order hint
+		}
+		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
+			return strings.TrimSpace(payload.OrderID)
 		}
 	case payment.TypeStripe:
 		return WebhookExtractStripeOutTradeNo(rawBody)

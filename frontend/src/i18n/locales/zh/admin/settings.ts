@@ -963,6 +963,9 @@ export default {
       providerWxpay: '微信官方',
       providerStripe: 'Stripe',
       providerAirwallex: 'Airwallex',
+      providerEPUSDT: 'EPUSDT / GMPay',
+      field_epusdtApiBaseHint:
+        '填写部署的 epusdt HTTPS 地址，例如 https://pay.example.com。使用 API Key 中的商户密钥。',
       typeDisabled: '类型已禁用',
       enableTypesFirst: '请先在上方启用至少一种服务商',
       easypayRedirect: '跳转',

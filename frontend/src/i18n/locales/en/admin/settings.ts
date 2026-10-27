@@ -1026,6 +1026,9 @@ export default {
       providerWxpay: 'WeChat Pay (Direct)',
       providerStripe: 'Stripe',
       providerAirwallex: 'Airwallex',
+      providerEPUSDT: 'EPUSDT / GMPay',
+      field_epusdtApiBaseHint:
+        'Enter your deployed epusdt HTTPS URL, such as https://pay.example.com. Use the merchant API key secret for payment requests.',
       typeDisabled: 'type disabled',
       enableTypesFirst: 'Enable at least one payment type above first',
       easypayRedirect: 'Redirect',

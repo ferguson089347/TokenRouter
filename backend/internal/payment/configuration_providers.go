@@ -43,6 +43,7 @@ var (
 	// providerConfig.ts sensitive metadata when changing the schema.
 	ConfigProviderSensitiveConfigFields = map[string]map[string]struct{}{
 		TypeEasyPay:   {"pkey": {}},
+		TypeEPUSDT:    {"secretkey": {}},
 		TypeAlipay:    {"privatekey": {}, "publickey": {}, "alipaypublickey": {}},
 		TypeWxpay:     {"privatekey": {}, "apiv3key": {}, "publickey": {}},
 		TypeStripe:    {"secretkey": {}, "webhooksecret": {}},
@@ -56,6 +57,7 @@ var (
 	// PostgreSQL adapter.
 	ConfigProviderPendingOrderProtectedConfigFields = map[string]map[string]struct{}{
 		TypeEasyPay:   {"pkey": {}, "pid": {}},
+		TypeEPUSDT:    {"secretkey": {}, "pid": {}, "currency": {}, "apibase": {}},
 		TypeAlipay:    {"privatekey": {}, "publickey": {}, "alipaypublickey": {}, "appid": {}},
 		TypeWxpay:     {"privatekey": {}, "apiv3key": {}, "publickey": {}, "appid": {}, "mpappid": {}, "mchid": {}, "publickeyid": {}, "certserial": {}},
 		TypeStripe:    {"secretkey": {}, "webhooksecret": {}, "currency": {}},
@@ -65,7 +67,7 @@ var (
 	// ConfigValidProviderKeys contains exact provider labels accepted by creation
 	// request validation and the configured adapter factory choices.
 	ConfigValidProviderKeys = map[string]bool{
-		TypeEasyPay: true, TypeAlipay: true, TypeWxpay: true, TypeStripe: true, TypeAirwallex: true,
+		TypeEasyPay: true, TypeAlipay: true, TypeWxpay: true, TypeStripe: true, TypeAirwallex: true, TypeEPUSDT: true,
 	}
 
 	// ConfigEasyPayCustomMethodCodePattern accepts nonempty lowercase ASCII
@@ -245,6 +247,12 @@ func (s *ConfigService) CreateProviderInstance(ctx context.Context, req CreatePr
 	if err := ConfigValidateProviderRequest(req.ProviderKey, req.Name, typesStr); err != nil {
 		return nil, err
 	}
+	if req.ProviderKey == TypeEPUSDT {
+		if req.RefundEnabled || req.AllowUserRefund {
+			return nil, infraerrors.BadRequest("REFUND_UNSUPPORTED", "epusdt automatic refunds are not supported")
+		}
+		req.PaymentMode = "popup"
+	}
 	if req.ProviderKey == TypeEasyPay {
 		// Prepare stable display identities and localization revisions before custom
 		// mapping checks and serialization. The supplied map can already be changed
@@ -334,12 +342,15 @@ func (s *ConfigService) TestProviderDraft(ctx context.Context, req TestProviderD
 }
 
 // ConfigValidateProviderRequest requires a trimmed nonblank display name and
-// exact key in ConfigValidProviderKeys. The supportedTypes argument is not
-// validated here, so empty support and provider-specific support validation
-// remain separate calling behavior.
+// exact key in ConfigValidProviderKeys. EPUSDT requires its single hosted
+// cryptocurrency method; other provider support rules are validated by their
+// configuration-specific paths before persistence.
 func ConfigValidateProviderRequest(providerKey, name, supportedTypes string) error {
 	if strings.TrimSpace(name) == "" {
 		return infraerrors.BadRequest("VALIDATION_ERROR", "provider name is required")
+	}
+	if providerKey == TypeEPUSDT && supportedTypes != TypeEPUSDT {
+		return infraerrors.BadRequest("VALIDATION_ERROR", "epusdt supports only the cryptocurrency payment method")
 	}
 	if !ConfigValidProviderKeys[providerKey] {
 		return infraerrors.BadRequest("VALIDATION_ERROR", fmt.Sprintf("invalid provider key: %s", providerKey))
@@ -432,6 +443,12 @@ func (s *ConfigService) UpdateProviderInstance(ctx context.Context, id int64, re
 	if err != nil {
 		return nil, fmt.Errorf("load provider instance: %w", err)
 	}
+	if current.ProviderKey == TypeEPUSDT {
+		if req.RefundEnabled != nil && *req.RefundEnabled || req.AllowUserRefund != nil && *req.AllowUserRefund {
+			return nil, infraerrors.BadRequest("REFUND_UNSUPPORTED", "epusdt automatic refunds are not supported")
+		}
+		req.PaymentMode = configPointer("popup")
+	}
 	var pendingOrderCount *int
 	getPendingOrderCount := func() (int, error) {
 		if pendingOrderCount != nil {
@@ -454,6 +471,9 @@ func (s *ConfigService) UpdateProviderInstance(ctx context.Context, id int64, re
 	nextSupportedTypes := current.SupportedTypes
 	if req.SupportedTypes != nil {
 		nextSupportedTypes = ConfigJoinTypes(req.SupportedTypes)
+	}
+	if current.ProviderKey == TypeEPUSDT && nextSupportedTypes != TypeEPUSDT {
+		return nil, infraerrors.BadRequest("VALIDATION_ERROR", "epusdt requires its cryptocurrency payment method")
 	}
 	if err := s.ConfigValidateVisibleMethodEnablementConflicts(ctx, id, current.ProviderKey, nextSupportedTypes, nextEnabled); err != nil {
 		return nil, err
