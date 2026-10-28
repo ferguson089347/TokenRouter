@@ -290,7 +290,7 @@ Testcontainers 的启动函数可能同时返回已创建的容器和错误。�
 
 ### CI
 
-`.github/workflows/ci.yml` 在每次 push 和 PR 上并行运行以下 job：
+`.github/workflows/ci.yml` 在每次 push、PR 或手动触发时并行运行以下 job：
 
 | job | 内容 |
 | --- | --- |

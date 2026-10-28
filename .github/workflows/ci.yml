@@ -1,12 +1,14 @@
-# ci.yml runs backend, frontend, build, and installer checks for pushes and pull requests.
-# Each job uses the repository Make targets so local acceptance follows the same
-# commands. Go jobs retain independent tool setup, while frontend jobs install the
-# frozen dependency graph and run formatter, parser-policy, and application tests.
+# ci.yml runs backend, frontend, build, and installer checks for pushes, pull
+# requests, and manual validation. Each job uses the repository Make targets so
+# local acceptance follows the same commands. Go jobs retain independent tool
+# setup, while frontend jobs install the frozen dependency graph and run
+# formatter, parser-policy, and application tests.
 name: CI
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
