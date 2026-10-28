@@ -419,9 +419,11 @@ DOMPurify 用于 Markdown 页面、公告、支付说明和 SVG 图标的内容�
 
 项目内置 [tr-release 技能](../../.agents/skills/tr-release/SKILL.md)，用于准备版本范围、核对发布说明和发布验收。Release 描述默认展示英文；技能在发布流程完成后，将完整的简体中文译文追加到描述最底部的「中文翻译」折叠区，覆盖更新说明、安装和文档部分。在仓库根目录运行 `python3 .agents/skills/tr-release/scripts/tr_release.py --prepare` 获取待发布范围。
 
-`.github/workflows/release.yml` 由 `v*` tag 或手动 dispatch 触发。标准发布只构建一次前端，再把 Linux、Windows 和 macOS 的五个 Go 目标，分配到独立的 runner 并行编译；最后的 job 通过 `tools/goreleaser_prebuilt.sh` 把这些二进制导入 GoReleaser，统一生成 Release 归档、校验和、双架构镜像和 manifest。GoReleaser 使用 `tokenrouter` build ID 生成五个平台归档，每个归档包含 `tokenrouter` 可执行文件，镜像复用其中的 Linux 二进制。
+`.github/workflows/release.yml` 由 `v*` tag 或手动 dispatch 触发。tag 推送默认执行 simple release，手动触发的 `simple_release` 也默认为 `true`。此模式构建一次前端，再通过 `.goreleaser.simple.yaml` 编译 Linux amd64 服务并发布单架构镜像，跳过跨平台二进制矩阵、QEMU 和 Release 二进制附件。`vars.SIMPLE_RELEASE` 不参与模式选择。
 
-每个镜像架构只构建一次，发布到当前仓库所有者的 GHCR 命名空间。本仓库的镜像地址是 `ghcr.io/kiroo92/tokenrouter`，发布通过 `GITHUB_TOKEN` 的 `packages: write` 权限认证。simple release 跳过二进制矩阵，只构建精简的镜像集合。workflow 从 annotated tag 的 body 读取 release notes，成功后把 `backend/cmd/server/VERSION` 同步回默认分支。
+需要完整发布时，手动触发并关闭 `simple_release`。前端仍构建一次，Linux、Windows 和 macOS 的五个 Go 目标分配到独立的 runner 并行编译；最后的 job 通过 `tools/goreleaser_prebuilt.sh` 把这些二进制导入 GoReleaser，生成 Release 归档、校验和、双架构镜像和 manifest。GoReleaser 使用 `tokenrouter` build ID 生成五个平台归档，每个归档包含 `tokenrouter` 可执行文件，镜像复用其中的 Linux 二进制。
+
+镜像发布到当前仓库所有者的 GHCR 命名空间，在 `ferguson089347/TokenRouter` 中为 `ghcr.io/ferguson089347/tokenrouter`。simple release 为同一次构建打上版本号、`版本号-amd64` 和 `latest` 三个标签。发布通过 `GITHUB_TOKEN` 的 `packages: write` 权限认证。workflow 从 annotated tag 的 body 读取 release notes，成功后把 `backend/cmd/server/VERSION` 同步回默认分支。
 
 `release` 和 `sync-version-file` 成功后，`notify-discord` 向 Discord 发布英文版本公告，标准发布和 simple release 都会执行。仓库 Actions Secret `DISCORD_RELEASE_WEBHOOK_URL` 保存 `releases` 频道的专用 Webhook URL，地址使用 Discord 生成的完整值。通知步骤从 GitHub Release 读取版本名、更新说明和下载链接，`tools/notify_discord_release.py` 构造消息并附上本次 workflow 链接。草稿发布会被拒绝，长说明会截断并保留完整 Release 链接，消息关闭所有提及通知。
 

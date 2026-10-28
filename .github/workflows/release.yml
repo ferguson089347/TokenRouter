@@ -1,9 +1,17 @@
 name: Release
 
-# release.yml builds release assets and publishes container images to GHCR.
-# Standard releases package the binary matrix and both Linux architectures;
-# simple releases build an amd64 image, with GitHub credentials authorizing
-# package uploads for the repository owner.
+# release.yml publishes annotated-tag releases and the repository owner's GHCR
+# images. Tag pushes select the simple Linux amd64 image build by default.
+# Manual dispatch accepts a simple_release boolean so maintainers can request
+# the complete platform archives and dual-architecture container manifests
+# for a specific tag. Release metadata supplies one version, commit, and
+# build date to every build job.
+#
+# Frontend assets are built once and shared with the selected backend build.
+# The release job accepts a skipped binary matrix when simple mode is active;
+# full mode requires every binary build to succeed before packaging begins.
+# Version-file synchronization follows publication, and Discord notification
+# waits for that synchronization to finish.
 
 on:
   push:
@@ -16,15 +24,13 @@ on:
         required: true
         type: string
       simple_release:
-        description: 'Simple release: only x86_64 GHCR image, skip other artifacts'
+        description: 'Simple release: publish only the Linux amd64 GHCR image'
         required: false
         type: boolean
-        default: false
+        default: true
 
-# 环境变量：合并 workflow_dispatch 输入和 repository variable
-# tag push 触发时读取 vars.SIMPLE_RELEASE，workflow_dispatch 时使用输入参数
 env:
-  SIMPLE_RELEASE: ${{ github.event.inputs.simple_release == 'true' || vars.SIMPLE_RELEASE == 'true' }}
+  SIMPLE_RELEASE: ${{ github.event_name == 'push' || inputs.simple_release }}
 
 permissions:
   contents: write

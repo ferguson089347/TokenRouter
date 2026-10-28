@@ -1,4 +1,7 @@
-# 简化版 GoReleaser 配置 - 仅发布 x86_64 GHCR 镜像
+# .goreleaser.simple.yaml builds the embedded server for Linux amd64 and
+# publishes its runtime image to the repository owner's GHCR namespace.
+# The GitHub Release contains the annotated tag notes and Docker installation
+# instructions; version, amd64, and latest tags point to the same image.
 version: 2
 
 project_name: tokenrouter
@@ -26,17 +29,17 @@ builds:
       - -X main.Date={{.Date}}
       - -X main.BuildType=release
 
-# 跳过 archives
+# Binary archives are excluded from uploads by release.skip_upload below.
 archives: []
 
-# 跳过 checksum
+# Container-only releases do not publish downloadable archive checksums.
 checksum:
   disable: true
 
 changelog:
   disable: true
 
-# 仅 GHCR x86_64 镜像
+# The three tags share one Linux amd64 image build.
 dockers:
   - id: ghcr-amd64
     goos: linux
@@ -55,7 +58,7 @@ dockers:
       - "--label=org.opencontainers.image.revision={{ .Commit }}"
       - "--label=org.opencontainers.image.source=https://github.com/{{ .Env.GITHUB_REPO_OWNER }}/{{ .Env.GITHUB_REPO_NAME }}"
 
-# 跳过 manifests（单架构不需要）
+# A single architecture is published directly through its image tags.
 docker_manifests: []
 
 release:
@@ -65,23 +68,23 @@ release:
   draft: false
   prerelease: auto
   name_template: "TokenRouter {{.Version}} (Simple)"
-  # 跳过上传二进制包
+  # Release assets are delivered through GHCR for this container-only mode.
   skip_upload: true
   header: |
-    > ⚡ Simple Release: 仅包含 x86_64 GHCR 镜像
+    > Simple release: Linux amd64 container image.
 
     {{ .Env.TAG_MESSAGE }}
 
   footer: |
     ---
 
-    ## 📥 Installation
+    ## Installation
 
-    **Docker (x86_64 only):**
+    Docker (Linux amd64):
     ```bash
     docker pull ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/tokenrouter:{{ .Version }}
     ```
 
-    ## 📚 Documentation
+    ## Documentation
 
     - [GitHub Repository](https://github.com/{{ .Env.GITHUB_REPO_OWNER }}/{{ .Env.GITHUB_REPO_NAME }})
