@@ -13,20 +13,34 @@ import (
 	"strings"
 )
 
-// layoutViolation 记录一条文件组织规则及其定位。
+// layout.go checks backend source and test organization across build
+// configurations. It groups parsed files by directory so each package's
+// handwritten source count, generated neighbors, test ownership, and
+// documentation references are evaluated together. Generated files remain
+// available for filename matching while their own layout checks are skipped.
+//
+// Integration tests must select integration=true and exclude integration=false,
+// while ordinary unit files need a usable combination with integration disabled.
+// The constraint evaluator searches remaining tags so platform-specific tests
+// can satisfy these rules. Violations are sorted by rule and path to give
+// maintainers stable reports across directory traversal and map iteration.
+
+var (
+	// These patterns match supported test suffixes and source references in
+	// package documentation during file organization checks.
+	layoutTestSuffixes = []string{"_external_integration_test.go", "_integration_test.go", "_external_test.go", "_test.go"}
+	layoutDocFile      = regexp.MustCompile(`[a-z0-9_]+\.go`)
+)
+
+// layoutViolation identifies one file organization rule and its offending path.
 type layoutViolation struct{ Rule, Path, Reason string }
 
-// layoutFile 保存跨构建集合的语法树，生成文件也参与同名源文件匹配。
+// layoutFile holds parsed source metadata for package-wide layout and ownership checks.
 type layoutFile struct {
 	path, name string
 	tree       *ast.File
 	generated  bool
 }
-
-var (
-	layoutTestSuffixes = []string{"_external_integration_test.go", "_integration_test.go", "_external_test.go", "_test.go"}
-	layoutDocFile      = regexp.MustCompile(`[a-z0-9_]+\.go`)
-)
 
 // scanLayout 检查所有构建集合的文件名、标签和包说明。
 func scanLayout(root string) ([]layoutViolation, error) {

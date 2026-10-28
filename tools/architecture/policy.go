@@ -9,20 +9,28 @@ import (
 	"github.com/arch-go/arch-go/v2/api/configuration"
 )
 
-const modulePath = "github.com/TokenFlux/TokenRouter"
+// policy.go derives per-file dependency rules from module, directory role,
+// leaf package, and upstream platform tables. Production and test additions
+// are selected separately before the rule builder combines allow lists with
+// restrictions on adapter implementations and retired packages. File permissions
+// identify exact callers for selected imports within those broader rules.
+//
+// Project paths become anchored regular expressions because arch-go interprets
+// dependency selectors as patterns. Empty allow lists use an impossible pattern
+// so the library cannot interpret an empty slice as unrestricted access. Role
+// rules also distinguish application code from test fixtures, and selected file
+// exceptions control otherwise blocked standard-library imports.
+
+const (
+	// modulePath anchors project import selectors so internal package checks
+	// share the backend module identity across dependency rules.
+	modulePath = "github.com/TokenFlux/TokenRouter"
+)
 
 // Tests 只保存测试相对生产增加的依赖，避免重复维护两份相同清单。
 type dependencySet struct {
 	Production string
 	Tests      string
-}
-
-func (d dependencySet) paths(test bool) []string {
-	values := strings.Fields(d.Production)
-	if test {
-		values = append(values, strings.Fields(d.Tests)...)
-	}
-	return values
 }
 
 type filePermission struct {
@@ -38,6 +46,24 @@ type location struct {
 	leaf     string
 	platform string
 	test     bool
+}
+
+type (
+	// dependencyRule names arch-go's configured import dependency rule representation.
+	dependencyRule = configuration.DependenciesRule
+	// dependencies names arch-go's grouped dependency selectors for each rule.
+	dependencies = configuration.Dependencies
+)
+
+// paths returns configured production imports and adds test-only imports when
+// test is true. Each call builds a new slice so callers can append selectors
+// independently.
+func (d dependencySet) paths(test bool) []string {
+	values := strings.Fields(d.Production)
+	if test {
+		values = append(values, strings.Fields(d.Tests)...)
+	}
+	return values
 }
 
 func within(value, directory string) bool {
@@ -139,11 +165,6 @@ func closed(values []string) []string {
 	}
 	return values
 }
-
-type (
-	dependencyRule = configuration.DependenciesRule
-	dependencies   = configuration.Dependencies
-)
 
 func allowProject(values []string) *dependencyRule {
 	return &dependencyRule{ShouldOnlyDependsOn: &dependencies{Internal: closed(expressions(values, true))}}
