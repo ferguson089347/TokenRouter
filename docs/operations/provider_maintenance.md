@@ -118,6 +118,8 @@ Anthropic 的限流响应头，由 upstream 解析成窗口观测，provider 负
 
 ## 提供商测试与自动恢复
 
+日常渠道健康由[渠道被动监控](ops_monitoring_and_alerting.md#passive_channel_monitor)统计。分组主动诊断和提供商定时测试会额外调用上游，按各自配置执行。
+
 管理端的即时测试和 `scheduled-test-plans`，使用平台的测试服务调用实际的凭据和模型，并保存测试结果。计划和结果的值、增删改查、结果保留规则和执行器在 `provider`，SQL 在 `provider/postgres`，管理 HTTP 在 `provider/httpapi`。app 注入一个实例、时钟和 cron 技术适配；构造时不启动，每分钟一个周期，偏移十秒，每轮最多十个测试，预算五分钟。停止时，取消偏移和槽位的等待，等待在途的测试，超时时报告；停止后无法再次 Start。
 
 即时测试、计划测试和分组的后台探测，都调用同一个 `provider.TestService.Test` 事件用例。`provider/httpapi` 负责 SSE 的 Header、提交时机和逐个事件的 Flush，后台直接汇总类型化的事件；平台执行通过受控的句柄，调用 `provider/provider` 的测试目标，不接触 Gin。写出失败时返回写入错误并取消执行，事件顺序和已经产生的部分内容保留。健康恢复由 `provider.RecoveryService`（只有一个）执行，管理员、即时测试、计划测试和窗口恢复入口都使用它。

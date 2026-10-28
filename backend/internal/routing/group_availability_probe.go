@@ -5,12 +5,11 @@ import (
 	"time"
 )
 
-// group_availability_probe.go defines probe outcomes, availability summaries,
-// and their persistence interface.
-// Availability history stores one final outcome per probe round, independently
-// of transient failures within retries. Group summaries combine counts in a
-// bounded window with the latest recorded status, and a bucket without
-// observations keeps an unknown ratio rather than reporting failure.
+// group_availability_probe.go defines active diagnostic outcomes and public
+// observation summaries. Active diagnostics store one result per probe round,
+// while the marketplace reads eligible real requests from passive monitoring.
+// Both readers retain missing ratios, and passive summaries include sampled
+// health and committed coverage so absent data cannot imply healthy traffic.
 
 // Probe outcome labels distinguish successful execution from failures in stored
 // history and latest-state responses returned to marketplace consumers.
@@ -53,35 +52,52 @@ type GroupAvailabilityProbeResult struct {
 	FinishedAt time.Time // recorded attempt finish time
 }
 
-// GroupAvailabilityBucket aggregates recorded probe outcomes within one
-// marketplace time bucket.
-type GroupAvailabilityBucket struct {
-	Date string // formatted time-bucket start label
-	// SuccessCount and TotalCount count saved round observations within the
-	// bucket. AvailabilityRate divides those counts and is nil when the bucket has
-	// no observations.
-	SuccessCount     int64    // successful observations in bucket
-	TotalCount       int64    // all observations in bucket
-	AvailabilityRate *float64 // success fraction in bucket
+// GroupAvailabilityHealth contains sampled channel health for a marketplace observation interval.
+type GroupAvailabilityHealth struct {
+	// Status and Score use the configured request minimum. TTFTP50Ms and
+	// CacheRate additionally require enough observations for their own signals;
+	// absent pointers represent unavailable measurements rather than zero values.
+	Status    string   // sampled health category label
+	Score     *float64 // optional weighted health score
+	TTFTP50Ms *int64   // milliseconds
+	CacheRate *float64 // observed cache read ratio
 }
 
-// GroupAvailabilitySummary combines window observations with the latest
-// recorded probe status.
+// GroupAvailabilityBucket aggregates observations within one displayed marketplace interval.
+type GroupAvailabilityBucket struct {
+	Date string // formatted time-bucket start label
+	// SuccessCount and TotalCount count observations supplied by the owning
+	// reader. Active diagnostics count rounds; passive monitoring counts requests
+	// and withholds AvailabilityRate until its minimum sample requirement is met.
+	SuccessCount     int64                    // successful observations in bucket
+	TotalCount       int64                    // all observations in bucket
+	AvailabilityRate *float64                 // success fraction in bucket
+	Health           *GroupAvailabilityHealth // optional passive health assessment
+}
+
+// GroupAvailabilitySummary combines window observations, sampled health, and the reader's latest status.
 type GroupAvailabilitySummary struct {
 	WindowDays    int // nominal observation-window day count
 	BucketMinutes int // observation bucket width in minutes
-	// SuccessCount and TotalCount count saved rounds within the observation
-	// window. AvailabilityRate is their success fraction and remains nil when that
-	// window contains no observations.
+	// SuccessCount and TotalCount describe the selected reader's observations
+	// within the window. Passive monitoring requires enough requests before
+	// publishing AvailabilityRate or a measured health category.
 	SuccessCount     int64    // successful observations in window
 	TotalCount       int64    // all observations in window
 	AvailabilityRate *float64 // window success fraction
-	// LastStatus and LastCheckedAt come from the latest history row by start time
-	// and ID. That row can precede the observation window, and a missing row
-	// remains unknown.
+	// LastStatus and LastCheckedAt describe the reader's latest observation.
+	// Active diagnostics can use a round before the window; passive monitoring
+	// uses its newest nonempty bucket and the committed observation cutoff.
 	LastStatus    string                    // latest observed status string
 	LastCheckedAt *time.Time                // latest observation finish time
 	Days          []GroupAvailabilityBucket // ordered observation time buckets
+	// Health, DataThrough, CoverageComplete, and RefreshIntervalSeconds are
+	// supplied by passive monitoring. Active diagnostic readers leave them unset;
+	// public consumers interpret coverage and freshness when passive data exists.
+	Health                 *GroupAvailabilityHealth // optional passive window health
+	DataThrough            *time.Time               // latest committed aggregation cutoff
+	CoverageComplete       bool                     // selected history fully recomputed
+	RefreshIntervalSeconds int                      // seconds
 }
 
 // GroupAvailabilityProbeRepository manages probe claims, atomic result

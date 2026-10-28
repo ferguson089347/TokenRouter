@@ -165,35 +165,49 @@ type ModelMarketplaceCapacity struct {
 	RPMMax          int `json:"rpm_max"`          // aggregate provider RPM capacity
 }
 
-// ModelMarketplaceAvailabilityDay contains probe counts for one displayed
-// time bucket.
-type ModelMarketplaceAvailabilityDay struct {
-	Date string `json:"date"` // local time-bucket label
-	// SuccessCount, TotalCount, and AvailabilityRate summarize final probe
-	// rounds within this bucket. AvailabilityRate is success divided by total,
-	// with nil indicating no recorded rounds.
-	SuccessCount     int64    `json:"success_count"`               // successful probe round count
-	TotalCount       int64    `json:"total_count"`                 // recorded probe round count
-	AvailabilityRate *float64 `json:"availability_rate,omitempty"` // successful round proportion
+// ModelMarketplaceHealth contains sampled passive health and measured signal summaries.
+type ModelMarketplaceHealth struct {
+	// Status and Score follow the configured request minimum. TTFTP50Ms and
+	// CacheRate require enough signal-specific samples; absent pointers remain
+	// omitted from public JSON instead of implying a zero measurement.
+	Status    string   `json:"status"`                // sampled health category label
+	Score     *float64 `json:"score,omitempty"`       // optional weighted health score
+	TTFTP50Ms *int64   `json:"ttft_p50_ms,omitempty"` // milliseconds
+	CacheRate *float64 `json:"cache_rate,omitempty"`  // measured cache read ratio
 }
 
-// ModelMarketplaceAvailability combines windowed probe totals, latest status,
-// and time buckets.
+// ModelMarketplaceAvailabilityDay contains observations for one displayed history interval.
+type ModelMarketplaceAvailabilityDay struct {
+	Date string `json:"date"` // local time-bucket label
+	// SuccessCount, TotalCount, and AvailabilityRate describe the reader's
+	// observations. Passive monitoring publishes a ratio after its configured
+	// request minimum; active diagnostic readers can still supply round counts.
+	SuccessCount     int64                   `json:"success_count"`               // successful observation count
+	TotalCount       int64                   `json:"total_count"`                 // complete observation count
+	AvailabilityRate *float64                `json:"availability_rate,omitempty"` // measured successful observation ratio
+	Health           *ModelMarketplaceHealth `json:"health,omitempty"`            // optional passive health assessment
+}
+
+// ModelMarketplaceAvailability combines window totals, passive health, committed coverage, and history.
 type ModelMarketplaceAvailability struct {
 	WindowDays    int `json:"window_days"`    // configured observation window days
 	BucketMinutes int `json:"bucket_minutes"` // configured time-bucket size minutes
 	// SuccessCount, TotalCount, and AvailabilityRate summarize the observation
-	// window. AvailabilityRate is success divided by total, and nil indicates
-	// that the window contains no recorded rounds.
-	SuccessCount     int64    `json:"success_count"`               // successful window round count
-	TotalCount       int64    `json:"total_count"`                 // recorded window round count
-	AvailabilityRate *float64 `json:"availability_rate,omitempty"` // window successful round proportion
-	// LastStatus and LastCheckedAt describe the latest stored probe round even
-	// when it predates the observation window. LastCheckedAt is that round's
-	// finish time; absent history leaves these values unset.
-	LastStatus    string                            `json:"last_status,omitempty"`     // latest probe round status
-	LastCheckedAt *time.Time                        `json:"last_checked_at,omitempty"` // latest round completion time
-	Days          []ModelMarketplaceAvailabilityDay `json:"days"`                      // ordered local observation buckets
+	// window. Passive monitoring requires its configured request minimum before
+	// publishing a ratio; missing or insufficient observations keep it absent.
+	SuccessCount     int64    `json:"success_count"`               // successful window observation count
+	TotalCount       int64    `json:"total_count"`                 // complete window observation count
+	AvailabilityRate *float64 `json:"availability_rate,omitempty"` // measured successful observation ratio
+	// LastStatus and LastCheckedAt describe the reader's newest observation.
+	// Passive monitoring supplies a sampled health category and bounds its time
+	// by committed aggregation; active diagnostic readers retain round outcomes.
+	LastStatus             string                            `json:"last_status,omitempty"`              // latest observed reader status
+	LastCheckedAt          *time.Time                        `json:"last_checked_at,omitempty"`          // latest observation cutoff time
+	Days                   []ModelMarketplaceAvailabilityDay `json:"days"`                               // ordered local observation buckets
+	Health                 *ModelMarketplaceHealth           `json:"health,omitempty"`                   // optional passive window assessment
+	DataThrough            *time.Time                        `json:"data_through,omitempty"`             // committed aggregation cutoff timestamp
+	CoverageComplete       bool                              `json:"coverage_complete"`                  // selected history fully recomputed
+	RefreshIntervalSeconds int                               `json:"refresh_interval_seconds,omitempty"` // seconds
 }
 
 // ModelMarketplaceGroup contains localized product text, models, prices, and
@@ -223,9 +237,9 @@ type ModelMarketplaceGroup struct {
 	// summary; disabled or unavailable capacity queries leave this member
 	// absent.
 	Capacity *ModelMarketplaceCapacity `json:"capacity,omitempty"` // optional current capacity summary
-	// Availability contains observed probe history when supplied by routing; a
+	// Availability contains passive request history when supplied by routing; a
 	// missing summary remains absent and does not invent an availability rate.
-	Availability *ModelMarketplaceAvailability `json:"availability,omitempty"` // optional historical probe summary
+	Availability *ModelMarketplaceAvailability `json:"availability,omitempty"` // optional passive health summary
 	ModelCount   int                           `json:"model_count"`            // resolved public model count
 	Models       []ModelMarketplaceModel       `json:"models"`                 // requestable public model entries
 }
@@ -277,7 +291,7 @@ func ModelMarketplaceGroupsFromRouting(groups []routing.ModelMarketplaceGroup) [
 	return out
 }
 
-// modelMarketplaceAvailabilityFromRouting maps a probe summary or returns nil
+// modelMarketplaceAvailabilityFromRouting maps an observation summary or returns nil
 // when it is unavailable. Bucket records are allocated for the DTO, while
 // availability-rate and latest-check pointers retain the summary's values and
 // storage.
@@ -292,18 +306,33 @@ func modelMarketplaceAvailabilityFromRouting(availability *routing.GroupAvailabi
 			SuccessCount:     day.SuccessCount,
 			TotalCount:       day.TotalCount,
 			AvailabilityRate: day.AvailabilityRate,
+			Health:           modelMarketplaceHealthFromRouting(day.Health),
 		})
 	}
 	return &ModelMarketplaceAvailability{
-		WindowDays:       availability.WindowDays,
-		BucketMinutes:    availability.BucketMinutes,
-		SuccessCount:     availability.SuccessCount,
-		TotalCount:       availability.TotalCount,
-		AvailabilityRate: availability.AvailabilityRate,
-		LastStatus:       availability.LastStatus,
-		LastCheckedAt:    availability.LastCheckedAt,
-		Days:             days,
+		WindowDays:             availability.WindowDays,
+		BucketMinutes:          availability.BucketMinutes,
+		SuccessCount:           availability.SuccessCount,
+		TotalCount:             availability.TotalCount,
+		AvailabilityRate:       availability.AvailabilityRate,
+		LastStatus:             availability.LastStatus,
+		LastCheckedAt:          availability.LastCheckedAt,
+		Days:                   days,
+		Health:                 modelMarketplaceHealthFromRouting(availability.Health),
+		DataThrough:            availability.DataThrough,
+		CoverageComplete:       availability.CoverageComplete,
+		RefreshIntervalSeconds: availability.RefreshIntervalSeconds,
 	}
+}
+
+// modelMarketplaceHealthFromRouting allocates a public passive health record.
+// A missing health record remains absent; optional scalar pointers retain their
+// read-only observation values through encoding of the enclosing marketplace response.
+func modelMarketplaceHealthFromRouting(health *routing.GroupAvailabilityHealth) *ModelMarketplaceHealth {
+	if health == nil {
+		return nil
+	}
+	return &ModelMarketplaceHealth{Status: health.Status, Score: health.Score, TTFTP50Ms: health.TTFTP50Ms, CacheRate: health.CacheRate}
 }
 
 // modelMarketplaceCapacityFromRouting copies current capacity observations

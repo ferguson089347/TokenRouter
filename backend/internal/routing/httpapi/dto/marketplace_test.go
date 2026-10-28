@@ -3,6 +3,7 @@ package dto
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -37,6 +38,28 @@ func TestMarketplaceHeaderTagVisibilityJSON(t *testing.T) {
 			require.Equal(t, ratio, fields["official_price_ratio"])
 		}
 	}
+}
+
+// TestMarketplacePassiveHealthJSON converts sampled and unknown history cells
+// alongside the committed cutoff. It protects absent latency and score values
+// while retaining measured zero scores and independent success ratios in JSON.
+func TestMarketplacePassiveHealthJSON(t *testing.T) {
+	zero := float64(0)
+	latency := int64(1250)
+	through := time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC)
+	result := modelMarketplaceAvailabilityFromRouting(&routing.GroupAvailabilitySummary{
+		WindowDays: 7, DataThrough: &through, CoverageComplete: false, RefreshIntervalSeconds: 300,
+		Health: &routing.GroupAvailabilityHealth{Status: "critical", Score: &zero, TTFTP50Ms: &latency},
+		Days:   []routing.GroupAvailabilityBucket{{Date: "2026-10-28T00:00:00Z", Health: &routing.GroupAvailabilityHealth{Status: "unknown"}}},
+	})
+	body, err := json.Marshal(result)
+	require.NoError(t, err)
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &fields))
+	require.JSONEq(t, `{"status":"critical","score":0,"ttft_p50_ms":1250}`, string(fields["health"]))
+	require.JSONEq(t, `"2026-10-28T00:00:00Z"`, string(fields["data_through"]))
+	require.JSONEq(t, `[{"date":"2026-10-28T00:00:00Z","success_count":0,"total_count":0,"health":{"status":"unknown"}}]`, string(fields["days"]))
+	require.JSONEq(t, `false`, string(fields["coverage_complete"]))
 }
 
 // TestImagePriceJSONPreservesFreeAndMissingSizes serializes a quote with two

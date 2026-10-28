@@ -15,6 +15,13 @@
           />
         </div>
 
+        <router-link
+          v-if="authStore.isAdmin"
+          to="/admin/channel-monitor"
+          class="btn btn-secondary shrink-0"
+        >
+          {{ t('marketplace.monitorSettings') }}
+        </router-link>
         <FilterDropdown
           :active-count="activeFilterCount"
           :columns="3"
@@ -244,11 +251,7 @@
                   </div>
                 </div>
               </div>
-              <div
-                v-if="group.availability"
-                class="w-full xl:w-2/5 xl:shrink-0"
-                data-testid="marketplace-group-availability"
-              >
+              <div class="w-full xl:w-2/5 xl:shrink-0" data-testid="marketplace-group-availability">
                 <GroupAvailabilityBar :availability="group.availability" class="min-w-0" />
               </div>
             </div>
@@ -419,8 +422,10 @@ import { useAppStore, useAuthStore } from '@/stores'
 // Search and brand, pricing, and group filters determine the summaries shown in
 // one vertical list. Groups start collapsed and open independently. The first
 // expansion mounts twelve models at most; closing a rendered group retains its
-// current page and pricing controls. Changed filters reset model pages, while
-// expansion choices remain associated with group IDs. Filtering searches each
+// current page and pricing controls. Group headers retain sampled passive health
+// and historical status even while their model lists are collapsed. Changed
+// filters reset model pages, while expansion choices remain associated with
+// group IDs. Filtering searches each
 // complete model directory, including models outside the current page. Paging
 // returns to that group's disclosure entry below the fixed application header.
 

@@ -146,7 +146,7 @@ func TestMarketplaceHeaderTagVisibility(t *testing.T) {
 // TestMarketplaceBatchAttributesAndOptionalCapacity varies attribute failure
 // and capacity inclusion over mixed visible and excluded groups. It checks
 // one attribute batch, quote identity, protocol forwarding, repository order,
-// probe filtering, and unknown attributes after failure.
+// passive group filtering, and unknown attributes after failure.
 func TestMarketplaceBatchAttributesAndOptionalCapacity(t *testing.T) {
 	for _, attributesFail := range []bool{false, true} {
 		for _, includeCapacity := range []bool{false, true} {
@@ -190,7 +190,7 @@ func TestMarketplaceBatchAttributesAndOptionalCapacity(t *testing.T) {
 			require.Equal(t, float64(2), result[0].Models[0].Pricing.InputPricePerToken)
 			require.Equal(t, marketplaceLoadingProtocols, result[0].Models[0].Protocols)
 			require.Equal(t, marketplaceLoadingProtocols[:1], result[0].Models[0].NativeProtocols)
-			require.Equal(t, []int64{1}, observations.availabilityGroups)
+			require.ElementsMatch(t, []int64{2, 1}, observations.availabilityGroups)
 			require.NotNil(t, result[1].Availability)
 			if includeCapacity {
 				require.Equal(t, 1, observations.capacityCalls)

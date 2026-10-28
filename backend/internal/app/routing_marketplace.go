@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 
 // routing_marketplace.go assembles marketplace model display with shared
 // routing, capacity, pricing, and public statistics. Model presentation also
-// receives current attributes and availability probes. Its statistics adapter
+// receives current attributes and passive availability history. Its statistics adapter
 // exposes dashboard token/user totals, while price and modality calls delegate
 // to shared billing components so public presentation uses the assembled
 // pricing readers.
@@ -40,9 +41,9 @@ type marketplaceStats struct {
 // price/capacity presentation. cfg, catalogue, and attributes are required by
 // construction; the marketplace retains the supplied timezone and current
 // model-attribute resolver for later queries.
-func provideMarketplace(groups *routingpostgres.GroupStore, store *settings.Store, catalogue *routing.RequestableCatalogue, prices *billing.PriceResolver, calculator *billing.Calculator, capacity *routing.CapacityService, availability routing.GroupAvailabilityProbeRepository, cfg *config.Config, attributes *routing.ModelAttributeService) *routing.Marketplace {
+func provideMarketplace(groups *routingpostgres.GroupStore, store *settings.Store, catalogue *routing.RequestableCatalogue, prices *billing.PriceResolver, calculator *billing.Calculator, capacity *routing.CapacityService, db *sql.DB, cfg *config.Config, attributes *routing.ModelAttributeService) *routing.Marketplace {
 	options := routing.MarketplaceOptions{Attributes: attributes.ResolveMarketplaceGroups, Timezone: cfg.Timezone, Now: time.Now, Warn: slog.Warn}
-	return routing.NewMarketplace(groups, store, catalogue, catalogue.Resolver, marketplacePrices{prices, calculator}, capacity, availability, options)
+	return routing.NewMarketplace(groups, store, catalogue, catalogue.Resolver, marketplacePrices{prices, calculator}, capacity, routingpostgres.NewGroupAvailabilityStore(db), options)
 }
 
 // PublicStats returns dashboard token and user counts for public marketplace

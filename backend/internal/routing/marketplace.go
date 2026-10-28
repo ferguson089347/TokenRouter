@@ -68,11 +68,11 @@ type ModelMarketplaceGroup struct {
 	// Capacity is omitted when IncludeCapacity is false, a capacity reader is
 	// absent or fails, or the returned map contains no entry for this group.
 	Capacity *GroupCapacitySummary // optional group capacity summary
-	// Availability is queried for visible groups with enabled probe configuration.
+	// Availability is queried for visible public groups with eligible providers.
 	// Nil represents absent readers, failed queries, or an unavailable history
 	// entry. The supplied summary and its nested buckets remain borrowed from the
 	// history reader and are treated as read-only.
-	Availability *GroupAvailabilitySummary // optional recorded probe summary
+	Availability *GroupAvailabilitySummary // optional passive request summary
 	ModelCount   int                       // returned public model count
 	Models       []ModelMarketplaceModel   // eligible public model presentations
 }
@@ -232,7 +232,7 @@ type MarketplaceOptions struct {
 	// blank. The history reader decides its response to an invalid nonblank
 	// timezone.
 	Timezone string // availability bucket interpretation timezone
-	// Now is called when querying a nonempty set of visible probe-enabled groups.
+	// Now is called when querying a nonempty set of visible public groups.
 	// NewMarketplace retains it as supplied, so that observation path requires a
 	// configured callback.
 	Now func() time.Time // availability query time callback
@@ -257,7 +257,7 @@ type Marketplace struct {
 
 // NewMarketplace retains readers for public groups, models, prices, and
 // optional observations. Construction performs no queries; callers configure
-// Now when querying enabled probe history and Warn for provider-prefetch or
+// Now when querying passive request history and Warn for provider-prefetch or
 // attribute-error reporting paths.
 func NewMarketplace(groups MarketplaceGroups, settings MarketplaceSettings, models MarketplaceModels, resolver RequestableResolver, prices MarketplacePrices, capacity MarketplaceCapacity, availability MarketplaceAvailability, options MarketplaceOptions) *Marketplace {
 	return &Marketplace{groups: groups, settings: settings, models: models, requestable: resolver, prices: prices, capacity: capacity, availability: availability, options: options}
@@ -272,8 +272,8 @@ func NewMarketplace(groups MarketplaceGroups, settings MarketplaceSettings, mode
 // assembled before a single attribute batch and optional observation queries.
 // Capability resolution failures stop the query. Optional display enrichment,
 // capacity, availability, and currency failures retain models with missing
-// auxiliary values; capability filtering and display share one catalog view. Probe history is limited
-// to visible probe-enabled groups, and capacity is skipped when IncludeCapacity
+// auxiliary values; capability filtering and display share one catalog view. Passive history is limited
+// to visible public groups, and capacity is skipped when IncludeCapacity
 // is false. A failed active-group read returns an error before assembly.
 // @project-doc docs/interfaces/model_catalog_and_marketplace.md#model_catalog_resolution
 func (s *Marketplace) ListPublic(ctx context.Context, options MarketplaceListOptions) ([]ModelMarketplaceGroup, error) {
@@ -466,7 +466,7 @@ func marketplaceGroupCapacity(capacityMap map[int64]GroupCapacitySummary, groupI
 	return &capacity
 }
 
-// getPublicAvailabilityMap reads optional history for public probe-enabled
+// getPublicAvailabilityMap reads optional history for public
 // groups with active providers. Missing readers, empty usable IDs, or query
 // failure returns nil; it passes the normalized display window, trimmed
 // timezone or UTC, and injected query time.
@@ -481,9 +481,6 @@ func (s *Marketplace) getPublicAvailabilityMap(ctx context.Context, groups []Gro
 		if group.IsExclusive || group.ActiveProviderCount <= 0 {
 			continue
 		}
-		if !group.AvailabilityProbeConfig.Enabled {
-			continue
-		}
 		groupIDs = append(groupIDs, group.ID)
 	}
 	if len(groupIDs) == 0 {
@@ -494,7 +491,7 @@ func (s *Marketplace) getPublicAvailabilityMap(ctx context.Context, groups []Gro
 	if strings.TrimSpace(s.options.Timezone) != "" {
 		timezone = strings.TrimSpace(s.options.Timezone)
 	}
-	// Probe history is optional observation data, so a failed read yields unknown
+	// Passive history is optional observation data, so a failed read yields unknown
 	// history while the already resolved model catalog and quotes remain
 	// available.
 	windowDays, bucketMinutes := s.resolveMarketplaceAvailabilityWindow(ctx)

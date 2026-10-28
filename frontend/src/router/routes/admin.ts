@@ -7,6 +7,18 @@ import type { RouteRecordRaw } from 'vue-router'
 // adminRoutes supplies the ordered records for this navigation area to the application router.
 export const adminRoutes: RouteRecordRaw[] = [
   {
+    path: '/admin/channel-monitor',
+    name: 'AdminChannelMonitor',
+    component: () => import('@/views/user/ChannelMonitorView.vue'),
+    props: { admin: true },
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Channel monitoring',
+      titleKey: 'monitor.title',
+    },
+  },
+  {
     path: '/admin/remote-account-pool',
     name: 'AdminRemoteAccountPool',
     component: () => import('@/views/admin/RemoteAccountPoolSettingsView.vue'),

@@ -114,26 +114,37 @@ export interface MarketplaceGroupCapacity {
   rpm_max: number // Aggregate per-minute request ceiling.
 }
 
-// MarketplaceGroupAvailabilityDay summarizes probe outcomes within one daily availability
-// bucket.
-export interface MarketplaceGroupAvailabilityDay {
-  date: string // Reporting calendar date.
-  success_count: number // Successful probe count.
-  total_count: number // Total observation count.
-  availability_rate?: number | null // Observed probe success rate.
+// MarketplaceGroupHealth contains sample-gated health and measured latency summaries.
+export interface MarketplaceGroupHealth {
+  status: 'healthy' | 'warning' | 'critical' | 'unknown' // Sample-gated health category.
+  score?: number | null // Optional weighted health score.
+  ttft_p50_ms?: number | null // Milliseconds; absent when insufficiently sampled.
+  cache_rate?: number | null // Observed cache read ratio.
 }
 
-// MarketplaceGroupAvailability summarizes recent group probe outcomes and daily
-// availability history.
+// MarketplaceGroupAvailabilityDay contains passive observations within one displayed history interval.
+export interface MarketplaceGroupAvailabilityDay {
+  date: string // Local history interval start.
+  success_count: number // Successful eligible request count.
+  total_count: number // Total observation count.
+  availability_rate?: number | null // Sample-gated request success ratio.
+  health?: MarketplaceGroupHealth // Optional passive bucket assessment.
+}
+
+// MarketplaceGroupAvailability summarizes passive health, history, and committed aggregation coverage.
 export interface MarketplaceGroupAvailability {
   window_days: number // Availability reporting window days.
   bucket_minutes?: number // Availability bucket duration minutes.
-  success_count: number // Successful probe count.
+  success_count: number // Successful eligible request count.
   total_count: number // Total observation count.
-  availability_rate?: number | null // Observed probe success rate.
-  last_status?: string // Latest probe status.
+  availability_rate?: number | null // Sample-gated request success ratio.
+  last_status?: string // Latest observed reader status.
   last_checked_at?: string | null // Last checked timestamp.
-  days: MarketplaceGroupAvailabilityDay[] // Daily probe outcome buckets.
+  days: MarketplaceGroupAvailabilityDay[] // Ordered observed history buckets.
+  health?: MarketplaceGroupHealth // Optional passive window assessment.
+  data_through?: string | null // Committed aggregation cutoff timestamp.
+  coverage_complete?: boolean // Selected history fully recomputed.
+  refresh_interval_seconds?: number // Seconds between configured aggregate refreshes.
 }
 
 // MarketplaceGroup describes a public routing group and its requestable model catalog.

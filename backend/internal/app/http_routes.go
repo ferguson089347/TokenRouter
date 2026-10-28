@@ -15,6 +15,7 @@ import (
 	identityhttp "github.com/TokenFlux/TokenRouter/internal/identity/httpapi"
 	intelligencehttp "github.com/TokenFlux/TokenRouter/internal/intelligence/httpapi"
 	notificationhttp "github.com/TokenFlux/TokenRouter/internal/notification/httpapi"
+	opshttp "github.com/TokenFlux/TokenRouter/internal/ops/httpapi"
 	paymenthttp "github.com/TokenFlux/TokenRouter/internal/payment/httpapi"
 	promotionhttp "github.com/TokenFlux/TokenRouter/internal/promotion/httpapi"
 	poolhttp "github.com/TokenFlux/TokenRouter/internal/remotepool/httpapi"
@@ -147,6 +148,7 @@ func providePaymentRouteMount(user *paymenthttp.PaymentHandler, webhook *payment
 // creative registrars receive the heavy-query limiter in addition to those
 // group guards.
 func provideUserRouteMount(
+	eChannelMonitor *opshttp.ChannelMonitorV2Handler,
 	eRemotePool *poolhttp.RemoteAccountPoolHandler,
 	eIntelligence *intelligencehttp.IntelligenceHandler,
 	eTickets *tickethttp.TicketHandler,
@@ -180,6 +182,7 @@ func provideUserRouteMount(
 		poolhttp.RegisterUserRoutes(authenticated, eRemotePool)
 		intelligencehttp.RegisterUserRoutes(authenticated, eIntelligence)
 		tickethttp.RegisterUserRoutes(authenticated, eTickets)
+		opshttp.RegisterChannelMonitorUserRoutes(authenticated, eChannelMonitor)
 		billinghttp.RegisterUserRoutes(authenticated, eRedeem, eSubscription)
 	}
 }

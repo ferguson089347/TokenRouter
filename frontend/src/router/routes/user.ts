@@ -6,6 +6,7 @@ import type { RouteRecordRaw } from 'vue-router'
 
 // userRoutes supplies the ordered records for this navigation area to the application router.
 export const userRoutes: RouteRecordRaw[] = [
+  { path: '/channel-monitor', redirect: '/models' },
   {
     path: '/account-pool',
     name: 'AccountPool',

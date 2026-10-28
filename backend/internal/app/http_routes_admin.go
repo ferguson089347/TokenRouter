@@ -96,6 +96,7 @@ func provideAdminRouteMount(eRemotePool *poolhttp.RemoteAccountPoolHandler,
 	eAdminTeam *httpapi.AdminHandler,
 	eAdminUser *routeidentity.AdminUserHandler[dto.APIKey[routingdto.Group]],
 	eAdminOps *routeops.OpsHandler,
+	eChannelMonitor *routeops.ChannelMonitorV2Handler,
 	eSearch *routesearch.Handler,
 ) adminRouteMount {
 	return func(v1 *gin.RouterGroup, security httpRouteSecurity, protocolCatalog gin.HandlerFunc) {
@@ -217,6 +218,7 @@ func provideAdminRouteMount(eRemotePool *poolhttp.RemoteAccountPoolHandler,
 			// Operations monitoring.
 			{
 				routeops.RegisterOpsRoutes(admin, eAdminOps)
+				routeops.RegisterChannelMonitorAdminRoutes(admin, eChannelMonitor)
 			}
 
 			// System administration.

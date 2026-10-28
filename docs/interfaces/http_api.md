@@ -413,3 +413,11 @@ Grok 请求缓存开关使用 `X-TokenRouter-Grok-Client-Tool-Cache`，没有新
 ## MCP OAuth 接入
 
 `/mcp` 同时接受专用 Token 和 OAuth access token。OAuth 公开发现与协议端点使用标准响应，浏览器授权和应用管理位于 `/api/v1/admin/mcp/oauth`，要求管理员 JWT。端点清单、授权期限和刷新规则见 [MCP OAuth 应用授权](mcp_management.md#oauth_authorization)。
+
+## 渠道被动监控
+
+模型广场的公开 `/api/v1/marketplace/models` 响应在 `availability` 中附带整体和时间桶的被动健康、首字时间与聚合覆盖状态，供 `/models` 分组头部显示。公开响应由模型广场的可见分组范围限制，字段见[模型目录与市场](model_catalog_and_marketplace.md#group_availability_probe)。
+
+登录用户通过 `GET /api/v1/channel-monitor/v2/{snapshot,dimensions,models,matrix,errors,users}` 读取当前有权访问分组的被动统计。查询接受 `range=90m|24h|7d|30d`，平台、模型和分组使用可重复的 `platform`、`model`、`group_id` 参数；矩阵另接受 `group_by=platform|platform_group|platform_model|platform_group_model`。用户响应隐藏绝对流量、上游错误样本和其他用户身份。
+
+管理员使用 `/api/v1/admin/channel-monitor/v2/` 下的同名读取入口，以及 `GET/PUT config`。配置提交包含读取到的 `version`，并发修改返回 409；关闭监控时读取统计返回 503，配置仍可编辑。管理操作按 `ops.channel_monitor.*` 登记到 `adminapi`，由管理端的认证、限流和审计中间件保护。样本、评分、水位与迁移规则见[渠道被动监控](../operations/ops_monitoring_and_alerting.md#passive_channel_monitor)。

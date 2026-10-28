@@ -14,5 +14,6 @@
 //   - collector_queries.go, ops_sla_sql.go: metric sampling and SLA filters.
 //   - ops_ingress_reject_repo.go: batch writes and queries for ingress rejection counts.
 //   - cleanup.go, historical_ingress_cleanup.go: expired logs and historical ingress rejection cleanup.
+//   - monitor*.go: passive channel facts, fixed rollups, coverage, and versioned configuration.
 //   - advisory.go: PostgreSQL advisory locks for maintenance tasks.
 package postgres

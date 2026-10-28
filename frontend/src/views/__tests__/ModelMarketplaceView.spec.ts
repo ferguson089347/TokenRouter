@@ -356,8 +356,8 @@ describe('ModelMarketplaceView', () => {
     wrapper.unmount()
   })
 
-  // Public group details omit internal capacity even when availability information is supplied.
-  // A collapsed group keeps its availability summary visible before visitors open its models.
+  // Collapsed public groups retain passive monitoring beside their names.
+  // Missing observations render unknown state instead of hiding monitoring entirely.
   it('用户侧不展示分组容量，收起分组时仍显示可用率摘要', async () => {
     const fixture = marketplaceFixture()
     fixture[0] = {
@@ -376,7 +376,13 @@ describe('ModelMarketplaceView', () => {
     const wrapper = await mountMarketplace()
 
     expect(wrapper.findAll('[data-testid="group-capacity"]')).toHaveLength(0)
-    expect(wrapper.get('[data-testid="marketplace-group-availability"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="marketplace-group-availability"]')).toHaveLength(
+      fixture.length,
+    )
+    const emptyGroup = wrapper.get('[data-group-id="2"]')
+    expect(emptyGroup.get('[data-testid="passive-health-status"]').text()).toContain(
+      'marketplace.monitorStates.unknown',
+    )
     wrapper.unmount()
   })
 

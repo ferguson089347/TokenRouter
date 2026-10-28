@@ -225,7 +225,7 @@ internal/identity/httpapi/dto internal/pkg/ internal/promotion/... internal/serv
 internal/settings`, Tests: ""},
 		"internal/protocol": {Production: "internal/protocol/...", Tests: "internal/testutil/assertion"},
 		"internal/routing": {Production: `internal/server/adminapi internal/modelcatalog ent/... internal/provider internal/apikey/httpapi/dto internal/billing internal/billing/pricing
-internal/billing/provider internal/idempotency internal/idempotency/httpapi
+internal/billing/provider internal/ops/monitor internal/idempotency internal/idempotency/httpapi
 internal/infra/postgres/... internal/infra/telemetry/... internal/pkg/ internal/protocol
 internal/protocol/openai internal/routing/... internal/scheduler/policy internal/server/httpx
 internal/settings internal/upstream/anthropic internal/upstream/antigravity
@@ -436,6 +436,8 @@ internal/upstream/zhipu/...`, Tests: ""},
 		// 容器启动等待由共用测试入口提供，许可限定到接入该入口的文件。
 		{Scope: "internal/infra/redis", Imports: "internal/testutil/rediscontainer", Files: "helpers_integration_test.go"},
 		{Scope: "internal/ops/postgres", Imports: "internal/testutil/rediscontainer", Files: "main_integration_test.go"},
+		// Marketplace health uses the shared passive scorer through its SQL adapter.
+		{Scope: "internal/routing/postgres", Imports: "internal/ops/monitor", Files: "group_availability.go"},
 		{Scope: "internal/ops/rediscache", Imports: "internal/testutil/rediscontainer", Files: "main_integration_test.go"},
 		{Scope: "internal/scheduler/rediscache", Imports: "internal/testutil/rediscontainer", Files: "main_integration_test.go"},
 		{Scope: "internal/search/provider", Imports: "internal/testutil/rediscontainer", Files: "quota_reservation_scenario_integration_test.go"},

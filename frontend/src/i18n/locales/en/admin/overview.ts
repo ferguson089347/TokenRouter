@@ -1025,8 +1025,8 @@ export default {
       automatic: 'Automatic',
       protocolUnavailable:
         'Select a supported protocol allowed by this group, or disable the probe.',
-      title: 'Group Availability Probe',
-      hint: 'Send lightweight active probes to this group on a fixed interval. The marketplace shows availability using the configured public window.',
+      title: 'Active diagnostics (optional)',
+      hint: 'Channel monitoring and public availability use real traffic. Enable this option to send additional scheduled upstream requests for active diagnostics.',
       model: 'Probe Model',
       selectModel: 'Select probe model',
       interval: 'Probe Interval (minutes)',

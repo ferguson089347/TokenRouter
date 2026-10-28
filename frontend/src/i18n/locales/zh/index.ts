@@ -1,3 +1,4 @@
+import channelMonitor from './channelMonitor'
 import intelligence from './intelligence'
 import tickets from './tickets'
 import remotePool from './remotePool'
@@ -16,6 +17,7 @@ import requests from './requests'
 // determines the value retained if domain modules define the same key.
 
 export default {
+  ...channelMonitor,
   ...intelligence,
   ...remotePool,
   ...tickets,

@@ -178,6 +178,7 @@ backend/
 │   ├── ops/                                             运行观测、告警、报告和系统维护
 │   │   ├── httpapi/                                     HTTP 路由、鉴权接入与输入输出适配
 │   │   ├── maintenance/                                 系统更新、回退、操作互斥与生命周期
+│   │   ├── monitor/                                     渠道被动健康、查询范围、评分与历史聚合任务
 │   │   ├── postgres/                                    PostgreSQL 持久化及事务适配
 │   │   ├── provider/                                    外部服务与技术能力适配
 │   │   └── rediscache/                                  Redis 缓存、计数或会话适配
@@ -425,6 +426,8 @@ flowchart TB
 ```
 
 app/lifecycle 管理这些组件的启动和关闭。audit 独立记录操作审计，idempotency 协调面板写命令，backup 与 ops/maintenance 管理备份、恢复及系统更新；它们的等待与关闭顺序见[系统架构](system_architecture.md#startup_and_shutdown)。设置提交后的应用失败、邮件投递的不确定结果和各模块的多实例限制由相应专题说明。
+
+模型广场的 `routing/postgres/group_availability.go` 读取被动聚合，并调用 `ops/monitor` 的同一健康评分函数；这项依赖按文件许可，HTTP DTO 由 routing 自己维护。历史桶先合并组内计数和时延直方图，再计算整体与各桶的健康，公开读取不调用上游测试。
 
 <a id="module_topics"></a>
 ## 模块专题导航
