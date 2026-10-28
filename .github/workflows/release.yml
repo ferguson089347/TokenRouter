@@ -364,7 +364,9 @@ jobs:
 
   sync-version-file:
     needs: [release]
-    if: ${{ needs.release.result == 'success' }}
+    # Evaluate release completion directly so a skipped simple-mode binary
+    # matrix cannot suppress synchronization of the default branch version.
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout default branch

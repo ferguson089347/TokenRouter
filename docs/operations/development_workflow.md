@@ -425,6 +425,8 @@ DOMPurify 用于 Markdown 页面、公告、支付说明和 SVG 图标的内容�
 
 镜像发布到当前仓库所有者的 GHCR 命名空间，在 `ferguson089347/TokenRouter` 中为 `ghcr.io/ferguson089347/tokenrouter`。simple release 为同一次构建打上版本号、`版本号-amd64` 和 `latest` 三个标签。发布通过 `GITHUB_TOKEN` 的 `packages: write` 权限认证。workflow 从 annotated tag 的 body 读取 release notes，成功后把 `backend/cmd/server/VERSION` 同步回默认分支。
 
+版本回写任务使用 `!cancelled()` 和 `release.result` 判断是否运行，使 simple 模式跳过的二进制矩阵不阻止发布后的回写。
+
 `release` 和 `sync-version-file` 成功后，`notify-discord` 向 Discord 发布英文版本公告，标准发布和 simple release 都会执行。仓库 Actions Secret `DISCORD_RELEASE_WEBHOOK_URL` 保存 `releases` 频道的专用 Webhook URL，地址使用 Discord 生成的完整值。通知步骤从 GitHub Release 读取版本名、更新说明和下载链接，`tools/notify_discord_release.py` 构造消息并附上本次 workflow 链接。草稿发布会被拒绝，长说明会截断并保留完整 Release 链接，消息关闭所有提及通知。
 
 缺少 Secret 时通知步骤输出警告并跳过。发送失败会显示警告，发布结果仍为成功。脚本等待 Discord 返回消息回执；网络超时后由维护者检查频道，确认消息是否送达。重跑已成功的通知会再发送一条消息。GitHub feed 的提交动态使用仓库 push Webhook，发布公告由 Release workflow 发送。
