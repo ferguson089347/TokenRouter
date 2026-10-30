@@ -29,7 +29,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   useI18n: () => ({ t: (key: string) => key, locale: { value: 'en' } }),
 }))
 
-// Snapshot fixtures contain one visible account with a current local group multiplier and an expired remote session warning for users.
+// Snapshot fixtures contain one visible page row, totals covering 120 matching accounts, and an expired remote session warning for users.
 const snapshot = {
   stale: true,
   auth_invalid: true,
@@ -50,7 +50,19 @@ const result = {
       groups: [{ id: 100, name: 'Local group', rate_multiplier: 2.5 }],
     },
   ],
-  total: 1,
+  total: 120,
+  group_stats: [
+    {
+      id: 100,
+      name: 'Local group',
+      rate_multiplier: 2.5,
+      total_accounts: 120,
+      available_accounts: 96,
+      current_concurrency: 480,
+      concurrency: 1200,
+      unlimited_accounts: 0,
+    },
+  ],
 }
 let wrapper: ReturnType<typeof render> | undefined
 
@@ -110,7 +122,7 @@ describe('RemoteAccountPoolView', () => {
     expect(windows.map((window) => window.props('utilization'))).toEqual([4, 92])
     expect(
       wrapper.findAll('[role="progressbar"]').map((window) => window.attributes('aria-valuenow')),
-    ).toEqual(['4', '92'])
+    ).toEqual(['40', '4', '92'])
   })
   // Source measurements can be missing or exceed the displayed progress range.
   // Unknown usage has its own text, and bar geometry remains bounded while the
@@ -132,7 +144,7 @@ describe('RemoteAccountPoolView', () => {
     wrapper = render()
     await flushPromises()
     expect(wrapper.text()).toContain('remotePool.usageUnknown')
-    const windows = wrapper.findAll('[role="progressbar"]')
+    const windows = wrapper.findAll('[role="progressbar"]').slice(1)
     expect(windows.map((window) => window.attributes('aria-valuenow'))).toEqual(['0', '100'])
     expect(windows[1].attributes('aria-valuetext')).toBe('140%')
   })
@@ -152,6 +164,7 @@ describe('RemoteAccountPoolView', () => {
     api.list.mockResolvedValueOnce({
       ...result,
       items: [{ ...result.items[0], display_name: 'Current result' }],
+      group_stats: [{ ...result.group_stats[0], available_accounts: 88 }],
     })
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -163,6 +176,7 @@ describe('RemoteAccountPoolView', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Current result')
     expect(wrapper.text()).not.toContain('Old result')
+    expect(wrapper.get('[data-group-stats="100"]').text()).toContain('88')
   })
   // Initial reads use twenty rows. Paging and combined type, status, and local
   // group filters preserve the page size and restart at the first matching page.
@@ -213,5 +227,74 @@ describe('RemoteAccountPoolView', () => {
       }),
       expect.any(AbortSignal),
     )
+  })
+
+  // One page contains a single row while its server statistics cover 120 accounts.
+  // Paging retains those totals, and subsequent filtered data replaces the cards together with rows.
+  it('displays full filtered group statistics across pagination and filter changes', async () => {
+    wrapper = render()
+    await flushPromises()
+    const card = wrapper.get('[data-group-stats="100"]')
+    expect(card.text()).toMatch(/96\s*\/\s*120/)
+    expect(card.text()).toMatch(/480\s*\/\s*1,200/)
+    wrapper.findComponent(Pagination).vm.$emit('update:page', 2)
+    await flushPromises()
+    expect(wrapper.get('[data-group-stats="100"]').text()).toMatch(/96\s*\/\s*120/)
+    api.list.mockResolvedValueOnce({
+      ...result,
+      total: 2,
+      group_stats: [
+        {
+          ...result.group_stats[0],
+          total_accounts: 2,
+          available_accounts: 0,
+          current_concurrency: 0,
+          concurrency: 20,
+        },
+      ],
+    })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    const filtered = wrapper.get('[data-group-stats="100"]')
+    expect(filtered.text()).toMatch(/0\s*\/\s*2/)
+    expect(filtered.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('0')
+  })
+
+  // Source groups can contain unlimited accounts or report occupancy above their configured limit.
+  // Unlimited capacity stays distinct from zero and over-capacity progress geometry remains bounded.
+  it('handles unlimited group capacity and over-capacity occupancy', async () => {
+    api.list.mockResolvedValue({
+      ...result,
+      group_stats: [
+        { ...result.group_stats[0], unlimited_accounts: 1 },
+        {
+          ...result.group_stats[0],
+          id: 200,
+          name: 'Busy group',
+          current_concurrency: 140,
+          concurrency: 100,
+        },
+      ],
+    })
+    wrapper = render()
+    await flushPromises()
+    const unlimited = wrapper.get('[data-group-stats="100"]')
+    expect(unlimited.text()).toContain('∞')
+    expect(unlimited.find('[role="progressbar"]').exists()).toBe(false)
+    const busy = wrapper.get('[data-group-stats="200"]')
+    expect(busy.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100')
+    expect(busy.get('[role="progressbar"]').attributes('aria-valuetext')).toBe('140 / 100')
+  })
+
+  // A successful empty directory response replaces a previous populated snapshot.
+  // Summary cards disappear with its rows so stale totals cannot describe the newly selected filters.
+  it('clears group statistics when no accounts match', async () => {
+    wrapper = render()
+    await flushPromises()
+    expect(wrapper.find('[data-group-stats]').exists()).toBe(true)
+    api.list.mockResolvedValueOnce({ ...result, items: [], total: 0, group_stats: [] })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.find('[data-group-stats]').exists()).toBe(false)
   })
 })

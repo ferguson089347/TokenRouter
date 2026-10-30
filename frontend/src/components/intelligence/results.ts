@@ -3,10 +3,17 @@ import { marked } from 'marked'
 import type { IntelligenceRun, IntelligenceTest } from '@/api/intelligence'
 
 // results.ts converts stored quality-check observations into display states,
-// chronological bars, grouped histories, and sanitized content. Execution
-// failure and missing assessment remain separate from incorrect answers, and
-// drawing URLs must match the dedicated signed content route before an iframe
-// can load them.
+// chronological bars, grouped histories, and sanitized content. User rows show
+// the newest assessed result alongside the newest active task. Filtering quality
+// history before limiting its length keeps pending tasks and diagnostics from
+// displacing completed observations. Artwork matches the selected result identity,
+// so a newer generation cannot illustrate an older quality verdict.
+//
+// Completion timestamps describe finished observations; legacy summaries use their
+// last update time. Active records use submission time when inspected through a
+// history component. Execution failure and missing assessment remain separate from
+// incorrect answers, and drawing URLs must match the dedicated signed content route
+// before an iframe can load them.
 
 // IntelligenceDisplayStatus separates assessed quality from diagnostics and pending work.
 export type IntelligenceDisplayStatus =
@@ -50,14 +57,47 @@ export function recentRuns(runs: IntelligenceRun[], count = 60): IntelligenceRun
     .slice(-count)
 }
 
-// recentArtifacts returns at most ten retained drawings in newest-first
-// display order. Both summary artifact flags and already loaded HTML qualify,
-// allowing lightweight list responses and full details to share rendering.
-export function recentArtifacts(runs: IntelligenceRun[]): IntelligenceRun[] {
-  return recentRuns(
-    runs.filter((run) => run.has_artifact || !!run.html),
-    10,
-  ).reverse()
+// summarizeTestRuns selects a row's assessed history and newest active task
+// independently. Only completed observations with passing or failing verdicts enter
+// the sixty-result history; pending work and execution diagnostics remain separate.
+//
+// The thumbnail must belong to the latest assessed observation, even when a newer
+// unfinished task already has artwork. Missing retained HTML leaves the thumbnail
+// empty instead of showing another run's drawing. Counts use the same filtered
+// observations as the history bar, so partial histories retain their actual sample size.
+export function summarizeTestRuns(test: IntelligenceTest) {
+  const runs = test.runs || []
+  const history = recentRuns(
+    runs.filter(
+      (run) => run.status === 'completed' && ['passed', 'incorrect'].includes(resultStatus(run)),
+    ),
+  )
+  const latest = history.length ? history[history.length - 1] : undefined
+  const active = recentRuns(
+    runs.filter((run) => ['queued', 'submitting', 'running'].includes(run.status)),
+    1,
+  )[0]
+  const artwork = latest
+    ? [latest, ...(test.artifacts || [])].find(
+        (run) => run.id === latest.id && (run.has_artifact || !!run.html),
+      )
+    : undefined
+  const passedCount = history.filter((run) => run.verdict === 'passed').length
+  return {
+    history,
+    latest,
+    active,
+    artwork,
+    passedCount,
+    failedCount: history.length - passedCount,
+  }
+}
+
+// observationTime returns completion time for assessed records and submission time
+// for other states. Historical completed records lacking finished_at use their
+// recorded update time, keeping that timestamp distinct from the task's creation.
+export function observationTime(run: IntelligenceRun): string {
+  return run.status === 'completed' ? run.finished_at || run.updated_at : run.created_at
 }
 
 // groupTests groups authorized checks by group identity and requested model.

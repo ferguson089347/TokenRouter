@@ -61,6 +61,15 @@ export default {
     staleHint:
       'Remote data could not be updated. Showing the last successful snapshot. Contact an administrator to check the connection or update RT.',
     snapshotAt: 'Data updated',
+    statistics: {
+      title: 'Group statistics',
+      scope: 'All accounts matching the current filters',
+      availableAccounts: 'Available / Total accounts',
+      concurrency: 'Current concurrency / Limit',
+      concurrencyUsage: '{group} concurrent slot usage',
+      availabilityHint:
+        'Availability follows remote account status and includes accounts at their concurrency limit. Shared accounts count in each group. Concurrency reflects the data update time.',
+    },
     sourceGroup: 'Remote group',
   },
 }

@@ -30,7 +30,17 @@
         {{ t('intelligence.emptyHint') }}
       </div>
       <template v-if="groups.length">
-        <IntelligenceStatusLegend />
+        <div class="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-dark-400">
+          <span class="inline-flex items-center gap-1">
+            <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+            {{ t('intelligence.statuses.passed') }}
+          </span>
+          <span class="inline-flex items-center gap-1">
+            <span class="h-2 w-2 rounded-full bg-rose-500" aria-hidden="true" />
+            {{ t('intelligence.statuses.incorrect') }}
+          </span>
+          <span class="ml-auto">{{ t('intelligence.historyTimeHint') }}</span>
+        </div>
         <section
           v-for="group in groups"
           :key="group.id"
@@ -76,82 +86,131 @@
                   :key="row.test.source || 'site'"
                   :data-test-id="row.test.id"
                   :data-source="row.test.source || 'site'"
-                  class="grid min-w-0 grid-cols-[4rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-dark-800 lg:grid-cols-[4rem_5rem_8rem_minmax(6rem,1fr)_5rem]"
+                  class="min-w-0 px-4 py-4 transition-colors hover:bg-gray-50 dark:hover:bg-dark-800"
                 >
                   <div
-                    class="row-span-2 aspect-[4/3] w-full overflow-hidden rounded-control border border-gray-100 bg-gray-50 dark:border-dark-700 dark:bg-dark-950 lg:row-span-1"
-                    data-testid="latest-drawing"
+                    class="grid min-w-0 grid-cols-2 items-center gap-4 xl:grid-cols-[10rem_7rem_9rem_minmax(8rem,1fr)_7rem]"
                   >
-                    <IntelligenceDrawing
-                      v-if="row.artwork"
-                      :run-id="row.artwork.id"
-                      :title="model.model"
-                      compact
-                    />
-                    <span
-                      v-else
-                      class="flex h-full items-center justify-center text-gray-300 dark:text-dark-600"
-                    >
-                      <Icon name="modalityImage" size="sm" :animate-on-hover="false" />
-                    </span>
-                  </div>
-                  <div
-                    class="col-start-2 row-start-1 flex items-center gap-2 text-xs text-gray-500 dark:text-dark-400 lg:col-start-auto lg:row-start-auto"
-                  >
-                    <Icon
-                      :name="row.test.source === 'user' ? 'user' : 'shieldCheck'"
-                      size="xs"
-                      :animate-on-hover="false"
-                    />
-                    <span class="whitespace-nowrap">{{
-                      t(
-                        row.test.source === 'user'
-                          ? 'intelligence.userTests'
-                          : 'intelligence.siteTests',
-                      )
-                    }}</span>
-                  </div>
-                  <div
-                    class="col-span-2 col-start-2 row-start-2 flex flex-wrap items-center gap-2 text-xs lg:col-span-1 lg:col-start-auto lg:row-start-auto lg:block"
-                  >
-                    <IntelligenceStatusBadge v-if="row.latest" :status="resultStatus(row.latest)" />
-                    <span v-else class="text-gray-400 dark:text-dark-500">—</span>
-                    <span
-                      v-if="row.latest"
-                      class="text-gray-500 tabular-nums dark:text-dark-400 lg:mt-1 lg:block"
-                      data-testid="row-first-token"
-                    >
-                      {{ t('intelligence.firstToken') }}
-                      {{
-                        typeof row.latest.first_token_ms === 'number'
-                          ? `${row.latest.first_token_ms} ms`
-                          : '—'
-                      }}
-                    </span>
-                  </div>
-                  <div class="col-span-3 min-w-0 lg:col-span-1">
-                    <IntelligenceResultBar
-                      v-if="row.test.runs?.length"
-                      :runs="row.test.runs"
-                      compact
-                    />
-                    <span v-else class="text-xs text-gray-400 dark:text-dark-500">{{
-                      t('intelligence.noRuns')
-                    }}</span>
-                  </div>
-                  <div
-                    class="col-start-3 row-start-1 justify-self-end lg:col-start-auto lg:row-start-auto"
-                  >
-                    <button
-                      v-if="row.test.source === 'user' && model.site"
-                      type="button"
-                      class="btn btn-secondary btn-sm gap-1 whitespace-nowrap px-2"
-                      :aria-label="t('intelligence.selfTestForModel', { model: model.model })"
-                      @click="selfTestTarget = model.site"
-                    >
-                      <Icon name="play" size="xs" />
-                      {{ t('intelligence.selfTest') }}
-                    </button>
+                    <div class="col-span-2 flex min-w-0 items-center gap-3 xl:col-span-1">
+                      <div
+                        class="aspect-[4/3] w-16 shrink-0 overflow-hidden rounded-control border border-gray-100 bg-gray-50 dark:border-dark-700 dark:bg-dark-950"
+                        data-testid="latest-drawing"
+                      >
+                        <IntelligenceDrawing
+                          v-if="row.artwork"
+                          :run-id="row.artwork.id"
+                          :title="model.model"
+                          compact
+                        />
+                        <span
+                          v-else
+                          class="flex h-full items-center justify-center text-gray-300 dark:text-dark-600"
+                        >
+                          <Icon name="modalityImage" size="sm" :animate-on-hover="false" />
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-dark-400">
+                        <Icon
+                          :name="row.test.source === 'user' ? 'user' : 'shieldCheck'"
+                          size="xs"
+                          :animate-on-hover="false"
+                        />
+                        <span class="whitespace-nowrap">{{
+                          t(
+                            row.test.source === 'user'
+                              ? 'intelligence.userTests'
+                              : 'intelligence.siteTests',
+                          )
+                        }}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p class="mb-2 text-xs text-gray-500 dark:text-dark-400">
+                        {{ t('intelligence.latestValidResult') }}
+                      </p>
+                      <IntelligenceStatusBadge
+                        v-if="row.latest"
+                        :status="resultStatus(row.latest)"
+                      />
+                      <span v-else class="text-xs text-gray-400 dark:text-dark-500">{{
+                        t('intelligence.noValidResult')
+                      }}</span>
+                      <p
+                        v-if="row.active"
+                        data-testid="current-task"
+                        class="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-dark-400"
+                      >
+                        <Icon
+                          name="refresh"
+                          size="xs"
+                          class="animate-spin text-primary-500 motion-reduce:animate-none"
+                          :animate-on-hover="false"
+                        />
+                        <span role="status">{{ taskPhase(row.active) }}</span>
+                      </p>
+                    </div>
+                    <div v-if="row.latest" data-testid="result-time">
+                      <span class="sr-only">
+                        {{
+                          t(
+                            row.latest.finished_at
+                              ? 'intelligence.lastCompleted'
+                              : 'intelligence.resultUpdated',
+                          )
+                        }}
+                      </span>
+                      <time
+                        :datetime="observationTime(row.latest)"
+                        :title="`${t(row.latest.finished_at ? 'intelligence.lastCompleted' : 'intelligence.resultUpdated')}: ${formatDateTime(observationTime(row.latest))}`"
+                        class="block whitespace-nowrap text-sm font-medium tabular-nums text-gray-900 dark:text-dark-100"
+                        >{{ completionTime(observationTime(row.latest)) }}</time
+                      >
+                      <span
+                        class="mt-1 block text-xs text-gray-500 dark:text-dark-400"
+                        data-testid="result-age"
+                        >{{ relativeTime(observationTime(row.latest)) }}</span
+                      >
+                    </div>
+                    <div v-else class="text-sm text-gray-400 dark:text-dark-500">—</div>
+                    <div class="col-span-2 min-w-0 xl:col-span-1">
+                      <template v-if="row.history.length">
+                        <div
+                          class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-dark-400"
+                        >
+                          <span>{{
+                            t('intelligence.validResults', { count: row.history.length })
+                          }}</span>
+                          <span data-testid="result-counts">{{
+                            t('intelligence.resultCounts', {
+                              passed: row.passedCount,
+                              failed: row.failedCount,
+                            })
+                          }}</span>
+                        </div>
+                        <IntelligenceResultBar :runs="row.history" compact />
+                        <div
+                          class="mt-1 flex justify-between text-xs text-gray-400 dark:text-dark-400"
+                        >
+                          <span>{{ t('intelligence.olderResults') }}</span>
+                          <span>{{ t('intelligence.newestResult') }}</span>
+                        </div>
+                      </template>
+                      <span v-else class="text-xs text-gray-400 dark:text-dark-500">{{
+                        t('intelligence.noRuns')
+                      }}</span>
+                    </div>
+                    <div class="col-span-2 justify-self-end xl:col-span-1">
+                      <button
+                        v-if="row.test.source === 'user' && model.site"
+                        type="button"
+                        class="btn btn-secondary btn-sm gap-1 whitespace-nowrap px-2"
+                        :aria-label="t('intelligence.selfTestForModel', { model: model.model })"
+                        @click="selfTestTarget = model.site"
+                      >
+                        <Icon name="play" size="xs" />
+                        {{ t('intelligence.selfTest') }}
+                      </button>
+                    </div>
                   </div>
                 </article>
               </div>
@@ -173,6 +232,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useNow } from '@vueuse/core'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ModelIcon from '@/components/common/ModelIcon.vue'
@@ -180,18 +240,21 @@ import IntelligenceResultBar from '@/components/intelligence/IntelligenceResultB
 import IntelligenceDrawing from '@/components/intelligence/IntelligenceDrawing.vue'
 import IntelligenceSelfTestDialog from '@/components/intelligence/IntelligenceSelfTestDialog.vue'
 import IntelligenceStatusBadge from '@/components/intelligence/IntelligenceStatusBadge.vue'
-import IntelligenceStatusLegend from '@/components/intelligence/IntelligenceStatusLegend.vue'
-import { recentArtifacts, recentRuns, resultStatus } from '@/components/intelligence/results'
-import { intelligenceAPI, type IntelligenceTest } from '@/api/intelligence'
+import { observationTime, resultStatus, summarizeTestRuns } from '@/components/intelligence/results'
+import { intelligenceAPI, type IntelligenceRun, type IntelligenceTest } from '@/api/intelligence'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { provideIntelligenceResults } from '@/components/intelligence/useIntelligenceResults'
+import { formatDateTime } from '@/utils/format'
 
 // IntelligenceView.vue displays authorized model histories in routing group cards.
 // Each group uses shared card and badge styles for its name and billing
 // multiplier. History colors distinguish test outcomes, and the row action uses
 // the same secondary button treatment as other console lists.
 // Model identity occupies a shared column beside adjacent site and user rows,
-// whose latest artwork, status, history, and actions align for comparison.
+// whose latest assessed artwork, status, completion time, history, and actions
+// align for comparison. Active task stages sit beside the previous assessed result,
+// leaving row boundaries uniform during generation and retries. Completion labels
+// show a compact date and minute, with full timestamps available on hover.
 // Drawing models reserve an empty user row until the first contribution, so the
 // self-test entry stays beside its site's observations.
 //
@@ -203,7 +266,10 @@ import { provideIntelligenceResults } from '@/components/intelligence/useIntelli
 
 // Page observations, request feedback, and the selected self-test target belong
 // to this mounted page; the result provider owns transient preview resources.
-const { t } = useI18n()
+const { t, locale } = useI18n()
+// useNow advances minute-based completion ages and releases its timer with this
+// component; network refresh remains on the independent ten-second polling cycle.
+const now = useNow({ interval: 60000 })
 provideIntelligenceResults()
 const tests = ref<IntelligenceTest[]>([])
 const loading = ref(false)
@@ -282,15 +348,61 @@ const groups = computed(() => {
             ...model,
             rows: entries
               .sort((a, b) => Number(a.source === 'user') - Number(b.source === 'user'))
-              .map((test) => ({
-                test,
-                latest: recentRuns(test.runs || []).slice(-1)[0],
-                artwork: recentArtifacts(test.artifacts || [])[0],
-              })),
+              .map((test) => ({ test, ...summarizeTestRuns(test) })),
           }
         }),
     }))
 })
+
+// completionTime formats a compact local finish timestamp through minutes.
+// Today's observations use the translated today label; older dates include their
+// calendar date, and prior years retain the year to distinguish old observations.
+function completionTime(value: string): string {
+  const date = new Date(value)
+  const clock: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }
+  if (date.toDateString() === now.value.toDateString()) {
+    return t('intelligence.todayAt', { time: formatDateTime(value, clock) })
+  }
+  return formatDateTime(value, {
+    ...clock,
+    year: date.getFullYear() === now.value.getFullYear() ? undefined : 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+}
+
+// relativeTime describes how long ago a result completed using whole elapsed
+// minutes, hours, or days. Future timestamps clamp to the present to tolerate
+// clock skew, while invalid observations retain the unknown marker.
+function relativeTime(value: string): string {
+  // Whole seconds avoid displaying partial units as a completed minute or hour.
+  const seconds = Math.max(0, Math.floor((now.value.getTime() - Date.parse(value)) / 1000))
+  if (!Number.isFinite(seconds)) return '—'
+  if (seconds < 60) return t('common.time.justNow')
+  // Choose the largest completed unit, matching the console's relative-time labels.
+  const [unit, divisor]: [Intl.RelativeTimeFormatUnit, number] =
+    seconds >= 86400 ? ['day', 86400] : seconds >= 3600 ? ['hour', 3600] : ['minute', 60]
+  return new Intl.RelativeTimeFormat(locale.value, { numeric: 'always' }).format(
+    -Math.floor(seconds / divisor),
+    unit,
+  )
+}
+
+// taskPhase translates the observable execution stage of an active task.
+// Retry phase takes precedence over queued status because the same submitted
+// task can return to the queue after a transient generation failure.
+// Saved-artwork phases indicate evaluation even before the next worker claims
+// the task. A generating phase identifies model output work, while remote or
+// unrecognized stages retain the generic running label until an observable
+// stage arrives in a later list response.
+function taskPhase(run: IntelligenceRun): string {
+  if (run.phase === 'retrying') return t('intelligence.phases.retrying')
+  if (['generated', 'assessing', 'classifying'].includes(run.phase || ''))
+    return t('intelligence.phases.assessing')
+  if (run.phase === 'generating') return t('intelligence.phases.generating')
+  if (run.status === 'queued') return t('intelligence.statuses.queued')
+  return t('intelligence.statuses.running')
+}
 
 // submitted refreshes shared history after the user's paid drawing is queued.
 // The pending observation appears in its public user row while background reads

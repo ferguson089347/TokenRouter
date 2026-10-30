@@ -59,6 +59,15 @@ export default {
     rtInvalid: '远端 RT 已失效，请管理员在配置中更新 RT。列表保留最后一次成功获取的数据。',
     staleHint: '远端数据暂未更新，当前展示最近一次成功获取的数据。请联系管理员检查连接或更新 RT。',
     snapshotAt: '数据更新时间',
+    statistics: {
+      title: '分组统计',
+      scope: '覆盖当前筛选的全部账号',
+      availableAccounts: '可用 / 总账号',
+      concurrency: '当前并发 / 上限',
+      concurrencyUsage: '{group} 并发占用',
+      availabilityHint:
+        '可用按远端账号状态统计，满并发账号仍计入；共享账号在各所属分组分别统计。并发以数据更新时间为准。',
+    },
     sourceGroup: '远端分组',
   },
 }

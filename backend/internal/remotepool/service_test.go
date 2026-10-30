@@ -440,6 +440,89 @@ func TestRemotePoolCollectsSourceClampedPages(t *testing.T) {
 	require.EqualValues(t, 6, reads.Load())
 }
 
+// TestRemotePoolGroupStatisticsRespectAccessFiltersAndPagination serves a saved
+// snapshot with shared accounts and two remote bindings for one local group.
+// Totals cover every matching page, protect private groups, and distinguish
+// active status from occupied or unlimited concurrency slots.
+func TestRemotePoolGroupStatisticsRespectAccessFiltersAndPagination(t *testing.T) {
+	s, _, groups := poolFixture(t, func(context.Context, string, string, any, string) (any, error) {
+		t.Fatal("fresh snapshot statistics must not request remote data")
+		return nil, nil
+	})
+	groups.groups = append(groups.groups,
+		routing.Group{ID: 200, Name: "Shared group", RateMultiplier: 3, Status: routing.StatusActive},
+		routing.Group{ID: 300, Name: "Private group", RateMultiplier: 4, Status: routing.StatusActive},
+	)
+	_, err := s.mutate(context.Background(), func(record *remotePoolRecord) (bool, error) {
+		now := time.Now()
+		record.LastAttempt = now
+		record.SnapshotAt = &now
+		record.Warning = "retained snapshot"
+		record.Bindings = []RemotePoolBinding{{25, 100}, {26, 100}, {27, 200}, {28, 300}}
+		record.Snapshot = []RemotePoolAccount{
+			{ID: 1, PlanType: "pro", Status: "active", Concurrency: 10, CurrentConcurrency: 10, Groups: []RemotePoolGroup{{ID: 25}, {ID: 26}, {ID: 27}, {ID: 28}}},
+			{ID: 2, PlanType: "free", Status: "paused", Concurrency: 4, CurrentConcurrency: 2, Groups: []RemotePoolGroup{{ID: 25}}},
+			{ID: 3, PlanType: "pro", Status: "active", Concurrency: 0, CurrentConcurrency: 5, Groups: []RemotePoolGroup{{ID: 27}}},
+			{ID: 4, PlanType: "pro", Status: "active", Concurrency: 100, CurrentConcurrency: 90, Groups: []RemotePoolGroup{{ID: 28}}},
+		}
+		return true, nil
+	})
+	require.NoError(t, err)
+	allowed := groups.groups[:2]
+	page, err := s.List(context.Background(), url.Values{"page_size": {"1"}}, allowed)
+	require.NoError(t, err)
+	require.EqualValues(t, 3, page.Total)
+	require.Len(t, page.Items, 1)
+	require.True(t, page.Stale)
+	require.Equal(t, []RemotePoolGroupStats{
+		{RemotePoolGroup: RemotePoolGroup{ID: 100, Name: "Local group", RateMultiplier: 2.5}, TotalAccounts: 2, AvailableAccounts: 1, CurrentConcurrency: 12, Concurrency: 14},
+		{RemotePoolGroup: RemotePoolGroup{ID: 200, Name: "Shared group", RateMultiplier: 3}, TotalAccounts: 2, AvailableAccounts: 2, CurrentConcurrency: 15, Concurrency: 10, UnlimitedAccounts: 1},
+	}, page.GroupStats)
+	second, err := s.List(context.Background(), url.Values{"page_size": {"1"}, "page": {"2"}}, allowed)
+	require.NoError(t, err)
+	require.Equal(t, page.GroupStats, second.GroupStats)
+	for _, scenario := range []struct {
+		name     string     // selected list filter scenario
+		query    url.Values // filters applied before group totals
+		accounts int        // expected matching account count
+		groups   int        // expected returned group count
+		active   int        // expected first group active count
+	}{
+		{"local group", url.Values{"group_id": {"100"}}, 2, 1, 1},
+		{"active pro", url.Values{"status": {"active"}, "plan_type": {"pro"}}, 2, 2, 1},
+		{"paused", url.Values{"status": {"paused"}}, 1, 1, 0},
+		{"account reference", url.Values{"search": {s.accountReference("https://pool.example", 1)}}, 1, 2, 1},
+		{"private group", url.Values{"group_id": {"300"}}, 0, 0, 0},
+		{"empty match", url.Values{"search": {"no-match"}}, 0, 0, 0},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			filtered, err := s.List(context.Background(), scenario.query, allowed)
+			require.NoError(t, err)
+			require.EqualValues(t, scenario.accounts, filtered.Total)
+			require.Len(t, filtered.GroupStats, scenario.groups)
+			if len(filtered.GroupStats) > 0 {
+				require.Equal(t, scenario.active, filtered.GroupStats[0].AvailableAccounts)
+			}
+		})
+	}
+	denied, err := s.List(context.Background(), nil, []routing.Group{})
+	require.NoError(t, err)
+	require.Empty(t, denied.GroupStats)
+	raw, err := json.Marshal(denied)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"group_stats":[]`)
+	_, err = s.mutate(context.Background(), func(record *remotePoolRecord) (bool, error) {
+		record.Snapshot[2].CurrentConcurrency = -5
+		record.Snapshot[2].Concurrency = -1
+		return true, nil
+	})
+	require.NoError(t, err)
+	page, err = s.List(context.Background(), url.Values{"group_id": {"200"}}, allowed)
+	require.NoError(t, err)
+	require.EqualValues(t, 10, page.GroupStats[0].CurrentConcurrency)
+	require.Equal(t, 1, page.GroupStats[0].UnlimitedAccounts)
+}
+
 // TestRemotePoolPublicAccountReferences serves a cached source identity containing
 // its original numeric ID and generated name. Public rows, search, and restarts
 // retain site-local references while the persisted synchronization snapshot keeps

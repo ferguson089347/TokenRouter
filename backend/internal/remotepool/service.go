@@ -31,7 +31,8 @@ import (
 // current local names, multipliers, enabled state, and caller access. Account IDs
 // shared by multiple source groups are merged before publication. Public identities
 // use a site-keyed digest of source origin and account ID, while source names
-// remain inside the saved snapshot. Browser
+// remain inside the saved snapshot. Group statistics use every matching account
+// before pagination and retain each account's visible memberships. Browser
 // cancellation cannot interrupt the bounded persistence of a consumed refresh token.
 
 // remotePoolSettingKey identifies the settings record shared by remote
@@ -146,6 +147,21 @@ type RemotePoolGroup struct {
 	RateMultiplier float64 `json:"rate_multiplier"` // group display cost multiplier
 }
 
+// RemotePoolGroupStats summarizes matching remote accounts in one visible local group.
+type RemotePoolGroupStats struct {
+	RemotePoolGroup     // current authorized local group
+	TotalAccounts   int `json:"total_accounts"` // matching group account count
+	// AvailableAccounts counts the remote active status, including accounts whose
+	// current concurrency has reached their configured limit. It reports status availability.
+	AvailableAccounts int `json:"available_accounts"` // remotely active account count
+	// CurrentConcurrency and Concurrency sum nonnegative observations from all
+	// matching accounts in this group, including inactive accounts. Unlimited limits
+	// contribute to UnlimitedAccounts instead of the finite Concurrency sum.
+	CurrentConcurrency int64 `json:"current_concurrency"` // occupied remote request slots
+	Concurrency        int64 `json:"concurrency"`         // finite configured request slots
+	UnlimitedAccounts  int   `json:"unlimited_accounts"`  // accounts with unlimited slots
+}
+
 // RemotePoolPlan describes one available subscription tier for the pool filters.
 type RemotePoolPlan struct {
 	Value string `json:"value"` // source plan filter value
@@ -231,6 +247,9 @@ type RemotePoolPage struct {
 	Page        int                        `json:"page"`                  // one based page number
 	PageSize    int                        `json:"page_size"`             // maximum accounts per page
 	Pages       int                        `json:"pages"`                 // total matching page count
+	// GroupStats uses all permission-scoped matches before pagination. A selected
+	// local group restricts statistics to that group even for shared accounts.
+	GroupStats []RemotePoolGroupStats `json:"group_stats"` // matching local group statistics
 }
 
 // remotePoolTokens decodes session credentials returned by the remote refresh
@@ -768,10 +787,14 @@ func (s *RemoteAccountPoolService) project(ctx context.Context, r *remotePoolRec
 	return items, nil
 }
 
-// List filters and paginates the complete snapshot after applying current
-// local access.
-// Query group IDs identify local groups. Missing pagination selects page one and
-// twenty items; page sizes outside one through five hundred use the default.
+// List returns filtered account rows and group statistics after applying current
+// local access. Query group IDs identify local groups. Missing pagination selects
+// page one and twenty items; invalid page sizes use that default.
+//
+// Statistics consume all matches before pagination, so navigating pages cannot
+// change a group's observed account count or concurrency. Shared accounts count
+// once within each visible group, and a selected group limits statistics to its
+// own membership. Snapshot freshness applies to the rows and statistics together.
 func (s *RemoteAccountPoolService) List(ctx context.Context, query url.Values, allowed []routing.Group) (*RemotePoolPage, error) {
 	r, err := s.snapshot(ctx)
 	if err != nil {
@@ -814,7 +837,54 @@ func (s *RemoteAccountPoolService) List(ctx context.Context, query url.Values, a
 	}
 	start := min((page-1)*size, len(filtered))
 	end := min(start+size, len(filtered))
-	return &RemotePoolPage{Items: filtered[start:end], Total: int64(len(filtered)), Page: page, PageSize: size, Pages: (len(filtered) + size - 1) / size, SnapshotAt: r.SnapshotAt, Stale: r.Warning != "", AuthInvalid: r.AuthInvalid, Warning: r.Warning}, nil
+	return &RemotePoolPage{
+		Items: filtered[start:end], Total: int64(len(filtered)), Page: page, PageSize: size,
+		Pages: (len(filtered) + size - 1) / size, GroupStats: summarizeRemotePoolGroups(filtered, groupID),
+		SnapshotAt: r.SnapshotAt, Stale: r.Warning != "", AuthInvalid: r.AuthInvalid, Warning: r.Warning,
+	}, nil
+}
+
+// summarizeRemotePoolGroups totals accounts and concurrency within each visible
+// local membership after list filtering. Input accounts already have deduplicated
+// identities and memberships from snapshot collection and permission mapping.
+// A positive selectedGroup limits the result to that local group.
+//
+// Remote active status determines availability independently of slot saturation.
+// Negative occupancy contributes zero; nonpositive limits count as unlimited,
+// matching account-row presentation. Shared accounts contribute once per visible
+// group, and sorting by local ID makes output stable across snapshot ordering.
+func summarizeRemotePoolGroups(items []RemotePoolDisplayAccount, selectedGroup int64) []RemotePoolGroupStats {
+	groups := map[int64]*RemotePoolGroupStats{}
+	for _, account := range items {
+		for _, group := range account.Groups {
+			if selectedGroup > 0 && selectedGroup != group.ID {
+				continue
+			}
+			stats := groups[group.ID]
+			if stats == nil {
+				stats = &RemotePoolGroupStats{RemotePoolGroup: group}
+				groups[group.ID] = stats
+			}
+			stats.TotalAccounts++
+			if account.Status == "active" {
+				stats.AvailableAccounts++
+			}
+			// Malformed negative source values cannot reduce group totals; unlimited
+			// limits stay separate so clients can distinguish them from a measured zero capacity.
+			stats.CurrentConcurrency += int64(max(0, account.CurrentConcurrency))
+			if account.Concurrency <= 0 {
+				stats.UnlimitedAccounts++
+			} else {
+				stats.Concurrency += int64(account.Concurrency)
+			}
+		}
+	}
+	result := make([]RemotePoolGroupStats, 0, len(groups))
+	for _, stats := range groups {
+		result = append(result, *stats)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	return result
 }
 
 // Options returns local group choices and plan choices from visible snapshot

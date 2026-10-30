@@ -50,13 +50,9 @@
         :class="{ 'has-image': hovered.has_artifact || hovered.has_thumbnail || hovered.html }"
       >
         <div class="flex items-center justify-between gap-3">
-          <span>{{ timestamp(hovered.created_at) }}</span>
+          <span>{{ timestamp(observationTime(hovered)) }}</span>
           <IntelligenceStatusBadge :status="resultStatus(hovered)" />
         </div>
-        <p class="text-gray-500" data-testid="history-first-token">
-          {{ t('intelligence.firstToken') }}
-          {{ typeof hovered.first_token_ms === 'number' ? `${hovered.first_token_ms} ms` : '—' }}
-        </p>
         <IntelligenceThumbnail
           v-if="hovered.has_artifact || hovered.has_thumbnail || hovered.html"
           :run-id="hovered.id"
@@ -72,16 +68,17 @@ import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { IntelligenceRun } from '@/api/intelligence'
 import { formatDateTime } from '@/utils/format'
-import { recentRuns, resultColor, resultStatus } from './results'
+import { observationTime, recentRuns, resultColor, resultStatus } from './results'
 import IntelligenceThumbnail from './IntelligenceThumbnail.vue'
 import IntelligenceStatusBadge from './IntelligenceStatusBadge.vue'
 import IntelligenceStatusLegend from './IntelligenceStatusLegend.vue'
 
 // IntelligenceResultBar.vue renders sixty chronological status slots using the
 // shared result classification. Pointer hover or keyboard focus opens one
-// teleported panel with the selected screenshot, second-precision timestamp, and
-// observed first-token delay in milliseconds. Nodes expose descriptive labels
-// and display previews without click actions or detail navigation.
+// teleported panel with the selected screenshot and second-precision timestamp.
+// Completed records use completion time, with update time for legacy records.
+// Nodes expose descriptive labels and display previews without click actions
+// or detail navigation.
 // Shared badges label quality and execution states, and standalone histories
 // include a legend explaining the slot colors before a node is selected.
 //
@@ -144,7 +141,7 @@ function leaveFocus(event: FocusEvent) {
 // inspection.
 const label = (run: IntelligenceRun) =>
   t('intelligence.resultLabel', {
-    time: timestamp(run.created_at),
+    time: timestamp(observationTime(run)),
     status: t(`intelligence.statuses.${resultStatus(run)}`),
   })
 

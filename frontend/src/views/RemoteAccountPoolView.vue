@@ -110,6 +110,102 @@
         >
           {{ t('remotePool.staleHint') }}
         </p>
+        <section
+          v-if="groupStats.length"
+          class="mt-4"
+          aria-labelledby="pool-group-stats-title"
+          :aria-busy="loading"
+        >
+          <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
+            <h2
+              id="pool-group-stats-title"
+              class="text-sm font-semibold text-gray-900 dark:text-dark-50"
+            >
+              {{ t('remotePool.statistics.title') }}
+            </h2>
+            <p class="text-xs text-gray-500 dark:text-dark-400">
+              {{ t('remotePool.statistics.scope') }}
+            </p>
+          </div>
+          <div class="grid max-h-panel gap-4 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
+            <article
+              v-for="group in groupStats"
+              :key="group.id"
+              :data-group-stats="group.id"
+              class="min-w-0 rounded-surface border border-gray-200 bg-white p-4 dark:border-dark-600 dark:bg-dark-900"
+            >
+              <h3
+                class="flex items-start gap-2 break-words text-sm font-medium text-gray-900 dark:text-dark-50"
+              >
+                <Icon
+                  name="server"
+                  size="sm"
+                  class="mt-1 shrink-0 text-primary-500"
+                  :animate-on-hover="false"
+                />
+                {{ group.name }}
+              </h3>
+              <dl class="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <dt class="text-xs text-gray-500 dark:text-dark-400">
+                    {{ t('remotePool.statistics.availableAccounts') }}
+                  </dt>
+                  <dd class="mt-1 whitespace-nowrap tabular-nums">
+                    <span
+                      class="text-xl font-semibold"
+                      :class="
+                        group.available_accounts > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-gray-900 dark:text-dark-50'
+                      "
+                      >{{ formatCount(group.available_accounts) }}</span
+                    >
+                    <span class="ml-1 text-sm text-gray-500 dark:text-dark-400"
+                      >/ {{ formatCount(group.total_accounts) }}</span
+                    >
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-gray-500 dark:text-dark-400">
+                    {{ t('remotePool.statistics.concurrency') }}
+                  </dt>
+                  <dd class="mt-1 whitespace-nowrap tabular-nums">
+                    <span class="text-xl font-semibold text-gray-900 dark:text-dark-50">{{
+                      formatCount(group.current_concurrency)
+                    }}</span>
+                    <span class="ml-1 text-sm text-gray-500 dark:text-dark-400"
+                      >/
+                      {{
+                        group.unlimited_accounts > 0 ? '∞' : formatCount(group.concurrency)
+                      }}</span
+                    >
+                  </dd>
+                </div>
+              </dl>
+              <div
+                v-if="group.unlimited_accounts === 0 && group.concurrency > 0"
+                role="progressbar"
+                :aria-label="t('remotePool.statistics.concurrencyUsage', { group: group.name })"
+                :aria-valuenow="Math.min(100, concurrencyPercent(group))"
+                :aria-valuetext="`${formatCount(group.current_concurrency)} / ${formatCount(group.concurrency)}`"
+                :aria-valuemin="0"
+                :aria-valuemax="100"
+                class="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-dark-700"
+              >
+                <div
+                  class="h-full rounded-full"
+                  :class="
+                    group.current_concurrency >= group.concurrency ? 'bg-red-500' : 'bg-primary-500'
+                  "
+                  :style="{ width: `${Math.min(100, concurrencyPercent(group))}%` }"
+                />
+              </div>
+            </article>
+          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-dark-400">
+            {{ t('remotePool.statistics.availabilityHint') }}
+          </p>
+        </section>
       </template>
       <template #table>
         <DataTable
@@ -289,15 +385,19 @@ import { SEARCH_DEBOUNCE_MS } from '@/constants/ui'
 import {
   remoteAccountPoolAPI,
   type RemotePoolAccount,
+  type RemotePoolGroupStats,
   type RemotePoolOptions,
   type RemotePoolSnapshotStatus,
 } from '@/api/admin/remoteAccountPool'
 
 // RemoteAccountPoolView.vue presents the user's remote account directory using
 // current local group names and multipliers. Account rows use site-local references
-// and tier labels; utilization bars share the provider page's warning thresholds. The page reads user endpoints for
-// account rows and filter choices, and freshness notices explain when the server
-// retains a complete snapshot after remote synchronization fails.
+// and tier labels; utilization bars share the provider page's warning thresholds.
+// The page reads user endpoints for account rows and filter choices. Freshness
+// notices explain when the server retains a complete snapshot after remote
+// synchronization fails.
+// Group cards use server totals across all filtered pages; available status is
+// separate from concurrency saturation, and shared memberships keep separate cards.
 //
 // Each directory load replaces the previous request controller. Only the current
 // request may publish rows or loading state, so rapid filter changes cannot show
@@ -351,11 +451,13 @@ const planBadges: Record<string, PlanBadge> = {
   },
 }
 
-// Directory state tracks visible rows, snapshot freshness, local filters, and request ownership for the authenticated user's pool page.
+// Directory state tracks visible rows, complete filtered group totals, snapshot
+// freshness, local filters, and request ownership for the authenticated user's pool page.
 const { t, locale } = useI18n()
 const loading = ref(true)
 const error = ref('')
 const items = ref<RemotePoolAccount[]>([])
+const groupStats = ref<RemotePoolGroupStats[]>([])
 const options = ref<RemotePoolOptions>({
   groups: [],
   plan_types: [],
@@ -413,6 +515,21 @@ const activeFilterCount = computed(
 )
 const debouncedSearch = useDebounceFn(applyFilters, SEARCH_DEBOUNCE_MS)
 
+/** formatCount displays snapshot account and concurrency totals in the active locale. */
+function formatCount(value: number): string {
+  return new Intl.NumberFormat(locale.value).format(value)
+}
+
+/** concurrencyPercent calculates finite slot utilization for group progress bars.
+ * Nonpositive limits produce zero; unlimited groups omit the bar in the template.
+ * Occupancy above the limit stays visible in text while callers clamp bar geometry.
+ */
+function concurrencyPercent(group: RemotePoolGroupStats): number {
+  if (group.concurrency <= 0) return 0
+  // Convert occupied slots to a percentage; counts above the limit remain available to text labels.
+  return Math.max(0, (group.current_concurrency / group.concurrency) * 100)
+}
+
 /** planBadge resolves a source tier's row and filter styling consistently.
  * Source values or labels may vary in casing, spacing, or separators. Unknown
  * tiers use the neutral account treatment while retaining their supplied text.
@@ -460,8 +577,9 @@ function message(cause: unknown) {
 }
 
 /** loadData publishes a directory page for the current filters and optionally refreshes choices.
- * Each call aborts the previous read, and only its controller can publish rows or
- * release loading state. Leaving the page aborts outstanding requests and stops polling.
+ * Each call aborts the previous read, and only its controller can publish rows,
+ * statistics, or release loading state. Leaving the page aborts outstanding
+ * requests and stops polling.
  *
  * Choices load before rows so both use the backend's shared snapshot. Failed reads
  * retain existing rows and display an error. Disposed pages cannot publish asynchronous
@@ -493,6 +611,9 @@ async function loadData(includeOptions = false) {
     )
     if (request.signal.aborted) return
     items.value = result.items
+    // Older backend responses can omit statistics. Hide the cards in that case
+    // because computing page-only totals would misrepresent the complete filtered directory.
+    groupStats.value = result.group_stats ?? []
     total.value = result.total
     snapshotStatus.value = result
   } catch (cause) {

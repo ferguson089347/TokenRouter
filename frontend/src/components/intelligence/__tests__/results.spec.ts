@@ -4,11 +4,12 @@ import IntelligenceResultBar from '../IntelligenceResultBar.vue'
 import {
   groupTests,
   intelligencePreviewURL,
-  recentArtifacts,
   recentRuns,
   resultColor,
   resultMarkdown,
   resultStatus,
+  observationTime,
+  summarizeTestRuns,
 } from '../results'
 import { runFixture, testFixture } from './fixtures'
 
@@ -22,6 +23,60 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 }))
 
 describe('检测结果展示契约', () => {
+  // More than sixty active or diagnostic observations accompany an assessed history.
+  // Pending work cannot displace valid samples, and a newer drawing cannot illustrate the selected completed result.
+  it('分别选择有效历史与活动任务，保持结果和作品属于同一记录', () => {
+    const assessed = runFixture({ id: 'assessed', has_artifact: true })
+    const failed = runFixture({
+      id: 'failed',
+      verdict: 'failed',
+      created_at: '2026-10-02T01:00:00Z',
+    })
+    const pending = Array.from({ length: 65 }, (_, index) =>
+      runFixture({
+        id: `pending-${index}`,
+        status: 'running',
+        verdict: 'pending',
+        has_artifact: true,
+        created_at: new Date(Date.UTC(2026, 9, 4, 0, index)).toISOString(),
+      }),
+    )
+    const test = testFixture({
+      runs: [
+        failed,
+        assessed,
+        ...pending,
+        runFixture({ id: 'error', status: 'error', verdict: 'failed' }),
+        runFixture({ id: 'unknown', status: 'unknown', verdict: 'passed' }),
+      ],
+      artifacts: [pending.at(-1)!, assessed],
+    })
+    const summary = summarizeTestRuns(test)
+    expect(summary.history.map((run) => run.id)).toEqual(['failed', 'assessed'])
+    expect(summary.latest?.id).toBe('assessed')
+    expect(summary.active?.id).toBe('pending-64')
+    expect(summary.artwork?.id).toBe('assessed')
+    expect(summary.passedCount).toBe(1)
+    expect(summary.failedCount).toBe(1)
+    expect(
+      summarizeTestRuns({
+        ...test,
+        runs: [{ ...assessed, has_artifact: false }],
+        artifacts: pending,
+      }).artwork,
+    ).toBeUndefined()
+    expect(test.runs[0].id).toBe('failed')
+  })
+
+  // Completed legacy summaries lack a finish timestamp while pending tasks still have submission times.
+  // Timestamp selection keeps those meanings separate and honors an explicit finish time when supplied.
+  it('完成记录优先使用结束时间，旧记录使用更新时间，活动任务使用提交时间', () => {
+    const run = runFixture({ finished_at: '2026-10-03T01:02:00Z' })
+    expect(observationTime(run)).toBe(run.finished_at)
+    expect(observationTime(runFixture())).toBe(run.updated_at)
+    expect(observationTime({ ...run, status: 'running' })).toBe(run.created_at)
+  })
+
   it('明确未通过为红，执行异常与未知为黄，运行中保持灰色', () => {
     expect(resultColor(runFixture())).toContain('emerald')
     expect(resultColor(runFixture({ verdict: 'failed' }))).toContain('rose')
@@ -30,7 +85,9 @@ describe('检测结果展示契约', () => {
     expect(resultStatus(runFixture({ verdict: 'pending' }))).toBe('unknown')
   })
 
-  it('只保留最近60条，状态条从旧到新，作品从新到旧且最多10个', () => {
+  // Seventy reverse-ordered observations exceed the visible history limit.
+  // Selection retains sixty chronological results while the supplied array keeps its original ordering for other consumers.
+  it('只保留最近60条，状态条从旧到新且不修改输入', () => {
     const runs = Array.from({ length: 70 }, (_, index) =>
       runFixture({
         id: `run-${index}`,
@@ -41,9 +98,7 @@ describe('检测结果展示契约', () => {
     expect(recentRuns(runs)).toHaveLength(60)
     expect(recentRuns(runs)[0].id).toBe('run-10')
     expect(recentRuns(runs)[59].id).toBe('run-69')
-    expect(recentArtifacts(runs)).toHaveLength(10)
-    expect(recentArtifacts(runs)[0].id).toBe('run-69')
-    expect(recentArtifacts(runs)[9].id).toBe('run-60')
+    expect(runs[0].id).toBe('run-69')
   })
 
   it('同组多个模型和同模型多个类型分层分组，不用分组名合并不同分组', () => {

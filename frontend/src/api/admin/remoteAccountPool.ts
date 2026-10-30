@@ -48,6 +48,17 @@ export interface RemotePoolGroup {
   rate_multiplier: number // local display cost multiplier
 }
 
+/** RemotePoolGroupStats totals matching accounts in one authorized local group. */
+export interface RemotePoolGroupStats extends RemotePoolGroup {
+  total_accounts: number // matching group account count
+  /** Remote active status counts available accounts, including those currently occupying all their slots. */
+  available_accounts: number
+  current_concurrency: number // occupied remote request slots
+  concurrency: number // summed finite slot limits
+  /** A positive account count makes the group's displayed aggregate concurrency limit unlimited. */
+  unlimited_accounts: number
+}
+
 /** RemotePoolOptions supplies group and plan choices for the current caller. */
 export interface RemotePoolOptions extends RemotePoolSnapshotStatus {
   groups: RemotePoolGroup[] // visible local group choices
@@ -72,13 +83,15 @@ export interface RemotePoolAccount {
   last_used_at: string | null // ISO latest source usage
 }
 
-/** RemotePoolPage contains one filtered directory page and its snapshot status. */
+/** RemotePoolPage contains one directory page, full filtered group totals, and snapshot status. */
 export interface RemotePoolPage extends RemotePoolSnapshotStatus {
   items: RemotePoolAccount[] // visible filtered account summaries
   total: number // matching visible account count
   page: number // one based page number
   page_size: number // maximum accounts per page
   pages: number // total matching page count
+  /** Group totals follow all current filters and cover matches across every page. */
+  group_stats: RemotePoolGroupStats[]
 }
 
 /** RemotePoolFilters selects a local group and filters the saved account directory. */

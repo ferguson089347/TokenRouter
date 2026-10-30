@@ -18,9 +18,10 @@ import { intelligenceStatusColors, type IntelligenceDisplayStatus } from './resu
 import IntelligenceStatusBadge from './IntelligenceStatusBadge.vue'
 
 // IntelligenceStatusLegend.vue explains history colors beside their status
-// labels and symbols. The page shows one legend above its compact rows, while
-// standalone administrator histories include the same guide above their nodes.
-// Unknown assessments remain visible beside execution errors with separate labels.
+// labels and symbols in standalone administrator histories. User histories show
+// their assessed-result colors within the user page. This complete guide keeps
+// unknown assessments, execution errors, and pending work distinguishable during
+// administrator inspection of individual observations.
 
 const { t } = useI18n()
 
