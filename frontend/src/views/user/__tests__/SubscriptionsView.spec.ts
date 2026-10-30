@@ -25,8 +25,9 @@ vi.mock('@/api/subscriptions', () => ({
 }))
 
 // createTestI18n supplies the subscription and confirmation labels used by this page
-// fixture. Missing runtime compilation can leave keys visible, so assertions accept the
-// specific labels exercised by each case.
+// fixture. The real localization runtime resolves these messages before rendering,
+// so assertions inspect the translated text shown to users and the confirmation
+// choices supplied by this catalog.
 function createTestI18n() {
   return createI18n({
     legacy: false,
@@ -42,6 +43,7 @@ function createTestI18n() {
           cancel: 'Cancel',
           confirm: 'Confirm',
           processing: 'Processing...',
+          loading: 'Loading...',
         },
         userSubscriptions: {
           noActiveSubscriptions: 'No active subscriptions',
@@ -347,7 +349,7 @@ describe('SubscriptionsView', () => {
     await flushPromises()
     await wrapper.get('[data-testid="revoke-subscription"]').trigger('click')
     const dialog = wrapper.get('[data-testid="revoke-dialog"]')
-    expect(dialog.text()).toContain('userSubscriptions.revokeConfirmWithoutReplacement')
+    expect(dialog.text()).toContain('No queued pack will replace this plan.')
 
     await wrapper.get('[data-testid="revoke-dialog-confirm"]').trigger('click')
     await wrapper.vm.$nextTick()
