@@ -112,7 +112,8 @@ func providePaymentRuntime(client *dbent.Client, registry *payment.Registry, bal
 	})
 
 	fulfillment := payment.NewFulfillment(orders, bindings, registry, redeem, subscriptions, payment.FulfillmentRuntime{
-		Audit: audit, Now: time.Now, RebateEnabled: affiliate.IsEnabled,
+		RechargeConfig: coreConfig.GetPaymentConfig,
+		Audit:          audit, Now: time.Now, RebateEnabled: affiliate.IsEnabled,
 		Log: func(level, message string, args ...any) {
 			switch level {
 			case "warn":

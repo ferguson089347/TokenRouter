@@ -46,6 +46,10 @@
             )
           }}: {{ formatOrderAmount(row.amount, row) }}
         </div>
+        <div v-if="(row.bonus_amount ?? 0) > 0" class="text-xs text-gray-500 dark:text-dark-300"
+          >{{ t('rechargeBonus.giftTotal') }}:
+          {{ formatOrderAmount(row.bonus_amount ?? 0, row) }}</div
+        >
       </div>
     </template>
     <template #cell-payment_type="{ value }">

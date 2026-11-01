@@ -32,6 +32,8 @@
 
 支付页面的私有选择和结账逻辑放在页面业务目录，纯支付规则放在 `utils/payment/`。用户结账组件位于 `components/payment/`；提供商配置、密钥字段和管理操作位于 `components/admin/payment/`。跨角色的规则共同维护，管理端配置保持自己的归属。
 
+公开充值活动页位于 `views/activities/RechargeActivityView.vue`，通过公开路由 `/activities/:slug` 加载当前活动。页面首屏用品牌色通栏带给出状态、活动时间、倒计时格和最高档奖励卡，试算收在一张卡里，右栏结算明细在桌面端吸顶。档位由同目录的 `views/activities/ActivityTierLadder.vue` 画成一条横向阶梯：已达成档位填充分隔线并使用品牌色，下一档带描边和光环，点击档位把金额补到该档；移动端改成横向滚动的档位卡。活动页、购买页和后台预览共用 `utils/payment/rechargeBonus.ts`，按累计进度预估固定奖励差额并计算每笔时段加赠。预览和订单结果共用 `components/payment/RechargeBonusBreakdown.vue` 展示基础到账与赠送明细，订单列表展示赠送总额。后台 `RechargeBonusSettings.vue` 使用独立的草稿和保存登记，单独读取支付配置、提交赠送字段并重新读取规范化结果。页面切换或卸载会取消过期请求，服务器时间校准浏览器的活动状态。支付成功后的原子结算决定实际固定奖励增量，见[充值赠送与活动页](../domains/payments_and_entitlements.md#recharge_bonus)。
+
 代理选择器归 `components/admin/proxy/`，系统版本操作归 `components/admin/system/`，公告归 `components/announcements/`，验证码归 `components/auth/`。分组表单规则与模型属性组件分别在 `components/admin/group/` 和 `components/admin/model-attributes/` 中维护，页面通过这些模块使用表单能力。
 
 <a id="dependency_ownership"></a>

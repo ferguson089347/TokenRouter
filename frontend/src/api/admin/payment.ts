@@ -6,6 +6,7 @@ import type {
   SubscriptionPlan,
   ProviderInstance,
   PaymentDocument,
+  RechargeBonusSettings,
 } from '@/api/payment.types'
 import type { BasePaginationResponse } from '@/api/common.types'
 
@@ -20,7 +21,7 @@ import type { BasePaginationResponse } from '@/api/common.types'
  * AdminPaymentConfig contains current checkout limits, enabled methods and
  * payment presentation settings for administrators.
  */
-export interface AdminPaymentConfig {
+export interface AdminPaymentConfig extends Partial<RechargeBonusSettings> {
   enabled: boolean // Feature activation flag.
   min_amount: number // Minimum payment amount.
   max_amount: number // Maximum payment amount.
@@ -43,7 +44,7 @@ export interface AdminPaymentConfig {
  * UpdatePaymentConfigRequest contains selected payment-setting edits; omitted
  * properties stay outside the submitted update payload.
  */
-export interface UpdatePaymentConfigRequest {
+export interface UpdatePaymentConfigRequest extends Partial<RechargeBonusSettings> {
   enabled?: boolean // Feature activation flag.
   min_amount?: number // Minimum payment amount.
   max_amount?: number // Maximum payment amount.
@@ -106,11 +107,12 @@ export interface ProviderDraftTestResult {
  */
 export const adminPaymentAPI = {
   /**
-   * getConfig retrieves administrator payment settings in the shared client
-   * response object.
+   * getConfig retrieves administrator payment settings in the shared client response.
+   * An optional signal cancels section-owned reads when their settings panel is
+   * unmounted or replaces its current request.
    */
-  getConfig() {
-    return apiClient.get<AdminPaymentConfig>('/admin/payment/config')
+  getConfig(signal?: AbortSignal) {
+    return apiClient.get<AdminPaymentConfig>('/admin/payment/config', { signal })
   },
 
   /**

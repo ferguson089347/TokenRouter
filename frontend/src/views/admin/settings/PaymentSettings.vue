@@ -498,6 +498,8 @@
     </template>
   </SettingsCard>
 
+  <RechargeBonusSettings :multiplier="form.payment_balance_recharge_multiplier" />
+
   <!-- Provider cards invoke immediate persisted actions through the shared page controller. -->
   <PaymentProviderList
     v-if="form.payment_enabled"
@@ -520,6 +522,7 @@
 
 <script setup lang="ts">
 import { toRef } from 'vue'
+import RechargeBonusSettings from './RechargeBonusSettings.vue'
 import Collapse from '@/components/common/Collapse.vue'
 import SettingRow from '@/components/common/settings/SettingRow.vue'
 import SettingToggleRow from '@/components/common/settings/SettingToggleRow.vue'

@@ -21,6 +21,8 @@ import (
 // conditionally records payment state and resumes entitlement work. Only Stripe failure
 // notifications select the terminal payment-failure transition; other failure
 // callbacks are ignored before lookup.
+// First balance payment confirmation also allocates campaign rewards in that
+// state transaction, fixing total credit before fulfillment creates its redeem code.
 //
 // Fulfillment claims paid/failed or stale recharging state and uses the reread
 // stored timestamp to condition final completion/failure. That reread checks
@@ -389,9 +391,10 @@ func ExpectedNotificationProviderKey(registry *Registry, orderPaymentType string
 // Before retries, Stripe invoice progress retains the supplied observation's
 // pi_ reference when incoming trade is in_. Pending, processing, expired and
 // cancelled can transition to paid with the local observation time and cleared
-// failure fields; zero affected count rereads before another attempt. Failed,
-// paid and recharging delegate fulfillment directly, so that branch does not
-// rewrite payment time/trade. Completed/refunded and other unhandled states
+// failure fields. Failed orders without PaidAt take that same first-payment
+// transition, while failed orders already paid resume their saved entitlement.
+// Zero affected count rereads before another attempt. Paid and recharging
+// delegate fulfillment directly. Completed/refunded and other unhandled states
 // return nil. Grants still use their own replay and completion conditions.
 // EasyPay transaction identity is checked again after each order reread, so a
 // concurrent paid transition cannot make a conflicting reference acceptable.
@@ -414,16 +417,30 @@ func (s *Fulfillment) ToPaid(ctx context.Context, o *Order, tradeNo string, paid
 		}
 		previousStatus := o.Status
 		switch previousStatus {
-		case OrderStatusPending, OrderStatusProcessing, OrderStatusExpired, OrderStatusCancelled:
+		case OrderStatusPending, OrderStatusProcessing, OrderStatusExpired, OrderStatusCancelled, OrderStatusFailed:
+			// Initiation failure can precede a genuine late payment. Only a saved
+			// PaidAt proves this failed order already owns a finalized campaign allocation.
+			if previousStatus == OrderStatusFailed && o.PaidAt != nil {
+				return s.ExecuteFulfillment(ctx, o.ID)
+			}
+			var rechargeConfig *PaymentConfig
+			if o.OrderType == OrderTypeBalance && s.runtime.RechargeConfig != nil {
+				configured, configErr := s.runtime.RechargeConfig(ctx)
+				if configErr != nil {
+					return fmt.Errorf("read paid recharge campaign: %w", configErr)
+				}
+				rechargeConfig = configured
+			}
 			now := s.runtime.Now()
 			change := OrderTransition{
-				ID:           o.ID,
-				From:         []string{previousStatus},
-				Status:       OrderStatusPaid,
-				PayAmount:    &paid,
-				PaidAt:       &now,
-				ClearFailure: true,
-				TradeNo:      strings.TrimSpace(tradeNo),
+				RechargeConfig: rechargeConfig,
+				ID:             o.ID,
+				From:           []string{previousStatus},
+				Status:         OrderStatusPaid,
+				PayAmount:      &paid,
+				PaidAt:         &now,
+				ClearFailure:   true,
+				TradeNo:        strings.TrimSpace(tradeNo),
 			}
 			ApplyInvoiceMetadata(&change, metadata)
 			updated, err := s.store.TransitionOrder(ctx, change)
@@ -456,7 +473,7 @@ func (s *Fulfillment) ToPaid(ctx context.Context, o *Order, tradeNo string, paid
 			}
 			s.runtime.Audit(ctx, o.ID, "ORDER_PAID", pk, map[string]any{"tradeNo": tradeNo, "paidAmount": paid})
 			return s.ExecuteFulfillment(ctx, o.ID)
-		case OrderStatusFailed, OrderStatusPaid, OrderStatusRecharging:
+		case OrderStatusPaid, OrderStatusRecharging:
 			return s.ExecuteFulfillment(ctx, o.ID)
 		case OrderStatusCompleted, OrderStatusRefunded:
 			return nil

@@ -37,6 +37,9 @@ type (
 	// persisted details.
 	OrderTransition struct {
 		ID int64 // local payment order ID
+		// RechargeConfig supplies current campaign terms for the first confirmed
+		// payment transition. Storage serializes cumulative reward allocation with that paid state.
+		RechargeConfig *PaymentConfig
 		// From lists accepted current statuses for TransitionOrder. The update
 		// applies only while the addressed row remains in one of those supplied
 		// states.
@@ -175,7 +178,10 @@ type PaymentNotice struct {
 // FulfillmentRuntime supplies audit, logging, notification dispatch, user
 // reads, and the clock.
 type FulfillmentRuntime struct {
-	Now func() time.Time // payment state observation clock
+	// RechargeConfig reads campaign terms before first payment confirmation.
+	// Missing callbacks leave ordinary historical payment transitions and amounts unchanged.
+	RechargeConfig func(context.Context) (*PaymentConfig, error)
+	Now            func() time.Time // payment state observation clock
 	// Audit records ordinary payment events through an errorless callback.
 	// Mandatory rebate and refund records use their stores separately; this
 	// callback's persistence failures cannot be returned by fulfillment.

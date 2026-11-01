@@ -54,6 +54,8 @@ type CreateOrderResponse struct {
 	// response. The pre-creation WeChat OAuth response instead returns
 	// the checkout base supplied to that authorization step.
 	Amount        float64                 `json:"amount"`                   // returned entitlement or base
+	BonusAmount   float64                 `json:"bonus_amount,omitempty"`   // free credit included in amount
+	BonusSnapshot map[string]any          `json:"bonus_snapshot,omitempty"` // saved gift calculation details
 	PayAmount     float64                 `json:"pay_amount"`               // channel amount including fees
 	FeeRate       float64                 `json:"fee_rate"`                 // supplied fee percentage
 	FeeFixed      float64                 `json:"fee_fixed"`                // calculated fixed fee

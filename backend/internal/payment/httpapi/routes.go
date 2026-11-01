@@ -7,10 +7,11 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/server/adminapi"
 )
 
-// routes.go registers buyer, public recovery, webhook, and administrative
+// routes.go registers buyer, public activity, recovery, webhook, and administrative
 // payment endpoints with their supplied guards.
-// Payment routes expose authenticated buyer operations, anonymous recovery and
-// provider callbacks under separate groups. RegisterRoutes applies the
+// Payment routes expose authenticated buyer operations, published recharge
+// activities, anonymous recovery and provider callbacks under separate groups.
+// RegisterRoutes applies the
 // supplied buyer and administrator guard sequences, while public recovery
 // reads and webhook signature verification are handled by their endpoints;
 // payment OAuth is attached separately to the identity route group.
@@ -60,7 +61,7 @@ type WeChatAuthEndpoints interface {
 	WeChatPaymentOAuthCallback(*gin.Context)
 }
 
-// RegisterRoutes mounts buyer payment, public recovery, provider callback and
+// RegisterRoutes mounts buyer payment, public activity/recovery, provider callback and
 // administrator handlers beneath v1. Supply nonnil handlers, plan endpoints
 // and usable guards; any middleware already on v1 also applies. Buyer routes
 // receive JWT/BackendMode/Panel, administrator routes receive
@@ -96,11 +97,12 @@ func RegisterRoutes(
 		}
 	}
 
-	// Public token resolution and legacy merchant-number verification bypass
-	// buyer guards in this registration. Their handlers return selected saved
-	// fields according to each recovery input's validation.
+	// Published activity reads, public token resolution, and merchant-number
+	// verification bypass buyer guards here. Each handler limits its public
+	// fields according to publication settings or recovery-input validation.
 	public := v1.Group("/payment/public")
 	{
+		public.GET("/recharge-activity/:slug", paymentHandler.GetRechargeActivity)
 		public.POST("/orders/verify", paymentHandler.VerifyOrderPublic)
 		public.POST("/orders/resolve", paymentHandler.ResolveOrderPublicByResumeToken)
 	}

@@ -54,12 +54,30 @@ func (PaymentOrder) Fields() []ent.Field {
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "text"}),
 
-		// amount is the balance credit after the configured recharge multiplier,
+		// amount is the balance credit after the configured multiplier and gifts,
 		// or the subscription plan price. pay_amount stores the channel charge after
 		// fees and any subscription currency conversion, so the amounts can differ.
 		// Entitlement amount snapshot.
 		field.Float("amount").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}),
+		// Purchased API credit is fixed at checkout before payment-time rewards.
+		// Zero marks historical rows and excludes them from campaign accumulation.
+		field.Float("base_amount").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}).
+			Default(0),
+		// The campaign identity is written with the first confirmed paid transition.
+		field.String("recharge_campaign_id").
+			MaxLen(32).
+			Default(""),
+		// bonus_amount is included in amount. Historical purchases use zero;
+		// referral calculations subtract gifts before computing purchased credit.
+		field.Float("bonus_amount").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}).
+			Default(0),
+		// bonus_snapshot preserves paid-time rewards and cumulative observations so
+		// later callbacks and configuration edits consume the allocated order terms.
+		field.JSON("bonus_snapshot", map[string]any{}).
+			Optional(),
 		// Channel payment amount.
 		field.Float("pay_amount").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}),
@@ -304,6 +322,9 @@ func (PaymentOrder) Indexes() []ent.Index {
 			Unique().
 			Annotations(entsql.IndexWhere("out_trade_no <> ''")),
 		index.Fields("user_id"),
+		index.Fields("user_id", "recharge_campaign_id").
+			StorageKey("payment_orders_recharge_campaign_idx").
+			Annotations(entsql.IndexWhere("recharge_campaign_id <> ''")),
 		index.Fields("status"),
 		index.Fields("expires_at"),
 		index.Fields("created_at"),

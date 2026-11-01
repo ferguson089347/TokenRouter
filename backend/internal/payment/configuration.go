@@ -118,6 +118,15 @@ type PaymentConfig struct {
 	BalanceDisabled bool `json:"balance_disabled"`
 	// credited points per principal.
 	BalanceRechargeMultiplier float64 `json:"balance_recharge_multiplier"`
+	// RechargeBonusTiers and RechargeBonusActivity supply the rules used together
+	// by payment confirmation. Their parsed collections remain stable during each quote, and
+	// the activity page receives the same configuration with public presentation.
+	RechargeBonusTiers    []RechargeBonusTier   `json:"recharge_bonus_tiers"`    // cumulative credit fixed-reward thresholds
+	RechargeBonusNotice   string                `json:"recharge_bonus_notice"`   // public recharge promotion description
+	RechargeBonusActivity RechargeBonusActivity `json:"recharge_bonus_activity"` // gift schedule and landing presentation
+	// RechargeBonusLocalization exposes source content and review revisions to
+	// administrator editors. User responses select the ordinary presentation fields.
+	RechargeBonusLocalization *locale.Update[map[string]string] `json:"recharge_bonus_localization,omitempty"`
 	// CNY per subscription USD.
 	SubscriptionUSDToCNYRate float64 `json:"subscription_usd_to_cny_rate"`
 	// legacy fee percentage points.
@@ -200,6 +209,17 @@ type UpdatePaymentConfigRequest struct {
 	// multiplier into zero text, whose later normalization selects the default
 	// multiplier.
 	BalanceRechargeMultiplier *float64 `json:"balance_recharge_multiplier"`
+	// RechargeBonusTiers, RechargeBonusNotice, and RechargeBonusActivity omit their
+	// respective keys when nil. Supplied empty collections or text clear the saved
+	// configuration; supplied activity values replace the complete schedule record.
+	// Changes to notice or activity text require RechargeBonusLocalization, whose
+	// prepared source values control those ordinary presentation mirrors.
+	RechargeBonusTiers    *[]RechargeBonusTier   `json:"recharge_bonus_tiers"`    // optional complete tier replacement
+	RechargeBonusNotice   *string                `json:"recharge_bonus_notice"`   // optional public notice replacement
+	RechargeBonusActivity *RechargeBonusActivity `json:"recharge_bonus_activity"` // optional complete activity replacement
+	// RechargeBonusLocalization edits the shared activity and notice content with
+	// an expected revision. Its persistence is atomic with this payment update.
+	RechargeBonusLocalization *locale.Update[map[string]string] `json:"recharge_bonus_localization"`
 	// SubscriptionUSDToCNYRate is omitted when nil and otherwise must be finite
 	// nonnegative. Zero clears text to disable conversion; positive values retain
 	// full float precision.
@@ -432,6 +452,7 @@ func (s *ConfigService) GetByID(ctx context.Context, id int64) (*SubscriptionPla
 func (s *ConfigService) GetPaymentConfig(ctx context.Context) (*PaymentConfig, error) {
 	keys := []string{
 		SettingPaymentEnabled, SettingMinRechargeAmount, SettingMaxRechargeAmount,
+		SettingRechargeBonusTiers, SettingRechargeBonusNotice, SettingRechargeBonusActivity, SettingRechargeBonusContent,
 		SettingDailyRechargeLimit, SettingOrderTimeoutMinutes, SettingMaxPendingOrders,
 		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingSubscriptionUSDToCNYRate, SettingRechargeFeeRate, SettingPaymentMethodFees, SettingLoadBalanceStrategy,
 		SettingProductNamePrefix, SettingProductNameSuffix,
@@ -453,6 +474,7 @@ func (s *ConfigService) GetPaymentConfig(ctx context.Context) (*PaymentConfig, e
 		vals[key] = locale.ResolveSettingText(vals, key, "", locale.FromContext(ctx))
 	}
 	cfg := s.ConfigParsePaymentConfig(vals)
+	resolveRechargeBonusContent(cfg, vals, locale.FromContext(ctx))
 	// Observe the public Stripe key separately after settings have parsed. Its
 	// failure can leave an empty browser key while the rest of the checkout
 	// configuration is still returned.
@@ -482,6 +504,9 @@ func (s *ConfigService) ConfigParsePaymentConfig(vals map[string]string) *Paymen
 		MaxPendingOrders:          ConfigPcParseInt(vals[SettingMaxPendingOrders], ConfigDefaultMaxPendingOrders),
 		BalanceDisabled:           vals[SettingBalancePayDisabled] == "true",
 		BalanceRechargeMultiplier: NormalizeBalanceRechargeMultiplier(ConfigPcParseFloat(vals[SettingBalanceRechargeMult], DefaultBalanceRechargeMultiplier)),
+		RechargeBonusTiers:        parseRechargeBonusTiers(vals[SettingRechargeBonusTiers]),
+		RechargeBonusNotice:       vals[SettingRechargeBonusNotice],
+		RechargeBonusActivity:     parseRechargeBonusActivity(vals[SettingRechargeBonusActivity]),
 		SubscriptionUSDToCNYRate:  NormalizeSubscriptionUSDToCNYRate(ConfigPcParseFloat(vals[SettingSubscriptionUSDToCNYRate], 0)),
 		RechargeFeeRate:           ConfigPcParseFloat(vals[SettingRechargeFeeRate], 0),
 		MethodFees:                ConfigParseMethodFeeSettings(vals[SettingPaymentMethodFees]),
@@ -516,6 +541,11 @@ func (s *ConfigService) ConfigParsePaymentConfig(vals map[string]string) *Paymen
 			}
 		}
 		cfg.EnabledTypes = NormalizeVisibleMethods(types)
+	}
+	if cfg.RechargeBonusActivity.invalid {
+		// Public previews must reflect the same disabled gifts as checkout when a
+		// stored schedule fails validation; keep ordinary purchases available for repair.
+		cfg.RechargeBonusTiers = []RechargeBonusTier{}
 	}
 	return cfg
 }
@@ -723,10 +753,15 @@ func (cfg *PaymentConfig) EffectiveMethodFee(method string) FeeConfig {
 }
 
 // UpdatePaymentConfig validates/builds supplied setting values and delegates
-// one partial SetMultiple write. Omitted fields are absent from that map,
-// while supplied clearing/false values follow their formatter rules;
+// one partial settings write. Recharge presentation updates use a coordinated
+// conditional batch so stale translations cannot overwrite another editor.
+// Omitted fields are absent from the map, while supplied clearing/false values
+// follow their formatter rules;
 // repository errors remain visible.
 func (s *ConfigService) UpdatePaymentConfig(ctx context.Context, req UpdatePaymentConfigRequest) error {
+	if req.RechargeBonusLocalization != nil || req.RechargeBonusActivity != nil || req.RechargeBonusNotice != nil {
+		return s.updateRechargeBonusConfiguration(ctx, req)
+	}
 	values, err := PreparePaymentConfig(req)
 	if err != nil {
 		return err
@@ -738,6 +773,8 @@ func (s *ConfigService) UpdatePaymentConfig(ctx context.Context, req UpdatePayme
 // partial string-setting map without persistence. Nil pointers/maps/slices
 // omit their keys, while supplied zero/false/empty inputs take their
 // corresponding formatting path.
+// Revisioned recharge content is prepared by UpdatePaymentConfig; callers omit
+// that field here after its contextual preparation has completed.
 //
 // Multiplier must be finite positive, subscription rate finite nonnegative,
 // and legacy fee finite within zero through one hundred with exact two-decimal
@@ -747,6 +784,9 @@ func (s *ConfigService) UpdatePaymentConfig(ctx context.Context, req UpdatePayme
 // successfully supplied nonfinite text. Standalone settings service and
 // combined settings participant share this prepared map for their later write.
 func PreparePaymentConfig(req UpdatePaymentConfigRequest) (map[string]string, error) {
+	if req.RechargeBonusLocalization != nil {
+		return nil, infraerrors.BadRequest("LOCALIZATION_REQUIRES_CONTEXT", "Localized recharge content requires revision-aware preparation.")
+	}
 	if req.BalanceRechargeMultiplier != nil {
 		if math.IsNaN(*req.BalanceRechargeMultiplier) || math.IsInf(*req.BalanceRechargeMultiplier, 0) || *req.BalanceRechargeMultiplier <= 0 {
 			return nil, infraerrors.BadRequest("INVALID_BALANCE_RECHARGE_MULTIPLIER", "balance recharge multiplier must be greater than 0")
@@ -776,6 +816,9 @@ func PreparePaymentConfig(req UpdatePaymentConfigRequest) (map[string]string, er
 		}
 	}
 	m := make(map[string]string)
+	if err := prepareRechargeBonusSettings(req, m); err != nil {
+		return nil, infraerrors.BadRequest("INVALID_RECHARGE_BONUS", err.Error())
+	}
 	if req.Enabled != nil {
 		m[SettingPaymentEnabled] = ConfigFormatBoolOrEmpty(req.Enabled)
 	}

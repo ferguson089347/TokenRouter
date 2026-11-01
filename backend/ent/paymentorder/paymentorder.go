@@ -24,6 +24,14 @@ const (
 	FieldUserNotes = "user_notes"
 	// FieldAmount holds the string denoting the amount field in the database.
 	FieldAmount = "amount"
+	// FieldBaseAmount holds the string denoting the base_amount field in the database.
+	FieldBaseAmount = "base_amount"
+	// FieldRechargeCampaignID holds the string denoting the recharge_campaign_id field in the database.
+	FieldRechargeCampaignID = "recharge_campaign_id"
+	// FieldBonusAmount holds the string denoting the bonus_amount field in the database.
+	FieldBonusAmount = "bonus_amount"
+	// FieldBonusSnapshot holds the string denoting the bonus_snapshot field in the database.
+	FieldBonusSnapshot = "bonus_snapshot"
 	// FieldPayAmount holds the string denoting the pay_amount field in the database.
 	FieldPayAmount = "pay_amount"
 	// FieldFeeRate holds the string denoting the fee_rate field in the database.
@@ -129,6 +137,10 @@ var Columns = []string{
 	FieldUserName,
 	FieldUserNotes,
 	FieldAmount,
+	FieldBaseAmount,
+	FieldRechargeCampaignID,
+	FieldBonusAmount,
+	FieldBonusSnapshot,
 	FieldPayAmount,
 	FieldFeeRate,
 	FieldFeeFixed,
@@ -188,6 +200,14 @@ var (
 	UserEmailValidator func(string) error
 	// UserNameValidator is a validator for the "user_name" field. It is called by the builders before save.
 	UserNameValidator func(string) error
+	// DefaultBaseAmount holds the default value on creation for the "base_amount" field.
+	DefaultBaseAmount float64
+	// DefaultRechargeCampaignID holds the default value on creation for the "recharge_campaign_id" field.
+	DefaultRechargeCampaignID string
+	// RechargeCampaignIDValidator is a validator for the "recharge_campaign_id" field. It is called by the builders before save.
+	RechargeCampaignIDValidator func(string) error
+	// DefaultBonusAmount holds the default value on creation for the "bonus_amount" field.
+	DefaultBonusAmount float64
 	// DefaultFeeRate holds the default value on creation for the "fee_rate" field.
 	DefaultFeeRate float64
 	// DefaultFeeFixed holds the default value on creation for the "fee_fixed" field.
@@ -273,6 +293,21 @@ func ByUserNotes(opts ...sql.OrderTermOption) OrderOption {
 // ByAmount orders the results by the amount field.
 func ByAmount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAmount, opts...).ToFunc()
+}
+
+// ByBaseAmount orders the results by the base_amount field.
+func ByBaseAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBaseAmount, opts...).ToFunc()
+}
+
+// ByRechargeCampaignID orders the results by the recharge_campaign_id field.
+func ByRechargeCampaignID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRechargeCampaignID, opts...).ToFunc()
+}
+
+// ByBonusAmount orders the results by the bonus_amount field.
+func ByBonusAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBonusAmount, opts...).ToFunc()
 }
 
 // ByPayAmount orders the results by the pay_amount field.

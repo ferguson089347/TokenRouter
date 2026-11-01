@@ -31,6 +31,8 @@ import (
 // entitlement or plan amount, limitAmount is the current purchase principal,
 // and fee supplies the gateway payment breakdown.
 //
+// A balance order records amount as its immutable purchased BaseAmount.
+// Successful payment confirmation later adds cumulative and scheduled gifts to Amount.
 // Provider identity and display locale/subject are recorded together with
 // optional billing details. A plan contributes its supplied display fields,
 // price currency, converted day duration, and quota pointers. An unlabeled price
@@ -60,6 +62,9 @@ func BuildCheckoutDraft(req CreateOrderRequest, user *Buyer, plan *SubscriptionP
 	}
 	if order.ProviderSnapshot == nil {
 		order.ProviderSnapshot = map[string]any{}
+	}
+	if req.OrderType == OrderTypeBalance {
+		order.BaseAmount = amount
 	}
 	order.ProviderSnapshot["display_locale"] = locale.Negotiate(req.Locale, locale.Default())
 	order.ProviderSnapshot["display_subject"] = PaymentSubject(plan, limitAmount, cfg, sel, req.Locale)

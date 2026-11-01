@@ -6,6 +6,7 @@
 
 - [全局入口](#全局入口)：所有请求共同经过的处理顺序。
 - [路由族](#路由族)：URL 前缀、认证方式和负责的模块。
+- [充值赠送接口](#recharge_bonus_api)：活动公开展示、购买预览和订单赠送字段。
 - [支付管理恢复](#payment_admin_recovery)：订单强制过期和退款查单。
 - [身份登录接口](#身份登录接口)：修改 OAuth start、人机验证和 One Tap 时读取。
 - [创作台接口](#创作台接口)：修改工作区、任务和输出交付时读取。
@@ -57,7 +58,7 @@ RequestLogger
 | `/api/v1/admin/*` | 管理员 JWT 或受限的管理密钥；部分操作还需要 step-up | `app/http_routes_admin.go`；用户、分组、提供商、价格配置、设置、运维、备份、支付和安全管理 |
 | `/mcp` | 专用 MCP Bearer 令牌 | 四个通用管理工具，按具体操作授权；协议为 MCP JSON-RPC，见 [MCP 管理接口](mcp_management.md) |
 | `/api/v1/payment/*` | 用户 JWT | `app/http_routes.go`；读取配置和套餐、下单、查单、取消、invoice 和申请退款 |
-| `/api/v1/payment/public/*` | 签名的 resume token，或旧订单的验证约束 | 恢复支付结果；这组接口只服务已知订单，匿名列举订单是不允许的 |
+| `/api/v1/payment/public/*` | 活动读取公开；订单恢复使用签名 resume token 或旧订单的验证约束 | 读取当前已发布的充值活动、恢复已知订单的支付结果 |
 | `/api/v1/payment/webhook/*` | 提供商验签 | EasyPay、Alipay、WeChat Pay、Stripe、Airwallex 的通知 |
 | `/v1/*` 和兼容的裸路径别名 | TokenRouter API Key | Anthropic 和 OpenAI 兼容的消息、Responses、Chat、图片、视频、模型、用量和批任务 |
 | `/v1beta/*` | TokenRouter API Key | Gemini 原生的模型 URL、生成、流式生成和 token 统计 |
@@ -97,6 +98,21 @@ Markdown 正文需要 JWT，并且菜单可见；管理员页面只对管理员�
 - `POST /api/v1/subscriptions/:id/revoke` 需要用户 JWT。服务端只接受当前用户本人的、处于 `active`、并且最高层有限额度已经用完的订阅。成功时在事务里撤销当前记录，让同一套餐的下一份 pending 订阅提前生效，并自动改绑指定了这个订阅的 Key。
 - 成功响应的 `data` 是 `{ revoked_subscription_id, replacement_subscription_id, rebound_api_key_count }`；没有接续的订阅时，`replacement_subscription_id` 为 `null`，改绑数量为 `0`。
 - 订阅不属于当前用户或不存在，返回 `SUBSCRIPTION_NOT_FOUND`；不是当前 active 的记录，返回 `SUBSCRIPTION_NOT_ACTIVE`（409）；最高层额度还有剩余或套餐不限额，返回 `SUBSCRIPTION_QUOTA_NOT_EXHAUSTED`（409）。撤销不退款，用户端也没有恢复接口。
+
+<a id="recharge_bonus_api"></a>
+## 充值赠送接口
+
+`GET /api/v1/payment/public/recharge-activity/:slug` 供公开活动页使用。支付或余额充值关闭、页面未发布、slug 不匹配时返回 404；配置或支付方式限额读取失败时返回相应错误。成功响应使用面板 envelope，并带 `Cache-Control: no-store`。`data` 包含：
+
+- `activity`、`tiers`、`notice`：当前活动展示与时段、累计固定奖励档位和充值说明。
+- `multiplier`、`methods`、`min_amount`、`max_amount`：基础到账倍率、可用支付方式的公开限额和全局本金范围。
+- `server_time`：服务器当前时刻，浏览器用来校准活动状态和预览倒计时。
+
+`GET /api/v1/payment/checkout-info` 在已有购买配置中返回可选的 `recharge_bonus_tiers`、`recharge_bonus_notice`、`recharge_bonus_activity`、`recharge_bonus_progress` 和 `server_time`，购买页使用同一计算规则预览到账。创建订单时返回基础到账，成功付款确认后，用户和管理员订单查询以及凭恢复凭据返回的公开结果可带 `bonus_amount`、`bonus_snapshot`。已确认订单的 `amount` 是含赠送的总到账，赠送为零时可省略赠送字段。
+
+`recharge_bonus_progress` 使用 `{ campaign_id, cumulative_amount, tier_reward_total }`：分别表示活动身份、已确认付款的累计基础到账和此前固定奖励总额。进度属于经过认证的买家，读取失败时返回错误；公开活动接口返回通用配置。浏览器用当前进度预估本笔固定奖励差额，已确认付款但仍待钱包发放的订单也属于这份进度。
+
+公开活动和购买接口按 `Accept-Language` 返回选定语言的运营文本，管理配置另带 `recharge_bonus_localization` 的完整内容和版本。页面切换语言时重新加载活动数据。首次确认成功付款时，服务端在 `PAID` 事务固化实际累计和赠送；时段资格同样取这次确认的 `paid_at`。时段加赠按每笔基础到账独立计算，不占用固定奖励上限。管理员设置字段、部分更新和校验规则见[充值赠送设置](configuration.md#recharge_bonus_settings)，金额、返利与退款规则见[充值赠送与活动页](../domains/payments_and_entitlements.md#recharge_bonus)。
 
 <a id="payment_admin_recovery"></a>
 ## 支付管理恢复

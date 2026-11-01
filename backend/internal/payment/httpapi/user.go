@@ -55,7 +55,16 @@ type UserCheckoutInfoResponse struct {
 	// balance purchase disabled flag.
 	BalanceDisabled bool `json:"balance_disabled"`
 	// credited points per principal.
-	BalanceRechargeMultiplier float64 `json:"balance_recharge_multiplier"`
+	BalanceRechargeMultiplier float64                     `json:"balance_recharge_multiplier"`
+	RechargeBonusTiers        []payment.RechargeBonusTier `json:"recharge_bonus_tiers,omitempty"`  // cumulative purchased-credit reward thresholds
+	RechargeBonusNotice       string                      `json:"recharge_bonus_notice,omitempty"` // public recharge promotion description
+	// RechargeBonusActivity is included when a gift rule or landing page is
+	// configured. It contains presentation and schedules used by checkout previews.
+	RechargeBonusActivity *payment.RechargeBonusActivity `json:"recharge_bonus_activity,omitempty"`
+	// RechargeBonusProgress belongs to the authenticated buyer and current
+	// campaign. Failed reads abort the preview instead of assuming zero rewards.
+	RechargeBonusProgress *payment.RechargeBonusProgress `json:"recharge_bonus_progress,omitempty"`
+	ServerTime            *time.Time                     `json:"server_time,omitempty"` // authoritative preview clock instant
 	// CNY per subscription USD.
 	SubscriptionUSDToCNYRate float64 `json:"subscription_usd_to_cny_rate"`
 	// legacy recharge percentage rate.
@@ -191,6 +200,8 @@ type ResolveOrderByResumeTokenRequest struct {
 // PublicOrderResult exposes selected order and refund fields after signed
 // public session resolution.
 type PublicOrderResult struct {
+	BonusAmount   float64        `json:"bonus_amount,omitempty"`   // gift credit included in amount
+	BonusSnapshot map[string]any `json:"bonus_snapshot,omitempty"` // saved gift percentages and components
 	// AmountCurrency labels subscription Amount; balance quantities use the
 	// site's configurable unit and therefore omit this monetary currency field.
 	AmountCurrency string  `json:"amount_currency,omitempty"`
@@ -265,6 +276,8 @@ type PublicOrderVerifyResult struct {
 // PaymentOrderResult exposes selected persisted order fields to an
 // authenticated buyer.
 type PaymentOrderResult struct {
+	BonusAmount   float64        `json:"bonus_amount,omitempty"`   // gift credit included in amount
+	BonusSnapshot map[string]any `json:"bonus_snapshot,omitempty"` // saved gift percentages and components
 	// AmountCurrency labels subscription Amount; balance quantities use the
 	// site's configurable unit and therefore omit this monetary currency field.
 	AmountCurrency string  `json:"amount_currency,omitempty"`
@@ -340,6 +353,9 @@ func (h *PaymentHandler) GetPaymentConfig(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	// Buyers receive the language-selected presentation; editor revisions and
+	// translation drafts belong to the administrator configuration response only.
+	cfg.RechargeBonusLocalization = nil
 	response.Success(c, cfg)
 }
 
@@ -358,6 +374,8 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 // shared for serialization. Separate configuration and limit reads can observe
 // different updates, and a failed plan list can leave an empty or partial
 // display list rather than failing this combined endpoint.
+// A configured campaign also reads the authenticated buyer's confirmed progress;
+// an error aborts the response so previews cannot assume rewards are still unclaimed.
 func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -406,6 +424,26 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		})
 	}
 
+	var bonusActivity *payment.RechargeBonusActivity
+	var bonusProgress *payment.RechargeBonusProgress
+	var serverTime *time.Time
+	if len(cfg.RechargeBonusTiers) > 0 || len(cfg.RechargeBonusActivity.TimeWindows) > 0 || cfg.RechargeBonusActivity.PageEnabled {
+		bonusActivity = &cfg.RechargeBonusActivity
+		now := time.Now().UTC()
+		serverTime = &now
+	}
+	if cfg.RechargeBonusActivity.CampaignID != "" {
+		subject, ok := UserRequireAuth(c)
+		if !ok {
+			return
+		}
+		progress, err := h.configService.GetRechargeBonusProgress(ctx, subject.UserID, cfg.RechargeBonusActivity.CampaignID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		bonusProgress = &progress
+	}
 	response.Success(c, UserCheckoutInfoResponse{
 		Methods:                       limitsResp.Methods,
 		GlobalMin:                     limitsResp.GlobalMin,
@@ -413,6 +451,11 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		Plans:                         planList,
 		BalanceDisabled:               cfg.BalanceDisabled,
 		BalanceRechargeMultiplier:     cfg.BalanceRechargeMultiplier,
+		RechargeBonusTiers:            cfg.RechargeBonusTiers,
+		RechargeBonusNotice:           cfg.RechargeBonusNotice,
+		RechargeBonusActivity:         bonusActivity,
+		RechargeBonusProgress:         bonusProgress,
+		ServerTime:                    serverTime,
 		SubscriptionUSDToCNYRate:      cfg.SubscriptionUSDToCNYRate,
 		RechargeFeeRate:               cfg.RechargeFeeRate,
 		MethodFees:                    cfg.MethodFees,
@@ -735,6 +778,8 @@ func UserBuildPublicOrderResult(order *payment.Order) PublicOrderResult {
 		ID:                  order.ID,
 		OutTradeNo:          order.OutTradeNo,
 		Amount:              order.Amount,
+		BonusAmount:         order.BonusAmount,
+		BonusSnapshot:       order.BonusSnapshot,
 		PayAmount:           order.PayAmount,
 		FeeRate:             order.FeeRate,
 		FeeFixed:            order.FeeFixed,
@@ -880,6 +925,8 @@ func UserSanitizePaymentOrderForResponse(order *payment.Order) *PaymentOrderResu
 		ID:                  order.ID,
 		UserID:              order.UserID,
 		Amount:              order.Amount,
+		BonusAmount:         order.BonusAmount,
+		BonusSnapshot:       order.BonusSnapshot,
 		PayAmount:           order.PayAmount,
 		FeeRate:             order.FeeRate,
 		FeeFixed:            order.FeeFixed,

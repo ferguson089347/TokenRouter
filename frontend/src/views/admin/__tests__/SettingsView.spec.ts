@@ -809,6 +809,7 @@ function mountView() {
         ModelWhitelistSelector: true,
         ImageUpload: ImageUploadStub,
         BackupSettings: true,
+        RechargeBonusSettings: true,
       },
     },
   })

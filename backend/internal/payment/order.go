@@ -41,11 +41,23 @@ type Order struct {
 	// checkout buyer administration notes
 	UserNotes *string `json:"user_notes,omitempty"`
 	// Amount, PayAmount, FeeRate, FeeFixed, FeeRateAmount, and FeeAmount retain
-	// separate checkout quantities. Balance Amount can include its recharge
-	// multiplier, while PayAmount and fee amounts use the selected gateway
-	// currency.
+	// separate payment quantities. Pending balance Amount contains purchased API
+	// credit; first confirmation adds allocated gifts. PayAmount and fees use gateway currency.
 	// credited balance or plan amount
 	Amount float64 `json:"amount,omitempty"`
+	// BaseAmount fixes purchased API credit before payment-time rewards. Pending
+	// balance orders use this amount until successful payment finalizes cumulative gifts.
+	BaseAmount float64 `json:"base_amount,omitempty"`
+	// RechargeCampaignID records the campaign which finalized this payment's
+	// purchased credit and fixed reward allocation; empty means no campaign participation.
+	RechargeCampaignID string `json:"recharge_campaign_id,omitempty"`
+	// BonusAmount is the free part already included in Amount. Referral rewards
+	// subtract it from their purchased-credit base, while refunds reverse both
+	// purchased and gifted credit in the original order proportion.
+	BonusAmount float64 `json:"bonus_amount,omitempty"`
+	// BonusSnapshot records payment-time components, campaign accumulation, and
+	// allocated fixed rewards. Clone detaches its JSON collections before callers retain an order.
+	BonusSnapshot map[string]any `json:"bonus_snapshot,omitempty"`
 	// gateway currency payment amount
 	PayAmount float64 `json:"pay_amount,omitempty"`
 	// percentage gateway fee rate
@@ -257,6 +269,7 @@ func (o *Order) Clone() *Order {
 	// types and nil/empty distinctions survive the order copy without an encoding
 	// round trip.
 	copy.BillingSnapshot = cloneOrderMap(o.BillingSnapshot)
+	copy.BonusSnapshot = cloneOrderMap(o.BonusSnapshot)
 	copy.ProviderSnapshot = cloneOrderMap(o.ProviderSnapshot)
 	if o.PlanSnapshot.DailyLimitUSD != nil {
 		value := *o.PlanSnapshot.DailyLimitUSD

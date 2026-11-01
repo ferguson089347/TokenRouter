@@ -38,8 +38,10 @@ func (s *OrderStore) OrderByTradeNumber(ctx context.Context, no string) (*paymen
 }
 
 // TransitionOrder returns the affected count for the addressed row in an
-// accepted From state, optionally matching its UpdatedAt version. It stages
-// target status and supplied pointer/nonempty details in one Ent update.
+// accepted From state, optionally matching its UpdatedAt version. A first paid
+// transition carrying campaign configuration delegates buyer-serialized reward
+// allocation before committing status, entitlement, and campaign progress together.
+// Other transitions stage their supplied observations in one Ent update.
 //
 // ClearFailure clears old failure time and text before optional replacement
 // failure fields are added. Empty trade/invoice strings retain their existing
@@ -48,10 +50,20 @@ func (s *OrderStore) OrderByTradeNumber(ctx context.Context, no string) (*paymen
 // claims sensitive to intervening writes. Zero count leaves callers to reread
 // competing state; this method does not decide which observed outcome wins.
 func (s *OrderStore) TransitionOrder(ctx context.Context, c payment.OrderTransition) (int, error) {
+	if c.Status == payment.OrderStatusPaid && c.RechargeConfig != nil {
+		return s.confirmRechargePayment(ctx, c)
+	}
+	return applyOrderTransition(s.client.PaymentOrder.Update(), c).Save(ctx)
+}
+
+// applyOrderTransition stages the status predicate and optional payment observations.
+// The caller supplies its database or transaction update builder and owns Save.
+// A supplied version narrows the update, and omitted values retain stored observations.
+func applyOrderTransition(u *dbent.PaymentOrderUpdate, c payment.OrderTransition) *dbent.PaymentOrderUpdate {
 	// Keep status, optional version, and detail changes in one conditional
 	// update. A zero match reports lost expected state before any caller chooses
 	// recovery from a reread.
-	u := s.client.PaymentOrder.Update().Where(paymentorder.IDEQ(c.ID), paymentorder.StatusIn(c.From...)).SetStatus(c.Status)
+	u.Where(paymentorder.IDEQ(c.ID), paymentorder.StatusIn(c.From...)).SetStatus(c.Status)
 	if c.Version != nil {
 		u.Where(paymentorder.UpdatedAtEQ(*c.Version))
 	}
@@ -91,7 +103,7 @@ func (s *OrderStore) TransitionOrder(ctx context.Context, c payment.OrderTransit
 	if c.InvoiceStatus != "" {
 		u.SetPaymentInvoiceStatus(c.InvoiceStatus)
 	}
-	return u.Save(ctx)
+	return u
 }
 
 // ClaimFulfillment conditionally writes RECHARGING, the supplied claim time,

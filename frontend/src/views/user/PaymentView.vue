@@ -417,7 +417,11 @@
                       >
                     </div>
                     <div
-                      v-if="!isSubscriptionCheckout && balanceRechargeMultiplier !== 1"
+                      v-if="
+                        !isSubscriptionCheckout &&
+                        balanceRechargeMultiplier !== 1 &&
+                        rechargeQuote.bonus_amount === 0
+                      "
                       class="flex justify-between gap-4"
                     >
                       <dt class="text-gray-500 dark:text-dark-400">{{
@@ -428,6 +432,27 @@
                       }}</dd>
                     </div>
                   </dl>
+                  <RechargeBonusBreakdown
+                    v-if="!isSubscriptionCheckout && checkout.recharge_bonus_activity?.campaign_id"
+                    :quote="rechargeQuote"
+                    estimated
+                    class="mt-4"
+                  />
+                  <div
+                    v-if="!isSubscriptionCheckout && rechargeBonusNotice"
+                    class="markdown-body mt-4 text-sm"
+                    v-html="rechargeBonusNotice"
+                  />
+                  <RouterLink
+                    v-if="
+                      !isSubscriptionCheckout &&
+                      checkout.recharge_bonus_activity?.page_enabled &&
+                      checkout.recharge_bonus_activity.slug
+                    "
+                    :to="`/activities/${checkout.recharge_bonus_activity.slug}`"
+                    class="mt-4 inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700"
+                    >{{ t('rechargeBonus.viewActivity') }}<Icon name="arrowRight" size="sm"
+                  /></RouterLink>
                   <p
                     v-if="!isSubscriptionCheckout && balanceRechargeMultiplier !== 1"
                     class="mt-3 text-xs text-gray-500 dark:text-dark-400"
@@ -567,6 +592,7 @@ import MotionTransition from '@/components/common/MotionTransition.vue'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { useNow } from '@vueuse/core'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useAuthStore } from '@/stores/auth'
@@ -577,6 +603,8 @@ import { extractI18nErrorMessage } from '@/utils/apiError'
 import type { BillingInfo, SubscriptionPlan, CheckoutInfoResponse } from '@/api/payment.types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
+import RechargeBonusBreakdown from '@/components/payment/RechargeBonusBreakdown.vue'
+import { quoteRechargeBonus } from '@/utils/payment/rechargeBonus'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
 import {
   METHOD_ORDER,
@@ -745,6 +773,19 @@ const tabs = computed(() => {
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
 const validAmount = computed(() => amount.value ?? 0)
+// The server clock calibrates scheduled gifts while VueUse owns timer cleanup
+// for the mounted purchase page. Order creation recalculates the accepted terms.
+const bonusClock = useNow({ interval: 1000 })
+const bonusClockOffset = ref(0)
+const rechargeQuote = computed(() =>
+  quoteRechargeBonus(
+    checkout.value,
+    validAmount.value,
+    balanceRechargeMultiplier.value,
+    bonusClock.value.getTime() + bonusClockOffset.value,
+    checkout.value.recharge_bonus_progress,
+  ),
+)
 const balanceRechargeMultiplier = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
   return multiplier > 0 ? multiplier : 1
@@ -755,8 +796,11 @@ const subscriptionUsdToCnyRate = computed(() => {
   const rate = checkout.value.subscription_usd_to_cny_rate
   return Number.isFinite(rate) && rate > 0 ? rate : 0
 })
-const creditedAmount = computed(
-  () => Math.round(validAmount.value * balanceRechargeMultiplier.value * 100) / 100,
+const creditedAmount = computed(() => rechargeQuote.value.amount)
+// Administrator-authored Markdown is sanitized before it enters the recharge
+// explanation panel, keeping promotional formatting on the existing payment surface.
+const rechargeBonusNotice = computed(() =>
+  DOMPurify.sanitize(marked.parse(checkout.value.recharge_bonus_notice ?? '', { async: false })),
 )
 const hasHelpContent = computed(() =>
   Boolean(checkout.value.help_text || checkout.value.help_image_url),
@@ -1207,6 +1251,9 @@ onMounted(async () => {
   try {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
+    if (res.data.server_time) bonusClockOffset.value = Date.parse(res.data.server_time) - Date.now()
+    const requestedAmount = Number(route.query.amount)
+    if (Number.isFinite(requestedAmount) && requestedAmount > 0) amount.value = requestedAmount
     if (enabledMethods.value.length) {
       const order: readonly string[] = METHOD_ORDER
       const sorted = [...enabledMethods.value].sort((a, b) => {
@@ -1254,6 +1301,7 @@ onMounted(async () => {
 useLocaleRefresh(async () => {
   const { data } = await paymentAPI.getCheckoutInfo()
   checkout.value = data
+  if (data.server_time) bonusClockOffset.value = Date.parse(data.server_time) - Date.now()
   if (selectedPlan.value)
     selectedPlan.value = data.plans.find((plan) => plan.id === selectedPlan.value?.id) || null
 })

@@ -41,6 +41,9 @@
 | 套餐名称、介绍、权益、商品名 | `subscription_plans.localization`；套餐编辑 | 购买、订阅、Key 计费选择、订单快照 |
 | 余额单位、充值链接、OIDC 名称、支付帮助及图片、商品名前后缀、发件人名称 | `localized_settings` 管理对象，各原文键对应的 `_localized` JSON | 登录、余额、支付、用户邮件 |
 | 易支付自定义方式名称 | 支付实例 `customMethods` 条目；支付方式编辑 | 收银台 |
+| 充值赠送说明、活动标题、副标题、规则和问答 | `RECHARGE_BONUS_CONTENT`；充值赠送设置，问答使用稳定 ID | 购买页、公开充值活动页 |
+
+充值活动把标题、副标题、规则、说明和问答作为一个 `locale.Content[map[string]string]` 内容块维护。问答文本使用 `faq.<id>.question` 和 `faq.<id>.answer`，增删和排序按稳定 ID 对应译文。内容更新的版本检查与同批赠送规则在一个设置事务中完成；公开活动和购买接口按请求语言返回普通字段。配置格式见[充值赠送设置](configuration.md#recharge_bonus_settings)。
 
 `site_texts.contact_info` 的每种语言保存一份客服条目列表，以字符串 JSON `{"format":"support-contacts-v1","entries":[{"label":"客服 QQ","value":"123456789","image":""}]}` 存入原有文案字段。每条可配置名称、号码或 HTTP(S) 群链接，并附加上传图片或 HTTP(S) 图片地址；上传图片以 data URL 随设置保存，每张上限 500 KiB。联系信息的原文和每份译文各允许最多 4 MiB 的 UTF-8 内容，包含 JSON 字段和 base64 图片；普通短文案仍限制为 2,000 个 Unicode 字符。公开设置继续返回所选语言的 `contact_info` 字符串，前端在顶部客服入口和个人资料使用同一组件显示，用户菜单链接到个人资料的客服区。旧的单条文本、换行、逗号或分号分隔的内容继续读取，独立的 `/n` 标记和字面 `\n` 也作为换行处理。
 

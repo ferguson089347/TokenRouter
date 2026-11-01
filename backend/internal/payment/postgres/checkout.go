@@ -84,6 +84,9 @@ func (s *OrderStore) CreateCheckout(ctx context.Context, draft payment.CheckoutD
 		SetUserName(draft.Order.UserName).
 		SetNillableUserNotes(draft.Order.UserNotes).
 		SetAmount(draft.Order.Amount).
+		SetBaseAmount(draft.Order.BaseAmount).
+		SetRechargeCampaignID(draft.Order.RechargeCampaignID).
+		SetBonusAmount(draft.Order.BonusAmount).
 		SetPayAmount(draft.Order.PayAmount).
 		SetFeeRate(draft.Order.FeeRate).
 		SetFeeFixed(draft.Order.FeeFixed).
@@ -112,6 +115,9 @@ func (s *OrderStore) CreateCheckout(ctx context.Context, draft payment.CheckoutD
 	}
 	if draft.Order.BillingSnapshot != nil {
 		b.SetBillingSnapshot(draft.Order.BillingSnapshot)
+	}
+	if draft.Order.BonusSnapshot != nil {
+		b.SetBonusSnapshot(draft.Order.BonusSnapshot)
 	}
 	if draft.Order.PlanID != nil {
 		b.SetPlanID(*draft.Order.PlanID).SetPlanSnapshot(draft.Order.PlanSnapshot)

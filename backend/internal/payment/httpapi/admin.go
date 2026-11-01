@@ -51,6 +51,8 @@ type ForceExpireOrderRequest struct {
 // AdminPaymentOrderResult selects administrator order fields while omitting
 // the merchant identity snapshot.
 type AdminPaymentOrderResult struct {
+	BonusAmount   float64        `json:"bonus_amount,omitempty"`   // free credit included in amount
+	BonusSnapshot map[string]any `json:"bonus_snapshot,omitempty"` // saved gift components and percentages
 	// AmountCurrency labels subscription Amount; balance quantities use the
 	// site's configurable unit and therefore omit this monetary currency field.
 	AmountCurrency string `json:"amount_currency,omitempty"`
@@ -440,6 +442,8 @@ func AdminSanitizeAdminPaymentOrderForResponse(order *payment.Order) *AdminPayme
 		UserName:             order.UserName,
 		UserNotes:            order.UserNotes,
 		Amount:               order.Amount,
+		BonusAmount:          order.BonusAmount,
+		BonusSnapshot:        order.BonusSnapshot,
 		PayAmount:            order.PayAmount,
 		FeeRate:              order.FeeRate,
 		FeeFixed:             order.FeeFixed,

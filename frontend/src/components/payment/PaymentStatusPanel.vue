@@ -53,6 +53,15 @@
           </dd>
         </div>
       </dl>
+      <RechargeBonusBreakdown
+        v-if="paidOrder && (paidOrder.bonus_amount ?? 0) > 0"
+        :quote="{
+          ...paidOrder.bonus_snapshot,
+          amount: paidOrder.amount,
+          bonus_amount: paidOrder.bonus_amount,
+        }"
+        class="mt-6 text-left"
+      />
       <button class="btn btn-primary mt-6 w-full" @click="handleDone">
         {{ t('common.confirm') }}
       </button>
@@ -391,6 +400,7 @@ import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/utils/payment/currency'
 import type { PaymentOrder } from '@/api/payment.types'
 import Icon from '@/components/icons/Icon.vue'
+import RechargeBonusBreakdown from './RechargeBonusBreakdown.vue'
 import QRCode from 'qrcode'
 import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'

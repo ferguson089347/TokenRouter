@@ -7,6 +7,16 @@ import type { RouteRecordRaw } from 'vue-router'
 // publicRoutes supplies the ordered records for this navigation area to the application router.
 export const publicRoutes: RouteRecordRaw[] = [
   {
+    path: '/activities/:slug',
+    name: 'RechargeActivity',
+    component: () => import('@/views/activities/RechargeActivityView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Recharge activity',
+      titleKey: 'rechargeBonus.singleOrder',
+    },
+  },
+  {
     path: '/setup',
     name: 'Setup',
     component: () => import('@/views/setup/SetupWizardView.vue'),

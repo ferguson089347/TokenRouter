@@ -5,6 +5,90 @@ import type { LocalizedUpdate } from '@/i18n/content'
 // creation can return a completed initiation, a required OAuth handoff, or the payload
 // needed for WeChat JSAPI payment.
 
+// RechargeBonusTier pairs a cumulative purchased-credit threshold with its total reward.
+export interface RechargeBonusTier {
+  min_amount: number // Cumulative purchased-credit threshold amount.
+  bonus_amount: number // Total tier credit reward.
+}
+
+// RechargeBonusWindow adds a percentage during one enabled half-open server-time interval.
+export interface RechargeBonusWindow {
+  enabled: boolean // Scheduled gift activation flag.
+  starts_at: string // Inclusive ISO timestamp.
+  ends_at: string // Exclusive ISO timestamp.
+  bonus_percent: number // Base credited amount percentage.
+}
+
+// RechargeBonusFAQ records one administrator-authored public activity question and answer.
+export interface RechargeBonusFAQ {
+  // id preserves translation identity when administrators remove or reorder
+  // entries; absent IDs remain accepted for older configuration responses.
+  id?: string
+  question: string // Public activity question text.
+  answer: string // Public activity answer text.
+}
+
+// RechargeBonusActivity provides editable landing content and the authoritative gift schedule.
+export interface RechargeBonusActivity {
+  campaign_id: string // Stable activity ledger identity.
+  page_enabled: boolean // Public landing page visibility.
+  slug: string // Public activity route segment.
+  title: string // Administrator activity display title.
+  subtitle: string // Administrator activity introduction text.
+  timezone: string // IANA presentation timezone identifier.
+  // Omitted endpoints leave the corresponding side open. Present endpoints gate
+  // both gift components even when the public landing page is disabled.
+  starts_at?: string // Inclusive activity ISO timestamp.
+  ends_at?: string // Exclusive activity ISO timestamp.
+  time_windows: RechargeBonusWindow[] // Extra gift schedule intervals.
+  rules: string // Administrator activity rule paragraphs.
+  faqs: RechargeBonusFAQ[] // Ordered public question and answer pairs.
+}
+
+// RechargeBonusSettings holds the payment-owned configuration shared by both purchase pages.
+export interface RechargeBonusSettings {
+  recharge_bonus_tiers: RechargeBonusTier[] // Highest matching cumulative thresholds.
+  recharge_bonus_notice: string // Administrator recharge promotion description.
+  recharge_bonus_activity: RechargeBonusActivity // Gift schedule and landing presentation.
+  // recharge_bonus_localization holds the complete editable content block on
+  // administrator responses; buyer responses already contain resolved plain text.
+  recharge_bonus_localization?: LocalizedUpdate<Record<string, string>>
+}
+
+// RechargeBonusProgress records successful purchases and fixed rewards for one activity.
+export interface RechargeBonusProgress {
+  campaign_id: string // Stable activity ledger identity.
+  cumulative_amount: number // Confirmed purchased-credit total before gifts.
+  tier_reward_total: number // Fixed tier rewards already assigned.
+}
+
+// RechargeBonusQuote describes the independent gift components of one purchase preview.
+export interface RechargeBonusQuote {
+  base_amount: number // Purchased credit before gifts.
+  tier_bonus_amount: number // Credit from the matched tier.
+  time_bonus_amount: number // Credit from the active extra window.
+  bonus_amount: number // Combined free credit amount.
+  amount: number // Final credited purchase amount.
+  tier_reward_total: number // Highest qualifying cumulative reward total.
+  previous_tier_reward: number // Fixed tier rewards already assigned.
+  cumulative_before: number // Successful credit purchased before this payment.
+  cumulative_amount: number // Expected cumulative credit after this payment.
+  time_percent: number // Matched extra percentage points.
+  min_amount: number // Matched cumulative purchased-credit threshold.
+}
+
+// PublicRechargeActivity exposes published content and anonymous checkout preview inputs.
+export interface PublicRechargeActivity {
+  activity: RechargeBonusActivity // Published presentation and gift schedule.
+  tiers: RechargeBonusTier[] // Eligible cumulative fixed reward thresholds.
+  notice: string // Public recharge promotion description.
+  multiplier: number // Base credit per payment principal.
+  methods: Record<string, Pick<MethodLimit, 'currency' | 'fee_rate' | 'fee_fixed'>> // Public channel currency and fees.
+  min_amount: number // Minimum purchase principal amount.
+  max_amount: number // 0 = unlimited
+  server_time: string // Authoritative server ISO timestamp.
+}
+
 // PlanCopy contains a complete language version of subscription plan marketing text.
 export type PlanCopy = {
   name: string // Localized plan name.
@@ -48,7 +132,8 @@ export type OrderType = 'balance' | 'subscription'
 
 // PaymentConfig describes payment availability, limits, fees, and public checkout
 // credentials.
-export interface PaymentConfig {
+export interface PaymentConfig extends Partial<RechargeBonusSettings> {
+  recharge_bonus_progress?: RechargeBonusProgress // Current buyer's successful activity progress.
   payment_enabled: boolean // Payment checkout availability.
   min_amount: number // Minimum payment amount.
   max_amount: number // Maximum payment amount.
@@ -98,7 +183,9 @@ export interface MethodLimitsResponse {
 
 // CheckoutInfoResponse supplies method limits, plan offerings, and public payment page
 // settings.
-export interface CheckoutInfoResponse {
+export interface CheckoutInfoResponse extends Partial<RechargeBonusSettings> {
+  recharge_bonus_progress?: RechargeBonusProgress // Current buyer's successful activity progress.
+  server_time?: string // Optional server preview clock timestamp.
   methods: Record<string, MethodLimit> // Available payment method limits.
   global_min: number // Widest method minimum.
   global_max: number // Widest method maximum.
@@ -123,6 +210,8 @@ export interface CheckoutInfoResponse {
 
 // PaymentOrder records a purchase, its provider payment identifiers, and refund state.
 export interface PaymentOrder {
+  bonus_amount?: number // Gift credit included in amount.
+  bonus_snapshot?: Partial<RechargeBonusQuote> // Persisted selected gift components.
   id: number // Record numeric identifier.
   user_id: number // Owning account identifier.
   amount: number // Purchased resource face amount.
@@ -295,6 +384,8 @@ export interface WechatJSAPIPayload {
 // CreateOrderResult returns payment initiation details for the chosen provider checkout
 // flow.
 export interface CreateOrderResult {
+  bonus_amount?: number // Gift credit included in amount.
+  bonus_snapshot?: Partial<RechargeBonusQuote> // Persisted selected gift components.
   order_id: number // Created order identifier.
   amount: number // Credited balance or subscription face amount.
   amount_currency?: string // Persisted subscription price currency.

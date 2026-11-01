@@ -8,6 +8,7 @@ import type {
   CreateOrderResult,
   PaymentDocument,
   PaymentOrder,
+  PublicRechargeActivity,
 } from '@/api/payment.types'
 import type { BasePaginationResponse } from '@/api/common.types'
 
@@ -37,6 +38,15 @@ export interface PublicOrderVerifyResult {
  * callers using the module's named or default API object.
  */
 export const paymentAPI = {
+  // getRechargeActivity reads public gift rules for the supplied published route.
+  // The optional signal belongs to its page request; aborting it prevents a
+  // departed page's response from replacing a newer activity preview.
+  getRechargeActivity(slug: string, signal?: AbortSignal) {
+    return apiClient.get<PublicRechargeActivity>(
+      `/payment/public/recharge-activity/${encodeURIComponent(slug)}`,
+      { signal },
+    )
+  },
   /**
    * getConfig retrieves payment configuration (enabled types, limits, etc.).
    */
@@ -53,10 +63,12 @@ export const paymentAPI = {
   },
 
   /**
-   * getCheckoutInfo retrieves all checkout page data in a single call.
+   * getCheckoutInfo retrieves checkout configuration and the buyer's activity progress.
+   * An optional signal cancels page-owned configuration and progress reads when
+   * another activity or language replaces the current request.
    */
-  getCheckoutInfo() {
-    return apiClient.get<CheckoutInfoResponse>('/payment/checkout-info')
+  getCheckoutInfo(signal?: AbortSignal) {
+    return apiClient.get<CheckoutInfoResponse>('/payment/checkout-info', { signal })
   },
 
   /**

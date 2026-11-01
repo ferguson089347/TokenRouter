@@ -218,7 +218,7 @@ internal/settings/preaggregation`, Tests: `internal/testutil/rediscontainer ent/
 internal/routing/capability internal/testutil/assertion migrations`},
 		"internal/payment": {Production: `internal/server/adminapi ent/... internal/billing internal/billing/httpapi internal/billing/postgres internal/identity
 internal/identity/httpapi internal/identity/httpapi/authctx internal/payment/... internal/pkg/
-internal/promotion internal/server/httpx internal/settings`, Tests: "internal/testutil/assertion internal/testutil/sqlite"},
+internal/promotion internal/server/httpx internal/settings`, Tests: "internal/testutil/assertion internal/testutil/sqlite internal/testutil/postgrescontainer"},
 		"internal/pkg": {Production: "internal/pkg/...", Tests: ""},
 		"internal/promotion": {Production: `internal/server/adminapi ent/... internal/identity internal/identity/contact internal/identity/httpapi/authctx
 internal/identity/httpapi/dto internal/pkg/ internal/promotion/... internal/server/httpx
@@ -474,7 +474,8 @@ internal/upstream/zhipu/...`, Tests: ""},
 		{Scope: "internal/identity/postgres", Imports: "internal/usage/postgres/query", Files: "user_repo.go"},
 		{Scope: "internal/moderation", Imports: "internal/moderation/provider", Files: "service_test.go helpers_test.go"},
 		{Scope: "internal/moderation/postgres", Imports: "internal/identity/postgres", Files: "repository_test.go"},
-		{Scope: "internal/payment/postgres", Imports: "internal/billing/postgres", Files: "checkout_scenario_test.go"},
+		{Scope: "internal/payment/postgres", Imports: "internal/billing/postgres", Files: "checkout_scenario_test.go checkout_integration_test.go"},
+		{Scope: "internal/payment", Imports: "internal/testutil/postgrescontainer", Files: "postgres/checkout_integration_test.go postgres/recharge_bonus_integration_test.go"},
 		{Scope: "internal/routing", Imports: "internal/modelcatalog/provider", Files: "marketplace_external_test.go"},
 		{Scope: "internal/routing", Imports: "internal/provider/provider", Files: "group_admin_external_test.go"},
 		{Scope: "internal/routing", Imports: "internal/gateway/provider/modelidentity", Files: "marketplace_external_test.go"},

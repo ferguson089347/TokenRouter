@@ -3,6 +3,8 @@ package payment
 import (
 	"math"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 // fulfillment_values.go resolves historical notification identities and
@@ -16,7 +18,7 @@ import (
 //
 // Affiliate rebates also need the purchased reasoning-point base,
 // which differs from the channel charge. Balance orders use credited
-// Amount, and subscription orders choose one valid recorded quota ceiling
+// Amount minus BonusAmount, and subscriptions choose one recorded quota ceiling
 // in monthly, weekly, daily order. Invoice metadata helpers separately
 // prepare transition fields from notification strings; persistence and
 // fulfillment eligibility remain with the transition callers.
@@ -67,8 +69,8 @@ func OrderErrorMessage(err error) string {
 
 // OrderPurchasedReasoningPoints returns a positive finite purchase
 // base for affiliate rebates and a flag indicating that it exists.
-// Balance orders use credited Amount, so the external channel payment
-// and fees do not determine that base.
+// Balance orders use credited Amount minus BonusAmount, so free credit does
+// not earn another referral gift. Channel payment and fees retain their own units.
 //
 // Subscription orders inspect recorded monthly, weekly, then daily
 // ceilings and select the first positive finite value. Missing, zero,
@@ -83,7 +85,15 @@ func OrderPurchasedReasoningPoints(order *Order) (float64, bool) {
 	var points float64
 	switch order.OrderType {
 	case OrderTypeBalance:
-		points = order.Amount
+		if math.IsNaN(order.Amount) || math.IsInf(order.Amount, 0) ||
+			math.IsNaN(order.BonusAmount) || math.IsInf(order.BonusAmount, 0) ||
+			order.BonusAmount < 0 || order.BonusAmount > order.Amount {
+			return 0, false
+		}
+		points = decimal.NewFromFloat(order.Amount).
+			Sub(decimal.NewFromFloat(order.BonusAmount)).
+			Round(2).
+			InexactFloat64()
 	case OrderTypeSubscription:
 		limits := []*float64{
 			order.PlanSnapshot.MonthlyLimitUSD,

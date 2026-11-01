@@ -62,6 +62,54 @@ func (_c *PaymentOrderCreate) SetAmount(v float64) *PaymentOrderCreate {
 	return _c
 }
 
+// SetBaseAmount sets the "base_amount" field.
+func (_c *PaymentOrderCreate) SetBaseAmount(v float64) *PaymentOrderCreate {
+	_c.mutation.SetBaseAmount(v)
+	return _c
+}
+
+// SetNillableBaseAmount sets the "base_amount" field if the given value is not nil.
+func (_c *PaymentOrderCreate) SetNillableBaseAmount(v *float64) *PaymentOrderCreate {
+	if v != nil {
+		_c.SetBaseAmount(*v)
+	}
+	return _c
+}
+
+// SetRechargeCampaignID sets the "recharge_campaign_id" field.
+func (_c *PaymentOrderCreate) SetRechargeCampaignID(v string) *PaymentOrderCreate {
+	_c.mutation.SetRechargeCampaignID(v)
+	return _c
+}
+
+// SetNillableRechargeCampaignID sets the "recharge_campaign_id" field if the given value is not nil.
+func (_c *PaymentOrderCreate) SetNillableRechargeCampaignID(v *string) *PaymentOrderCreate {
+	if v != nil {
+		_c.SetRechargeCampaignID(*v)
+	}
+	return _c
+}
+
+// SetBonusAmount sets the "bonus_amount" field.
+func (_c *PaymentOrderCreate) SetBonusAmount(v float64) *PaymentOrderCreate {
+	_c.mutation.SetBonusAmount(v)
+	return _c
+}
+
+// SetNillableBonusAmount sets the "bonus_amount" field if the given value is not nil.
+func (_c *PaymentOrderCreate) SetNillableBonusAmount(v *float64) *PaymentOrderCreate {
+	if v != nil {
+		_c.SetBonusAmount(*v)
+	}
+	return _c
+}
+
+// SetBonusSnapshot sets the "bonus_snapshot" field.
+func (_c *PaymentOrderCreate) SetBonusSnapshot(v map[string]interface{}) *PaymentOrderCreate {
+	_c.mutation.SetBonusSnapshot(v)
+	return _c
+}
+
 // SetPayAmount sets the "pay_amount" field.
 func (_c *PaymentOrderCreate) SetPayAmount(v float64) *PaymentOrderCreate {
 	_c.mutation.SetPayAmount(v)
@@ -618,6 +666,18 @@ func (_c *PaymentOrderCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *PaymentOrderCreate) defaults() {
+	if _, ok := _c.mutation.BaseAmount(); !ok {
+		v := paymentorder.DefaultBaseAmount
+		_c.mutation.SetBaseAmount(v)
+	}
+	if _, ok := _c.mutation.RechargeCampaignID(); !ok {
+		v := paymentorder.DefaultRechargeCampaignID
+		_c.mutation.SetRechargeCampaignID(v)
+	}
+	if _, ok := _c.mutation.BonusAmount(); !ok {
+		v := paymentorder.DefaultBonusAmount
+		_c.mutation.SetBonusAmount(v)
+	}
 	if _, ok := _c.mutation.FeeRate(); !ok {
 		v := paymentorder.DefaultFeeRate
 		_c.mutation.SetFeeRate(v)
@@ -687,6 +747,20 @@ func (_c *PaymentOrderCreate) check() error {
 	}
 	if _, ok := _c.mutation.Amount(); !ok {
 		return &ValidationError{Name: "amount", err: errors.New(`ent: missing required field "PaymentOrder.amount"`)}
+	}
+	if _, ok := _c.mutation.BaseAmount(); !ok {
+		return &ValidationError{Name: "base_amount", err: errors.New(`ent: missing required field "PaymentOrder.base_amount"`)}
+	}
+	if _, ok := _c.mutation.RechargeCampaignID(); !ok {
+		return &ValidationError{Name: "recharge_campaign_id", err: errors.New(`ent: missing required field "PaymentOrder.recharge_campaign_id"`)}
+	}
+	if v, ok := _c.mutation.RechargeCampaignID(); ok {
+		if err := paymentorder.RechargeCampaignIDValidator(v); err != nil {
+			return &ValidationError{Name: "recharge_campaign_id", err: fmt.Errorf(`ent: validator failed for field "PaymentOrder.recharge_campaign_id": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.BonusAmount(); !ok {
+		return &ValidationError{Name: "bonus_amount", err: errors.New(`ent: missing required field "PaymentOrder.bonus_amount"`)}
 	}
 	if _, ok := _c.mutation.PayAmount(); !ok {
 		return &ValidationError{Name: "pay_amount", err: errors.New(`ent: missing required field "PaymentOrder.pay_amount"`)}
@@ -830,7 +904,7 @@ func (_c *PaymentOrderCreate) sqlSave(ctx context.Context) (*PaymentOrder, error
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	_node.ID = id
+	_node.ID = int64(id)
 	_c.mutation.id = &_node.ID
 	_c.mutation.done = true
 	return _node, nil
@@ -857,6 +931,22 @@ func (_c *PaymentOrderCreate) createSpec() (*PaymentOrder, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.Amount(); ok {
 		_spec.SetField(paymentorder.FieldAmount, field.TypeFloat64, value)
 		_node.Amount = value
+	}
+	if value, ok := _c.mutation.BaseAmount(); ok {
+		_spec.SetField(paymentorder.FieldBaseAmount, field.TypeFloat64, value)
+		_node.BaseAmount = value
+	}
+	if value, ok := _c.mutation.RechargeCampaignID(); ok {
+		_spec.SetField(paymentorder.FieldRechargeCampaignID, field.TypeString, value)
+		_node.RechargeCampaignID = value
+	}
+	if value, ok := _c.mutation.BonusAmount(); ok {
+		_spec.SetField(paymentorder.FieldBonusAmount, field.TypeFloat64, value)
+		_node.BonusAmount = value
+	}
+	if value, ok := _c.mutation.BonusSnapshot(); ok {
+		_spec.SetField(paymentorder.FieldBonusSnapshot, field.TypeJSON, value)
+		_node.BonusSnapshot = value
 	}
 	if value, ok := _c.mutation.PayAmount(); ok {
 		_spec.SetField(paymentorder.FieldPayAmount, field.TypeFloat64, value)
@@ -1164,6 +1254,72 @@ func (u *PaymentOrderUpsert) UpdateAmount() *PaymentOrderUpsert {
 // AddAmount adds v to the "amount" field.
 func (u *PaymentOrderUpsert) AddAmount(v float64) *PaymentOrderUpsert {
 	u.Add(paymentorder.FieldAmount, v)
+	return u
+}
+
+// SetBaseAmount sets the "base_amount" field.
+func (u *PaymentOrderUpsert) SetBaseAmount(v float64) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldBaseAmount, v)
+	return u
+}
+
+// UpdateBaseAmount sets the "base_amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateBaseAmount() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldBaseAmount)
+	return u
+}
+
+// AddBaseAmount adds v to the "base_amount" field.
+func (u *PaymentOrderUpsert) AddBaseAmount(v float64) *PaymentOrderUpsert {
+	u.Add(paymentorder.FieldBaseAmount, v)
+	return u
+}
+
+// SetRechargeCampaignID sets the "recharge_campaign_id" field.
+func (u *PaymentOrderUpsert) SetRechargeCampaignID(v string) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldRechargeCampaignID, v)
+	return u
+}
+
+// UpdateRechargeCampaignID sets the "recharge_campaign_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateRechargeCampaignID() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldRechargeCampaignID)
+	return u
+}
+
+// SetBonusAmount sets the "bonus_amount" field.
+func (u *PaymentOrderUpsert) SetBonusAmount(v float64) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldBonusAmount, v)
+	return u
+}
+
+// UpdateBonusAmount sets the "bonus_amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateBonusAmount() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldBonusAmount)
+	return u
+}
+
+// AddBonusAmount adds v to the "bonus_amount" field.
+func (u *PaymentOrderUpsert) AddBonusAmount(v float64) *PaymentOrderUpsert {
+	u.Add(paymentorder.FieldBonusAmount, v)
+	return u
+}
+
+// SetBonusSnapshot sets the "bonus_snapshot" field.
+func (u *PaymentOrderUpsert) SetBonusSnapshot(v map[string]interface{}) *PaymentOrderUpsert {
+	u.Set(paymentorder.FieldBonusSnapshot, v)
+	return u
+}
+
+// UpdateBonusSnapshot sets the "bonus_snapshot" field to the value that was provided on create.
+func (u *PaymentOrderUpsert) UpdateBonusSnapshot() *PaymentOrderUpsert {
+	u.SetExcluded(paymentorder.FieldBonusSnapshot)
+	return u
+}
+
+// ClearBonusSnapshot clears the value of the "bonus_snapshot" field.
+func (u *PaymentOrderUpsert) ClearBonusSnapshot() *PaymentOrderUpsert {
+	u.SetNull(paymentorder.FieldBonusSnapshot)
 	return u
 }
 
@@ -1971,6 +2127,83 @@ func (u *PaymentOrderUpsertOne) AddAmount(v float64) *PaymentOrderUpsertOne {
 func (u *PaymentOrderUpsertOne) UpdateAmount() *PaymentOrderUpsertOne {
 	return u.Update(func(s *PaymentOrderUpsert) {
 		s.UpdateAmount()
+	})
+}
+
+// SetBaseAmount sets the "base_amount" field.
+func (u *PaymentOrderUpsertOne) SetBaseAmount(v float64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBaseAmount(v)
+	})
+}
+
+// AddBaseAmount adds v to the "base_amount" field.
+func (u *PaymentOrderUpsertOne) AddBaseAmount(v float64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBaseAmount(v)
+	})
+}
+
+// UpdateBaseAmount sets the "base_amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateBaseAmount() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBaseAmount()
+	})
+}
+
+// SetRechargeCampaignID sets the "recharge_campaign_id" field.
+func (u *PaymentOrderUpsertOne) SetRechargeCampaignID(v string) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetRechargeCampaignID(v)
+	})
+}
+
+// UpdateRechargeCampaignID sets the "recharge_campaign_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateRechargeCampaignID() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateRechargeCampaignID()
+	})
+}
+
+// SetBonusAmount sets the "bonus_amount" field.
+func (u *PaymentOrderUpsertOne) SetBonusAmount(v float64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBonusAmount(v)
+	})
+}
+
+// AddBonusAmount adds v to the "bonus_amount" field.
+func (u *PaymentOrderUpsertOne) AddBonusAmount(v float64) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBonusAmount(v)
+	})
+}
+
+// UpdateBonusAmount sets the "bonus_amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateBonusAmount() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBonusAmount()
+	})
+}
+
+// SetBonusSnapshot sets the "bonus_snapshot" field.
+func (u *PaymentOrderUpsertOne) SetBonusSnapshot(v map[string]interface{}) *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBonusSnapshot(v)
+	})
+}
+
+// UpdateBonusSnapshot sets the "bonus_snapshot" field to the value that was provided on create.
+func (u *PaymentOrderUpsertOne) UpdateBonusSnapshot() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBonusSnapshot()
+	})
+}
+
+// ClearBonusSnapshot clears the value of the "bonus_snapshot" field.
+func (u *PaymentOrderUpsertOne) ClearBonusSnapshot() *PaymentOrderUpsertOne {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearBonusSnapshot()
 	})
 }
 
@@ -2847,7 +3080,7 @@ func (_c *PaymentOrderCreateBulk) Save(ctx context.Context) ([]*PaymentOrder, er
 				mutation.id = &nodes[i].ID
 				if specs[i].ID.Value != nil {
 					id := specs[i].ID.Value.(int64)
-					nodes[i].ID = id
+					nodes[i].ID = int64(id)
 				}
 				mutation.done = true
 				return nodes[i], nil
@@ -3057,6 +3290,83 @@ func (u *PaymentOrderUpsertBulk) AddAmount(v float64) *PaymentOrderUpsertBulk {
 func (u *PaymentOrderUpsertBulk) UpdateAmount() *PaymentOrderUpsertBulk {
 	return u.Update(func(s *PaymentOrderUpsert) {
 		s.UpdateAmount()
+	})
+}
+
+// SetBaseAmount sets the "base_amount" field.
+func (u *PaymentOrderUpsertBulk) SetBaseAmount(v float64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBaseAmount(v)
+	})
+}
+
+// AddBaseAmount adds v to the "base_amount" field.
+func (u *PaymentOrderUpsertBulk) AddBaseAmount(v float64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBaseAmount(v)
+	})
+}
+
+// UpdateBaseAmount sets the "base_amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateBaseAmount() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBaseAmount()
+	})
+}
+
+// SetRechargeCampaignID sets the "recharge_campaign_id" field.
+func (u *PaymentOrderUpsertBulk) SetRechargeCampaignID(v string) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetRechargeCampaignID(v)
+	})
+}
+
+// UpdateRechargeCampaignID sets the "recharge_campaign_id" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateRechargeCampaignID() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateRechargeCampaignID()
+	})
+}
+
+// SetBonusAmount sets the "bonus_amount" field.
+func (u *PaymentOrderUpsertBulk) SetBonusAmount(v float64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBonusAmount(v)
+	})
+}
+
+// AddBonusAmount adds v to the "bonus_amount" field.
+func (u *PaymentOrderUpsertBulk) AddBonusAmount(v float64) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.AddBonusAmount(v)
+	})
+}
+
+// UpdateBonusAmount sets the "bonus_amount" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateBonusAmount() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBonusAmount()
+	})
+}
+
+// SetBonusSnapshot sets the "bonus_snapshot" field.
+func (u *PaymentOrderUpsertBulk) SetBonusSnapshot(v map[string]interface{}) *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.SetBonusSnapshot(v)
+	})
+}
+
+// UpdateBonusSnapshot sets the "bonus_snapshot" field to the value that was provided on create.
+func (u *PaymentOrderUpsertBulk) UpdateBonusSnapshot() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.UpdateBonusSnapshot()
+	})
+}
+
+// ClearBonusSnapshot clears the value of the "bonus_snapshot" field.
+func (u *PaymentOrderUpsertBulk) ClearBonusSnapshot() *PaymentOrderUpsertBulk {
+	return u.Update(func(s *PaymentOrderUpsert) {
+		s.ClearBonusSnapshot()
 	})
 }
 

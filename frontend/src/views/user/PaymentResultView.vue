@@ -124,6 +124,14 @@
                 formatOrderAmount(order.amount, order.order_type, order.amount_currency)
               }}</span>
             </div>
+            <RechargeBonusBreakdown
+              v-if="hasAmountFields(order) && (order.bonus_amount ?? 0) > 0"
+              :quote="{
+                ...order.bonus_snapshot,
+                amount: order.amount,
+                bonus_amount: order.bonus_amount,
+              }"
+            />
             <div v-if="hasPaymentType(order)" class="flex justify-between">
               <span class="text-gray-500 dark:text-gray-400">{{
                 t('payment.orders.paymentMethod')
@@ -189,6 +197,7 @@
 
 <script setup lang="ts">
 import Skeleton from '@/components/common/Skeleton.vue'
+import RechargeBonusBreakdown from '@/components/payment/RechargeBonusBreakdown.vue'
 import ContentSkeleton from '@/components/common/ContentSkeleton.vue'
 import { vContentReveal } from '@/directives/contentReveal'
 

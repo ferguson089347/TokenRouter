@@ -181,6 +181,30 @@ usage、audit 和 ops 的静态参数，由 app 整理成各模块的 Options；
 
 设置写入失败时，内存快照保持原样；数据库写入成功、但通知失败时，记录可观测的错误，靠 TTL 或重新加载恢复。更新请求里省略敏感字段时，保留原值；管理页面拿到的是掩码或空字符串，提交回来时 secret 不会因此被清空。验证码设置一次批量读取提供方的开关和密钥，同一个请求在多个 getter 之间看到的配置因此一致。
 
+<a id="recharge_bonus_settings"></a>
+### 充值赠送设置
+
+`payment.ConfigService` 从 `settings` 表读取充值赠送，管理员通过 `GET/PUT /api/v1/admin/payment/config` 维护：
+
+| 数据库键 | API 字段 | 内容和缺省行为 |
+| --- | --- | --- |
+| `RECHARGE_BONUS_TIERS` | `recharge_bonus_tiers` | JSON 数组，每项的 `min_amount` 为累计基础到账门槛，`bonus_amount` 为该档固定奖励总额；缺失或空数组表示关闭固定档位奖励 |
+| `RECHARGE_BONUS_NOTICE` | `recharge_bonus_notice` | 购买页和活动页的赠送说明；缺失时为空文本 |
+| `RECHARGE_BONUS_ACTIVITY` | `recharge_bonus_activity` | 当前活动的起止时间、加赠时段、展示时区和页面内容；缺失时按未发布且无时间限制处理 |
+| `RECHARGE_BONUS_CONTENT` | `recharge_bonus_localization` | 标题、副标题、规则、说明与问答的完整运营内容块，管理端读取 `locale.Content`，更新时提交 `locale.Update` |
+
+档位最多 20 个，门槛非负且唯一，固定奖励非负且不能随门槛增加而减少；门槛与奖励总额按两位小数保存，并按门槛升序排列。当前活动的七个固定档位及 1111 奖励上限见[充值赠送与活动页](../domains/payments_and_entitlements.md#recharge_bonus)。固定奖励按累计目标总额补发差额，时段配置里的 `bonus_percent` 仍是每笔基础到账的额外百分比。
+
+活动对象中的 `starts_at`、`ends_at` 可以分别省略；`time_windows` 最多 20 个，每项包含 `enabled`、`starts_at`、`ends_at`、`bonus_percent`。日期输入为带时区的时间戳，保存前规范化为 UTC；活动的 `timezone` 是展示用的 IANA 名称，空值选站点时区。总活动期间及启用时段的校验和计价规则见[充值赠送与活动页](../domains/payments_and_entitlements.md#recharge_bonus)。
+
+活动使用稳定的 `campaign_id` 对应累计记录，页面字段包括 `page_enabled`、`slug`、`title`、`subtitle`、`rules` 和 `faqs`。发布要求非空标题和合法的小写 slug，同一时刻维护一个当前活动。`campaign_id` 独立于 slug，修改页面路径不会开启一份新的累计记录。`page_enabled` 控制公开页面，金额规则由档位和成功付款时间决定。问答带最长 32 字符的稳定 `id`，内容块以 `faq.<id>.question` 和 `faq.<id>.answer` 保存对应文本，排序后继续使用同一 ID。
+
+档位和活动元数据支持省略保留，提交时整体替换，传空档位数组可清空。标题、说明及问答等文本通过本地化内容块修改或清空，直接改写原文字段返回 `LOCALIZATION_REQUIRED`。保存前校验全部已提交的赠送字段，金额或活动配置无效时返回 `INVALID_RECHARGE_BONUS`，该批支付设置不写入。读取到损坏的档位时停用固定奖励，读取到损坏的活动时停用全部赠送。已结算订单按持久化记录解释金额和累计贡献。
+
+`recharge_bonus_localization` 的 `source` 与译文值为字符串 map，包含 `title`、`subtitle`、`rules`、`notice` 及各问答字段。更新携带读取时的版本，译文核对与删除沿用[运营内容版本规则](user_localization.md#localized_content)。内容版本检查和本次赠送设置写入使用同一原子设置会话，冲突时返回 `LOCALIZATION_CONFLICT`，同批规则也不写入。公开活动及购买接口按 `Accept-Language` 返回选定语言的文本。
+
+后台的充值赠送面板独立读取和保存规则与内容块，保存后重新读取规范化结果；金额预览使用当前充值倍率。日期编辑器按浏览器时区输入并提交 UTC 时间，活动页按配置的展示时区格式化。启用顺序及回退要求见[充值赠送升级说明](../operations/upgrade_notes.md#recharge_bonus_upgrade)。
+
 ### 热路径的读取策略
 
 热路径上的设置，从下面几种策略里选择一种并写清楚：

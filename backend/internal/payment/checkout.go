@@ -20,8 +20,8 @@ import (
 // checkout.go validates purchases, selects provider instances, and coordinates
 // local order creation with external payment initiation.
 // Checkout separates credited entitlement, purchase principal and fee-bearing
-// gateway money before selecting a merchant instance. Balance credit can use a
-// multiplier, subscriptions use the sale plan price and optional CNY
+// gateway money before selecting a merchant instance. Balance credit applies its
+// multiplier; confirmed payment later allocates campaign gifts. Subscriptions use the sale plan price and CNY
 // conversion, and channel fees follow the chosen payment currency. Official
 // WeChat payer context can require a matching OAuth app before any local order
 // is created.
@@ -40,6 +40,8 @@ import (
 // visible method before reading current configuration.
 //
 // Credited entitlement and limit principal are calculated separately.
+// Balance checkout fixes purchased API credit after its multiplier. Successful
+// payment later allocates cumulative and scheduled rewards using confirmed progress.
 // Subscription currency conversion precedes fees, and a selected currency
 // difference recalculates gateway charge after instance selection. Stripe
 // retains validated billing information; other providers discard it.
@@ -87,7 +89,13 @@ func (s *Checkout) CreateOrder(ctx context.Context, req CreateOrderRequest) (*Cr
 		orderAmount = plan.Price
 		limitAmount = plan.Price
 	} else if req.OrderType == OrderTypeBalance {
-		orderAmount = CalculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
+		// Fix the purchased API credit before external payment begins. Confirmation
+		// uses this saved base when it allocates cumulative rewards and payment-time gifts.
+		base := CalculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
+		if math.IsNaN(base) || math.IsInf(base, 0) || base <= 0 {
+			return nil, infraerrors.BadRequest("INVALID_RECHARGE_AMOUNT", "credited recharge amount must be a finite positive number")
+		}
+		orderAmount = base
 	}
 	methodFee := cfg.EffectiveMethodFee(req.PaymentType)
 	methodCurrency := DefaultPaymentCurrency
@@ -866,6 +874,8 @@ func ClassifyCreatePaymentError(req CreateOrderRequest, providerKey string, err 
 // progressed to another state.
 //
 // Order identity, price currency, fees and expiration come from persistence.
+// Gift amounts also come from persistence, and their snapshot map is detached
+// before the response is returned.
 // Gateway PayAmount uses the caller's calculated value and current initiation details
 // come from the provider response. OAuth and JSAPI pointers remain shared, and
 // JSAPI plus JSAPIPayload reference the same object. Resume token and Alipay
@@ -875,6 +885,8 @@ func BuildCreateOrderResponse(order *Order, req CreateOrderRequest, payAmount fl
 	return &CreateOrderResponse{
 		OrderID:        order.ID,
 		Amount:         order.Amount,
+		BonusAmount:    order.BonusAmount,
+		BonusSnapshot:  cloneOrderMap(order.BonusSnapshot),
 		AmountCurrency: PaymentOrderAmountCurrency(order),
 		PayAmount:      payAmount,
 		FeeRate:        order.FeeRate,
