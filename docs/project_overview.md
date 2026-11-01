@@ -54,6 +54,7 @@ Go 模块路径是 `github.com/TokenFlux/TokenRouter`。后端 Go 版本以 `bac
 | `backend/migrations/` | 已发布数据库的前向演进 | SQL 嵌入二进制，按文件名顺序执行；已应用的文件保持原样 |
 | `backend/internal/config/` | 启动配置结构、默认值、环境变量映射和校验 | 数据库里的运行时设置由 settings 和各模块的读取器管理，和启动配置是两套东西 |
 | `frontend/src/` | Vue 应用、路由、API 客户端、Pinia store、视图、组件和 i18n | 后端接口变化时，通常要同步类型、调用方和前端测试 |
+| `plugins/` | 独立客户端插件，目前包含 Magpie 提供商插件 | 使用站点公开 API，安装和测试入口见各插件 README |
 | `deploy/` | Compose、安装脚本、反向代理基线和运行配置示例 | 和根目录 Dockerfile、GoReleaser、workflow 一起决定发布形态 |
 | `.github/workflows/` | 后端 CI、安全扫描和 release 自动化 | 实际的工具链版本和发布触发条件以 workflow 为准 |
 | `docs/` | Project Doc，以及库外的用户手册和法律材料 | 各级 `index.md` 列出的文档属于 Project Doc |
