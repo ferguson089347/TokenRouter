@@ -307,6 +307,7 @@
   "GET /api/v1/payment/orders/my",
   "GET /api/v1/payment/orders/refund-eligible-providers",
   "GET /api/v1/payment/plans",
+  "GET /api/v1/payment/public/recharge-activity/:slug",
   "GET /api/v1/payment/webhook/easypay",
   "GET /api/v1/redeem/history",
   "GET /api/v1/settings/email-unsubscribe",
