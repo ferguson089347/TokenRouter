@@ -133,7 +133,7 @@ export interface MarketplaceGroupAvailabilityDay {
 
 // MarketplaceGroupAvailability summarizes passive health, history, and committed aggregation coverage.
 export interface MarketplaceGroupAvailability {
-  window_days: number // Availability reporting window days.
+  window_days: number // Availability reporting window in fractional days.
   bucket_minutes?: number // Availability bucket duration minutes.
   success_count: number // Successful eligible request count.
   total_count: number // Total observation count.

@@ -178,10 +178,10 @@ export default {
       title: 'Marketplace Availability',
       description:
         'Adjust the public marketplace availability bar window and bucket size. Saved changes apply on the next marketplace refresh.',
-      windowDays: 'Window (days)',
-      windowDaysHint: 'Range {min}-{max} days. Default is 7 days.',
+      windowMinutes: 'Window (minutes)',
+      windowMinutesHint: 'Range {min}-{max} minutes. Default is 90 minutes.',
       bucketMinutes: 'Bucket size (minutes)',
-      bucketMinutesHint: 'Range {min}-{max} minutes. Default is 120 minutes.',
+      bucketMinutesHint: 'Range {min}-{max} minutes. Default is 5 minutes.',
       bucketLimitHint:
         'If the window and bucket size would produce more than 720 bars, the backend widens the bucket size automatically.',
     },

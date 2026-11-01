@@ -15,6 +15,23 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 // A low raw ratio can coexist with healthy scoring because ignored client
 // failures remain in success ratios. The card must trust the sampled assessment.
 describe('GroupAvailabilityBar', () => {
+  // A fractional-day window represents ninety minutes of five-minute observations.
+  // Empty history must render eighteen cells, including when the aggregate is absent.
+  it.each([
+    undefined,
+    {
+      window_days: 0.0625,
+      bucket_minutes: 5,
+      success_count: 0,
+      total_count: 0,
+      days: [],
+    },
+  ])('renders a ninety-minute empty history', (availability) => {
+    const wrapper = mount(GroupAvailabilityBar, { props: { availability } })
+    expect(wrapper.findAll('[data-testid="passive-health-bucket"]')).toHaveLength(18)
+    wrapper.unmount()
+  })
+
   // Configured health excludes client failures while retaining their raw ratio.
   // Both the visible status and history color follow that server assessment.
   it('uses sampled health rather than raw success thresholds', () => {

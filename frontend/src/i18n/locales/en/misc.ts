@@ -53,18 +53,20 @@ export default {
     monitorHistoryFilling: 'Filling historical data',
     monitorUpdated: 'Data through {time}',
     monitorInsufficientHint:
-      'Insufficient eligible requests in the last {days} days to assess channel health.',
+      'Insufficient eligible requests in the last {window} to assess channel health.',
     monitorStates: {
       healthy: 'Healthy',
       warning: 'Watch',
       critical: 'Critical',
       unknown: 'Insufficient samples',
     },
-    availabilityWindow: '{days}d availability',
+    durationMinutes: '{count} minutes',
+    durationDays: '{count} days',
+    availabilityWindow: '{window} availability',
     availabilityNoData: 'No data',
     availabilityHint:
-      '{days}-day passive request availability {rate} ({success} success / {total} total)',
-    availabilityHintNoData: 'No passive request data in the last {days} days',
+      '{window} passive request availability {rate} ({success} success / {total} total)',
+    availabilityHintNoData: 'No passive request data in the last {window}',
     rateMultiplier: 'Group Multiplier',
     rateMultiplierValue: 'Group Multiplier {multiplier}',
     maxDiscountHint:

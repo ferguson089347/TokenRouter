@@ -38,13 +38,13 @@ export const usageRankingLimitMax = 100
 export const usageRankingLimitDefault = 20
 
 /**
- * Availability window limits use days and keep the marketplace observation range within the bounds accepted by settings controls.
+ * Availability window limits use fractional days for storage; settings controls convert them to whole minutes for editing.
  */
-export const marketplaceAvailabilityWindowDaysMin = 1
+export const marketplaceAvailabilityWindowDaysMin = 5 / (24 * 60)
 
 export const marketplaceAvailabilityWindowDaysMax = 90
 
-export const marketplaceAvailabilityWindowDaysDefault = 7
+export const marketplaceAvailabilityWindowDaysDefault = 90 / (24 * 60)
 
 /**
  * Availability bucket limits use minutes and determine the initial aggregation interval shown by marketplace settings controls.
@@ -53,7 +53,7 @@ export const marketplaceAvailabilityBucketMinutesMin = 5
 
 export const marketplaceAvailabilityBucketMinutesMax = 1440
 
-export const marketplaceAvailabilityBucketMinutesDefault = 120
+export const marketplaceAvailabilityBucketMinutesDefault = 5
 
 /**
  * defaultLoginAgreementDocuments creates the four editable default legal documents.

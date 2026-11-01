@@ -158,14 +158,18 @@ export function createGeneralSettingsValidation(
 
     form.usd_exchange_rate = Math.max(0, Number(form.usd_exchange_rate) || 0)
 
+    // Round fractional days through minutes so saving keeps subday observation windows.
     form.marketplace_availability_window_days = Math.min(
       marketplaceAvailabilityWindowDaysMax,
       Math.max(
         marketplaceAvailabilityWindowDaysMin,
-        Math.floor(
-          Number(form.marketplace_availability_window_days) ||
-            marketplaceAvailabilityWindowDaysDefault,
-        ),
+        Math.round(
+          (Number(form.marketplace_availability_window_days) ||
+            marketplaceAvailabilityWindowDaysDefault) *
+            24 *
+            60,
+        ) /
+          (24 * 60),
       ),
     )
 

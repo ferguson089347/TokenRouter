@@ -1517,7 +1517,7 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 		BalanceIconSVG:                       req.BalanceIconSVG,
 		ReasoningPointRMBUnitPrice:           float64ValueOrDefault(req.ReasoningPointRMBUnitPrice, previousSettings.ReasoningPointRMBUnitPrice),
 		USDExchangeRate:                      float64ValueOrDefault(req.USDExchangeRate, previousSettings.USDExchangeRate),
-		MarketplaceAvailabilityWindowDays:    intValueOrDefault(req.MarketplaceAvailabilityWindowDays, previousSettings.MarketplaceAvailabilityWindowDays),
+		MarketplaceAvailabilityWindowDays:    float64ValueOrDefault(req.MarketplaceAvailabilityWindowDays, previousSettings.MarketplaceAvailabilityWindowDays),
 		MarketplaceAvailabilityBucketMinutes: intValueOrDefault(req.MarketplaceAvailabilityBucketMinutes, previousSettings.MarketplaceAvailabilityBucketMinutes),
 		EnableModelFallback:                  req.EnableModelFallback,
 		FallbackModelAnthropic:               req.FallbackModelAnthropic,

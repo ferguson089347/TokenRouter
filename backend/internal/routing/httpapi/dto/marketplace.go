@@ -190,8 +190,8 @@ type ModelMarketplaceAvailabilityDay struct {
 
 // ModelMarketplaceAvailability combines window totals, passive health, committed coverage, and history.
 type ModelMarketplaceAvailability struct {
-	WindowDays    int `json:"window_days"`    // configured observation window days
-	BucketMinutes int `json:"bucket_minutes"` // configured time-bucket size minutes
+	WindowDays    float64 `json:"window_days"`    // fractional observation-window days
+	BucketMinutes int     `json:"bucket_minutes"` // configured time-bucket size minutes
 	// SuccessCount, TotalCount, and AvailabilityRate summarize the observation
 	// window. Passive monitoring requires its configured request minimum before
 	// publishing a ratio; missing or insufficient observations keep it absent.

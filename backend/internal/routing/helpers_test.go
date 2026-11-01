@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// A probe round has to reach its repository claim before overlap or shutdown
-// can be exercised deterministically. The fixture records the claim count and
+// helpers_test.go coordinates probe repository claims for deterministic overlap
+// and shutdown tests. The fixture records the claim count and
 // worker limit under a mutex, then optionally announces entry and waits for a
 // test-controlled release.
 //
@@ -80,7 +80,7 @@ func (r *groupAvailabilityProbeRunnerRepoStub) SaveResultAndScheduleNext(context
 
 // GetSummaryByGroupIDs returns no historical summaries for these runner
 // fixtures.
-func (r *groupAvailabilityProbeRunnerRepoStub) GetSummaryByGroupIDs(context.Context, []int64, int, int, string, time.Time) (map[int64]*GroupAvailabilitySummary, error) {
+func (r *groupAvailabilityProbeRunnerRepoStub) GetSummaryByGroupIDs(context.Context, []int64, float64, int, string, time.Time) (map[int64]*GroupAvailabilitySummary, error) {
 	return nil, nil
 }
 

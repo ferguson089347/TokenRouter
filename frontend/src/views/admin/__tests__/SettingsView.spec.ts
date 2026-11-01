@@ -1025,6 +1025,30 @@ describe('admin SettingsView payment visible method controls', () => {
     )
   })
 
+  // The minute input edits a fractional-day API value through the shared draft.
+  // Bulk validation must retain ninety minutes when saving and reloading settings.
+  it('edits and saves marketplace windows in minutes', async () => {
+    getSettings.mockResolvedValue({
+      ...baseSettingsResponse,
+      marketplace_availability_window_days: 1,
+      marketplace_availability_bucket_minutes: 120,
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    const input = wrapper.get('#marketplace-availability-window-minutes')
+    expect((input.element as HTMLInputElement).value).toBe('1440')
+    await input.setValue('90')
+    await wrapper.get('#marketplace-availability-bucket-minutes').setValue('5')
+    await saveFromSaveBar(wrapper)
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        marketplace_availability_window_days: 0.0625,
+        marketplace_availability_bucket_minutes: 5,
+      }),
+    )
+    expect((input.element as HTMLInputElement).value).toBe('90')
+  })
+
   // Saving a dirty bulk field crosses four asynchronous persistence and refresh
   // steps. Each dependent request waits until its preceding promise completes, and
   // independent targets save in registration order despite edits in reverse order.

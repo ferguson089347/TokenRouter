@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/lib/pq"
@@ -107,7 +108,7 @@ func NewGroupAvailabilityStore(db *sql.DB) *GroupAvailabilityStore {
 // Missing cells remain unknown. Cancellation propagates through SQL and no
 // partial result is returned after a scan failure. Rates and nullable latency
 // values retain their units when copied into the public presentation records.
-func (s *GroupAvailabilityStore) GetSummaryByGroupIDs(ctx context.Context, ids []int64, days, minutes int, zone string, now time.Time) (map[int64]*routing.GroupAvailabilitySummary, error) {
+func (s *GroupAvailabilityStore) GetSummaryByGroupIDs(ctx context.Context, ids []int64, days float64, minutes int, zone string, now time.Time) (map[int64]*routing.GroupAvailabilitySummary, error) {
 	days, minutes = routing.NormalizeMarketplaceAvailabilityWindow(days, minutes)
 	sourceSeconds := 300
 	if days > 7 {
@@ -131,7 +132,9 @@ func (s *GroupAvailabilityStore) GetSummaryByGroupIDs(ctx context.Context, ids [
 	// one UTC day, keeping database bucket labels and output array indexes equal.
 	origin := time.Unix(0, 0).UTC()
 	end := origin.Add(now.Sub(origin).Truncate(width)).Add(width)
-	start := origin.Add(end.Add(-time.Duration(days) * 24 * time.Hour).Sub(origin).Truncate(width))
+	// Round fractional days before duration conversion to retain whole-minute alignment.
+	window := time.Duration(math.Round(days*24*60)) * time.Minute
+	start := origin.Add(end.Add(-window).Sub(origin).Truncate(width))
 	result := make(map[int64]*routing.GroupAvailabilitySummary, len(ids))
 	if len(ids) == 0 {
 		return result, nil

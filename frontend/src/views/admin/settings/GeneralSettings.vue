@@ -212,23 +212,23 @@
   >
     <SettingsSection>
       <SettingRow
-        id="marketplace-availability-window-days"
+        id="marketplace-availability-window-minutes"
         field
-        label-for="marketplace-availability-window-days"
-        :label="t('admin.settings.marketplaceAvailability.windowDays')"
+        label-for="marketplace-availability-window-minutes"
+        :label="t('admin.settings.marketplaceAvailability.windowMinutes')"
         :hint="
-          t('admin.settings.marketplaceAvailability.windowDaysHint', {
-            min: marketplaceAvailabilityWindowDaysMin,
-            max: marketplaceAvailabilityWindowDaysMax,
+          t('admin.settings.marketplaceAvailability.windowMinutesHint', {
+            min: marketplaceAvailabilityWindowDaysMin * 24 * 60,
+            max: marketplaceAvailabilityWindowDaysMax * 24 * 60,
           })
         "
       >
         <input
-          id="marketplace-availability-window-days"
-          v-model.number="form.marketplace_availability_window_days"
+          id="marketplace-availability-window-minutes"
+          v-model.number="marketplaceWindowMinutes"
           type="number"
-          :min="marketplaceAvailabilityWindowDaysMin"
-          :max="marketplaceAvailabilityWindowDaysMax"
+          :min="marketplaceAvailabilityWindowDaysMin * 24 * 60"
+          :max="marketplaceAvailabilityWindowDaysMax * 24 * 60"
           step="1"
           class="input"
         />
@@ -758,6 +758,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   marketplaceAvailabilityWindowDaysMin,
   marketplaceAvailabilityWindowDaysMax,
@@ -834,6 +835,17 @@ const {
 // The draft alias keeps nested v-model writes on the parent-owned reactive
 // object; the parent maintains its identity throughout this page lifetime.
 const { form } = props
+
+// marketplaceWindowMinutes exposes whole minutes while the settings API stores
+// fractional days. Both directions keep the existing draft field available to
+// shared hydration, dirty tracking, validation, and bulk serialization.
+const marketplaceWindowMinutes = computed({
+  get: () => Math.round(form.marketplace_availability_window_days * 24 * 60),
+  set: (minutes: number) => {
+    form.marketplace_availability_window_days = minutes / (24 * 60)
+  },
+})
+
 // Translation lookups are evaluated by the template so labels follow the
 // active interface language while stored setting values retain their API meaning.
 const { t } = useI18n()

@@ -1,5 +1,7 @@
 package routing
 
+import "math"
+
 // availability_window.go bounds marketplace history windows and adjusts bucket
 // widths to cap response size.
 // Availability history combines a requested day window with its bucket
@@ -16,36 +18,39 @@ package routing
 // Availability defaults and bounds govern public history size; the bucket cap
 // also constrains the combined normalized window and interval.
 const (
-	DefaultMarketplaceAvailabilityWindowDays    = 7    // default history days
-	DefaultMarketplaceAvailabilityBucketMinutes = 120  // default bucket minutes
-	MinMarketplaceAvailabilityWindowDays        = 1    // minimum history days
-	MaxMarketplaceAvailabilityWindowDays        = 90   // maximum history days
-	MinMarketplaceAvailabilityBucketMinutes     = 5    // initial minimum bucket minutes
-	MaxMarketplaceAvailabilityBucketMinutes     = 1440 // initial maximum bucket minutes
-	MaxMarketplaceAvailabilityBuckets           = 720  // public response bucket cap
+	DefaultMarketplaceAvailabilityWindowDays    = 90.0 / (24 * 60) // default fractional history days
+	DefaultMarketplaceAvailabilityBucketMinutes = 5                // default bucket minutes
+	MinMarketplaceAvailabilityWindowDays        = 5.0 / (24 * 60)  // minimum fractional history days
+	MaxMarketplaceAvailabilityWindowDays        = 90               // maximum history days
+	MinMarketplaceAvailabilityBucketMinutes     = 5                // initial minimum bucket minutes
+	MaxMarketplaceAvailabilityBucketMinutes     = 1440             // initial maximum bucket minutes
+	MaxMarketplaceAvailabilityBuckets           = 720              // public response bucket cap
 )
 
-// NormalizeMarketplaceAvailabilityWindow returns normalized history days and
-// bucket minutes for public availability queries. Nonpositive arguments select
-// defaults before each value is clamped to its accepted range.
+// NormalizeMarketplaceAvailabilityWindow returns normalized fractional history
+// days and bucket minutes for public availability queries. Nonpositive or
+// nonfinite windows select defaults; accepted windows are rounded to whole
+// minutes after clamping, and bucket widths are bounded independently.
 //
 // The day window and interval are then evaluated together because a small
 // interval can produce an oversized response even after those clamps. Raising
 // the interval to the rounded-up minutes per permitted bucket limits the
 // sequence while retaining the day window; the returned interval can exceed its
 // independently normalized input value.
-func NormalizeMarketplaceAvailabilityWindow(windowDays int, bucketMinutes int) (int, int) {
-	if windowDays <= 0 {
+func NormalizeMarketplaceAvailabilityWindow(windowDays float64, bucketMinutes int) (float64, int) {
+	if windowDays <= 0 || math.IsNaN(windowDays) || math.IsInf(windowDays, 0) {
 		windowDays = DefaultMarketplaceAvailabilityWindowDays
 	}
 	if bucketMinutes <= 0 {
 		bucketMinutes = DefaultMarketplaceAvailabilityBucketMinutes
 	}
-	windowDays = ClampInt(windowDays, MinMarketplaceAvailabilityWindowDays, MaxMarketplaceAvailabilityWindowDays)
+	windowDays = min(max(windowDays, MinMarketplaceAvailabilityWindowDays), MaxMarketplaceAvailabilityWindowDays)
 	bucketMinutes = ClampInt(bucketMinutes, MinMarketplaceAvailabilityBucketMinutes, MaxMarketplaceAvailabilityBucketMinutes)
 
 	// Convert history days to minutes before comparing bucket counts.
-	totalMinutes := windowDays * 24 * 60
+	totalMinutes := int(math.Round(windowDays * 24 * 60))
+	// Whole minutes keep stored windows aligned with the administrator's input.
+	windowDays = float64(totalMinutes) / (24 * 60)
 	// Ceiling division includes a partial final bucket. Increase spacing when its
 	// count would exceed the public response limit, retaining the normalized day
 	// window.

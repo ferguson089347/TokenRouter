@@ -85,7 +85,7 @@ import type {
 // props accepts the optional server aggregate; missing data still produces the
 // default window and empty cells so neighboring groups retain comparable geometry.
 const props = defineProps<{
-  // Server aggregate and buckets; null or omission uses an empty seven-day window.
+  // Server aggregate and buckets; null or omission uses an empty ninety-minute window.
   availability?: MarketplaceGroupAvailability | null
 }>()
 
@@ -93,12 +93,22 @@ const props = defineProps<{
 // empty history from a numerical rate in both visible and accessible text.
 const { t } = useI18n()
 
-// Window and bucket durations determine the target cell count; each duration is
-// clamped to one or more before converting the day window into minutes.
-const windowDays = computed(() => Math.max(props.availability?.window_days ?? 7, 1))
-const bucketMinutes = computed(() => Math.max(props.availability?.bucket_minutes ?? 24 * 60, 1))
+// Window and bucket durations determine the target cell count. Fractional days
+// from the API become whole minutes for cell counts and localized window labels.
+const windowMinutes = computed(() =>
+  Math.max(Math.round((props.availability?.window_days ?? 90 / (24 * 60)) * 24 * 60), 1),
+)
+const bucketMinutes = computed(() => Math.max(props.availability?.bucket_minutes ?? 5, 1))
 const targetBucketCount = computed(() =>
-  Math.max(Math.ceil((windowDays.value * 24 * 60) / bucketMinutes.value), 1),
+  Math.max(Math.ceil(windowMinutes.value / bucketMinutes.value), 1),
+)
+
+// windowLabel uses minutes for subday histories so the public tooltip describes
+// the selected range with the same unit as the administrator's window input.
+const windowLabel = computed(() =>
+  windowMinutes.value >= 24 * 60
+    ? t('marketplace.durationDays', { count: windowMinutes.value / (24 * 60) })
+    : t('marketplace.durationMinutes', { count: windowMinutes.value }),
 )
 
 // normalizedBuckets keeps the newest target-sized suffix, padding missing older
@@ -173,12 +183,12 @@ const tooltip = computed(() => {
   const observation =
     typeof availability?.availability_rate === 'number'
       ? t('marketplace.availabilityHint', {
-          days: windowDays.value,
+          window: windowLabel.value,
           rate: rateLabel.value,
           success: availability.success_count,
           total: availability.total_count,
         })
-      : t('marketplace.monitorInsufficientHint', { days: windowDays.value })
+      : t('marketplace.monitorInsufficientHint', { window: windowLabel.value })
   const through = availability?.data_through
   return through
     ? `${observation} · ${t('marketplace.monitorUpdated', { time: new Date(through).toLocaleString() })}`
@@ -188,7 +198,7 @@ const tooltip = computed(() => {
 // ariaLabel names the window and sampled health independently of chart color.
 const ariaLabel = computed(
   () =>
-    `${t('marketplace.availabilityWindow', { days: windowDays.value })}: ${t(`marketplace.monitorStates.${healthStatus.value}`)}, ${rateLabel.value}`,
+    `${t('marketplace.availabilityWindow', { window: windowLabel.value })}: ${t(`marketplace.monitorStates.${healthStatus.value}`)}, ${rateLabel.value}`,
 )
 
 // ratioLabel formats an observed success fraction and retains absent values.

@@ -212,20 +212,36 @@ func TestMarketplaceBatchAttributesAndOptionalCapacity(t *testing.T) {
 }
 
 // TestParseMarketplaceAvailabilityWindowSettings supplies missing, valid,
-// invalid, and oversized history settings. Assertions check defaults and
-// widening a ninety-day window's buckets to one hundred eighty minutes.
+// invalid, fractional, and oversized history settings. Assertions protect the
+// ninety-minute default, subday windows, and widening buckets for long histories.
 func TestParseMarketplaceAvailabilityWindowSettings(t *testing.T) {
 	tests := []struct {
 		name              string            // subtest window settings label
 		settings          map[string]string // supplied stored window strings
-		wantWindowDays    int               // expected displayed history days
+		wantWindowDays    float64           // expected displayed history days
 		wantBucketMinutes int               // expected history bucket minutes
 	}{
 		{
 			name:              "missing settings use defaults",
 			settings:          nil,
-			wantWindowDays:    routing.DefaultMarketplaceAvailabilityWindowDays,
-			wantBucketMinutes: routing.DefaultMarketplaceAvailabilityBucketMinutes,
+			wantWindowDays:    90.0 / (24 * 60),
+			wantBucketMinutes: 5,
+		},
+		{
+			name: "fractional days retain ninety minutes",
+			settings: map[string]string{
+				routing.SettingKeyMarketplaceAvailabilityWindowDays: "0.0625",
+			},
+			wantWindowDays:    90.0 / (24 * 60),
+			wantBucketMinutes: 5,
+		},
+		{
+			name: "nonfinite days use the default",
+			settings: map[string]string{
+				routing.SettingKeyMarketplaceAvailabilityWindowDays: "+Inf",
+			},
+			wantWindowDays:    90.0 / (24 * 60),
+			wantBucketMinutes: 5,
 		},
 		{
 			name: "uses stored settings",
@@ -242,8 +258,8 @@ func TestParseMarketplaceAvailabilityWindowSettings(t *testing.T) {
 				routing.SettingKeyMarketplaceAvailabilityWindowDays:    "-1",
 				routing.SettingKeyMarketplaceAvailabilityBucketMinutes: "0",
 			},
-			wantWindowDays:    routing.DefaultMarketplaceAvailabilityWindowDays,
-			wantBucketMinutes: routing.DefaultMarketplaceAvailabilityBucketMinutes,
+			wantWindowDays:    90.0 / (24 * 60),
+			wantBucketMinutes: 5,
 		},
 		{
 			name: "bucket count is capped by widening bucket",
@@ -260,7 +276,7 @@ func TestParseMarketplaceAvailabilityWindowSettings(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gotWindowDays, gotBucketMinutes := routing.ParseMarketplaceAvailabilityWindowSettings(tt.settings)
 			if gotWindowDays != tt.wantWindowDays || gotBucketMinutes != tt.wantBucketMinutes {
-				t.Fatalf("parseMarketplaceAvailabilityWindowSettings() = (%d, %d), want (%d, %d)", gotWindowDays, gotBucketMinutes, tt.wantWindowDays, tt.wantBucketMinutes)
+				t.Fatalf("parseMarketplaceAvailabilityWindowSettings() = (%g, %d), want (%g, %d)", gotWindowDays, gotBucketMinutes, tt.wantWindowDays, tt.wantBucketMinutes)
 			}
 		})
 	}
@@ -1002,7 +1018,7 @@ func (o *marketplaceLoadingObservations) GetGroupCapacityByIDs(_ context.Context
 // GetSummaryByGroupIDs retains the supplied group-ID slice directly and
 // returns a group 1 summary with a three-day window. Other query inputs are
 // ignored by this observation fixture.
-func (o *marketplaceLoadingObservations) GetSummaryByGroupIDs(_ context.Context, ids []int64, _ int, _ int, _ string, _ time.Time) (map[int64]*routing.GroupAvailabilitySummary, error) {
+func (o *marketplaceLoadingObservations) GetSummaryByGroupIDs(_ context.Context, ids []int64, _ float64, _ int, _ string, _ time.Time) (map[int64]*routing.GroupAvailabilitySummary, error) {
 	o.availabilityGroups = ids
 	return map[int64]*routing.GroupAvailabilitySummary{1: {WindowDays: 3}}, nil
 }

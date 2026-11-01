@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/lib/pq"
@@ -238,7 +239,7 @@ func (r *GroupAvailabilityProbeStore) SaveResultAndScheduleNext(ctx context.Cont
 // The two queries use separate database reads, and any read failure discards
 // the assembled result.
 // @project-doc docs/interfaces/model_catalog_and_marketplace.md#group_availability_probe
-func (r *GroupAvailabilityProbeStore) GetSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days int, bucketMinutes int, timezoneName string, now time.Time) (map[int64]*routing.GroupAvailabilitySummary, error) {
+func (r *GroupAvailabilityProbeStore) GetSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days float64, bucketMinutes int, timezoneName string, now time.Time) (map[int64]*routing.GroupAvailabilitySummary, error) {
 	out := make(map[int64]*routing.GroupAvailabilitySummary, len(groupIDs))
 	if r == nil || r.db == nil || len(groupIDs) == 0 {
 		return out, nil
@@ -258,7 +259,7 @@ func (r *GroupAvailabilityProbeStore) GetSummaryByGroupIDs(ctx context.Context, 
 	endLocal := nextLocalBucketBoundary(localNow, bucketDuration)
 	// Round the nominal day span up to complete fixed-duration buckets; the result
 	// includes the current partial bucket when now lies inside it.
-	totalMinutes := days * 24 * 60
+	totalMinutes := int(math.Round(days * 24 * 60))
 	bucketCount := (totalMinutes + bucketMinutes - 1) / bucketMinutes
 	if bucketCount <= 0 {
 		bucketCount = 1

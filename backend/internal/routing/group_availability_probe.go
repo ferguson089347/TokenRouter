@@ -77,8 +77,8 @@ type GroupAvailabilityBucket struct {
 
 // GroupAvailabilitySummary combines window observations, sampled health, and the reader's latest status.
 type GroupAvailabilitySummary struct {
-	WindowDays    int // nominal observation-window day count
-	BucketMinutes int // observation bucket width in minutes
+	WindowDays    float64 // fractional observation-window days
+	BucketMinutes int     // observation bucket width in minutes
 	// SuccessCount and TotalCount describe the selected reader's observations
 	// within the window. Passive monitoring requires enough requests before
 	// publishing AvailabilityRate or a measured health category.
@@ -122,8 +122,8 @@ type GroupAvailabilityProbeRepository interface {
 	// GetSummaryByGroupIDs returns window counts, time buckets, and the latest
 	// status for selected groups. Ratios use success divided by total and remain
 	// nil when unobserved; latest status is queried separately and may precede the
-	// window.
-	GetSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days int, bucketMinutes int, timezone string, now time.Time) (map[int64]*GroupAvailabilitySummary, error)
+	// window. Fractional days permit observation windows shorter than one day.
+	GetSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days float64, bucketMinutes int, timezone string, now time.Time) (map[int64]*GroupAvailabilitySummary, error)
 	// CleanupOldResults deletes stored probe observations older than the supplied
 	// cutoff. The runner schedules this as retention maintenance with its own
 	// timeout, allowing a failure to leave probes and later cleanup attempts

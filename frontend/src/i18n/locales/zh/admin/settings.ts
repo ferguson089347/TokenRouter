@@ -171,10 +171,10 @@ export default {
     marketplaceAvailability: {
       title: '模型广场可用率',
       description: '调整公开模型广场可用率条的统计窗口和柱状粒度，保存后下次刷新模型广场立即生效。',
-      windowDays: '统计窗口（天）',
-      windowDaysHint: '范围 {min}-{max} 天，默认 7 天。',
+      windowMinutes: '统计窗口（分钟）',
+      windowMinutesHint: '范围 {min}-{max} 分钟，默认 90 分钟。',
       bucketMinutes: '单柱时间窗口（分钟）',
-      bucketMinutesHint: '范围 {min}-{max} 分钟，默认 120 分钟。',
+      bucketMinutesHint: '范围 {min}-{max} 分钟，默认 5 分钟。',
       bucketLimitHint: '如果窗口和粒度会产生超过 720 根柱子，后端会自动放大单柱时间窗口。',
     },
     features: {

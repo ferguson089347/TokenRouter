@@ -14,13 +14,13 @@ import (
 // AdminReadSettings contains resolved model fallback and marketplace
 // observation values.
 type AdminReadSettings struct {
-	EnableModelFallback                  bool   // resolved model fallback flag
-	FallbackModelAnthropic               string // resolved Anthropic fallback model
-	FallbackModelAntigravity             string // resolved Antigravity fallback model
-	FallbackModelGemini                  string // resolved Gemini fallback model
-	FallbackModelOpenAI                  string // resolved OpenAI fallback model
-	MarketplaceAvailabilityBucketMinutes int    // availability bucket width in minutes
-	MarketplaceAvailabilityWindowDays    int    // availability window in days
+	EnableModelFallback                  bool    // resolved model fallback flag
+	FallbackModelAnthropic               string  // resolved Anthropic fallback model
+	FallbackModelAntigravity             string  // resolved Antigravity fallback model
+	FallbackModelGemini                  string  // resolved Gemini fallback model
+	FallbackModelOpenAI                  string  // resolved OpenAI fallback model
+	MarketplaceAvailabilityBucketMinutes int     // availability bucket width in minutes
+	MarketplaceAvailabilityWindowDays    float64 // fractional days
 }
 
 // ReadAdminSettings builds administrative routing values from the stored string

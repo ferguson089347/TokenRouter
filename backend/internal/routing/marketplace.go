@@ -193,9 +193,9 @@ type MarketplaceCapacity interface {
 // groups.
 type MarketplaceAvailability interface {
 	// GetSummaryByGroupIDs reads availability counts and the latest stored status
-	// for the selected groups. Window and bucket sizes govern the time series,
-	// while the supplied timezone and query time define its observation range.
-	GetSummaryByGroupIDs(context.Context, []int64, int, int, string, time.Time) (map[int64]*GroupAvailabilitySummary, error)
+	// for the selected groups. Fractional days and whole bucket minutes govern the
+	// time series, while the supplied timezone and query time define its range.
+	GetSummaryByGroupIDs(context.Context, []int64, float64, int, string, time.Time) (map[int64]*GroupAvailabilitySummary, error)
 }
 
 // MarketplaceQuoteRequest identifies the group and model used for a public
@@ -506,7 +506,7 @@ func (s *Marketplace) getPublicAvailabilityMap(ctx context.Context, groups []Gro
 // bucket settings. Missing settings readers or read failures select shared
 // defaults; usable stored values are parsed and normalized together before an
 // availability query.
-func (s *Marketplace) resolveMarketplaceAvailabilityWindow(ctx context.Context) (int, int) {
+func (s *Marketplace) resolveMarketplaceAvailabilityWindow(ctx context.Context) (float64, int) {
 	if s == nil || s.settings == nil {
 		return DefaultMarketplaceAvailabilityWindowDays, DefaultMarketplaceAvailabilityBucketMinutes
 	}
@@ -523,17 +523,17 @@ func (s *Marketplace) resolveMarketplaceAvailabilityWindow(ctx context.Context) 
 	return ParseMarketplaceAvailabilityWindowSettings(settings)
 }
 
-// ParseMarketplaceAvailabilityWindowSettings parses positive stored day and
-// minute values independently before applying shared window normalization.
+// ParseMarketplaceAvailabilityWindowSettings parses stored fractional days and
+// whole bucket minutes independently before applying shared window normalization.
 // Missing, malformed, or nonpositive values retain their defaults, and
 // normalization can widen buckets to bound the returned series.
-func ParseMarketplaceAvailabilityWindowSettings(settings map[string]string) (int, int) {
+func ParseMarketplaceAvailabilityWindowSettings(settings map[string]string) (float64, int) {
 	windowDays := DefaultMarketplaceAvailabilityWindowDays
 	bucketMinutes := DefaultMarketplaceAvailabilityBucketMinutes
 	// Parse the two stored values independently so a valid day count still applies
 	// when only the bucket value is malformed, with defaults bounding the remaining
 	// unknown input.
-	if parsed, err := strconv.Atoi(strings.TrimSpace(settings[SettingKeyMarketplaceAvailabilityWindowDays])); err == nil && parsed > 0 {
+	if parsed, err := strconv.ParseFloat(strings.TrimSpace(settings[SettingKeyMarketplaceAvailabilityWindowDays]), 64); err == nil && parsed > 0 {
 		windowDays = parsed
 	}
 	if parsed, err := strconv.Atoi(strings.TrimSpace(settings[SettingKeyMarketplaceAvailabilityBucketMinutes])); err == nil && parsed > 0 {

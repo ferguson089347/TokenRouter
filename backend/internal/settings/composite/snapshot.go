@@ -242,7 +242,7 @@ type Snapshot struct {
 	BalanceIconSVG                       string                               // balance display SVG markup
 	ReasoningPointRMBUnitPrice           float64                              // reasoning-point unit price in RMB
 	USDExchangeRate                      float64                              // RMB amount per USD conversion
-	MarketplaceAvailabilityWindowDays    int                                  // days
+	MarketplaceAvailabilityWindowDays    float64                              // fractional days
 	MarketplaceAvailabilityBucketMinutes int                                  // minutes
 
 	EnableModelFallback      bool   `json:"enable_model_fallback"`      // global fallback model selection switch

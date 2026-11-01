@@ -691,7 +691,7 @@ export interface SystemSettings {
   balance_icon_svg: string // Balance icon svg.
   reasoning_point_rmb_unit_price: number // Reasoning point rmb unit price.
   usd_exchange_rate: number // USD exchange rate.
-  marketplace_availability_window_days: number // Marketplace availability window days.
+  marketplace_availability_window_days: number // Marketplace availability window in fractional days.
   marketplace_availability_bucket_minutes: number // Marketplace availability bucket minutes.
   auth_source_default_email_balance?: number // Auth source default email balance.
   auth_source_default_email_concurrency?: number // Auth source default email concurrency.
@@ -1054,7 +1054,7 @@ export interface UpdateSettingsRequest {
   balance_icon_svg?: string // Balance icon svg.
   reasoning_point_rmb_unit_price?: number // Reasoning point rmb unit price.
   usd_exchange_rate?: number // USD exchange rate.
-  marketplace_availability_window_days?: number // Marketplace availability window days.
+  marketplace_availability_window_days?: number // Marketplace availability window in fractional days.
   marketplace_availability_bucket_minutes?: number // Marketplace availability bucket minutes.
   auth_source_default_email_balance?: number // Auth source default email balance.
   auth_source_default_email_concurrency?: number // Auth source default email concurrency.

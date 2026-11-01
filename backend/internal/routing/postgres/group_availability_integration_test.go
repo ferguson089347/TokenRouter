@@ -8,8 +8,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/TokenFlux/TokenRouter/internal/routing"
 	"github.com/TokenFlux/TokenRouter/internal/testutil/postgrescontainer"
 )
+
+// group_availability_integration_test.go verifies public passive monitoring with
+// committed PostgreSQL rollups. Stored observations exercise sample gating,
+// ignored errors, latency histograms, time-window filtering, and bucket alignment
+// through the production summary reader and migrated database schema.
 
 // TestPassiveGroupAvailability uses committed fixed rollups with sufficient and
 // insufficient samples in real PostgreSQL. Public summaries must follow monitor
@@ -75,6 +81,22 @@ func TestPassiveGroupAvailability(t *testing.T) {
 		require.NoError(t, parseErr)
 		require.Zero(t, at.Unix()%(25*60))
 	}
+	// A successful older bucket belongs in a day view but falls outside ninety
+	// minutes. The short window must retain recent counts and eighteen cells.
+	_, err = db.Exec(`INSERT INTO channel_monitor_v2_metrics_rollup
+ (bucket_start,bucket_seconds,platform,group_id,model,success_requests,error_requests)
+ VALUES($1,300,'openai',42,'model',100,0)`, first.Add(-2*time.Hour))
+	require.NoError(t, err)
+	short, err := store.GetSummaryByGroupIDs(t.Context(), []int64{42}, routing.DefaultMarketplaceAvailabilityWindowDays, routing.DefaultMarketplaceAvailabilityBucketMinutes, "UTC", now)
+	require.NoError(t, err)
+	require.Equal(t, 90.0/(24*60), short[42].WindowDays)
+	require.Len(t, short[42].Days, 18)
+	require.EqualValues(t, 61, short[42].TotalCount)
+	start, err := time.Parse(time.RFC3339, short[42].Days[0].Date)
+	require.NoError(t, err)
+	end, err := time.Parse(time.RFC3339, short[42].Days[17].Date)
+	require.NoError(t, err)
+	require.Equal(t, 90*time.Minute, end.Add(5*time.Minute).Sub(start))
 	_, err = db.Exec(`UPDATE channel_monitor_v2_config SET enabled=false WHERE id=1`)
 	require.NoError(t, err)
 	result, err = store.GetSummaryByGroupIDs(t.Context(), []int64{42}, 1, 5, "UTC", now)

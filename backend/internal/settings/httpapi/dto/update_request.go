@@ -241,7 +241,7 @@ type UpdateSettingsRequest struct {
 	BalanceIconSVG                       string                                   `json:"balance_icon_svg"`                        // balance display SVG markup
 	ReasoningPointRMBUnitPrice           *float64                                 `json:"reasoning_point_rmb_unit_price"`          // reasoning-point unit price in RMB
 	USDExchangeRate                      *float64                                 `json:"usd_exchange_rate"`                       // RMB amount per USD conversion
-	MarketplaceAvailabilityWindowDays    *int                                     `json:"marketplace_availability_window_days"`    // days
+	MarketplaceAvailabilityWindowDays    *float64                                 `json:"marketplace_availability_window_days"`    // fractional days
 	MarketplaceAvailabilityBucketMinutes *int                                     `json:"marketplace_availability_bucket_minutes"` // minutes
 	// The AuthSourceDefault fields for Email, LinuxDo, OIDC, WeChat, GitHub,
 	// Google, and DingTalk share the same merge rule across their Balance,

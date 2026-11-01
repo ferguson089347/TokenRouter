@@ -51,8 +51,8 @@ type AdminSettings struct {
 	// bounded bucket count, including caller-supplied zero values.
 	// availability bucket width in minutes
 	MarketplaceAvailabilityBucketMinutes int `json:"marketplace_availability_bucket_minutes"`
-	// availability window in days
-	MarketplaceAvailabilityWindowDays int `json:"marketplace_availability_window_days"`
+	// availability window in fractional days
+	MarketplaceAvailabilityWindowDays float64 `json:"marketplace_availability_window_days"`
 }
 
 // PrepareAdminSettings encodes routing settings and normalizes observation
@@ -65,7 +65,7 @@ func PrepareAdminSettings(settings *AdminSettings) map[string]string {
 		settings.MarketplaceAvailabilityWindowDays,
 		settings.MarketplaceAvailabilityBucketMinutes,
 	)
-	updates[SettingKeyMarketplaceAvailabilityWindowDays] = strconv.Itoa(settings.MarketplaceAvailabilityWindowDays)
+	updates[SettingKeyMarketplaceAvailabilityWindowDays] = strconv.FormatFloat(settings.MarketplaceAvailabilityWindowDays, 'f', -1, 64)
 	updates[SettingKeyMarketplaceAvailabilityBucketMinutes] = strconv.Itoa(settings.MarketplaceAvailabilityBucketMinutes)
 	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
 	updates[SettingKeyFallbackModelAnthropic] = settings.FallbackModelAnthropic
