@@ -229,6 +229,13 @@ OpenAI 和 Grok 共用的响应回合状态头由 `gateway/httpapi.CodexTurnStat
 
 通用的报文和转换算法在 `protocol/{anthropic,openai,gemini,google,bridge}`。采样和 Max effort 选项由 `gateway/forward` 的型号策略提供；平台适配层选择 schema、thinking、签名和工具选项，并注入时间和 ID 生成器；每个请求或 attempt 创建独立的转换状态。Gemini 的 Messages 流和 OpenAI 兼容流按各自的 thinking、index 和 usage 观测顺序逐事件返回输出。HTTP 适配层提供同步写入和 Flush；upstream 执行器负责首次输出判定、取消、失败后的排水和提供商内重试；换号由外层网关决定。流式输出保持逐事件转发，实际输出开始后的重试规则保持不变。
 
+<a id="responses_header_keepalive"></a>
+### Responses 等待响应头与保活
+
+原生和透传 Responses 的 `stream=true` 请求，在实际发送上游 HTTP 请求前启动 SSE 注释心跳，覆盖连接、发送和等待响应头的阶段。间隔使用 `gateway.stream_keepalive_interval`，默认 10 秒，设为 `0` 关闭。返回响应头或传输错误时，等待心跳先停止，响应读取器和错误输出再接管 writer。
+
+首次心跳提交 HTTP 200 和 SSE 响应格式。仅有心跳时，字节计数仍允许已有策略执行输出前的故障转移；重试耗尽后发送 `response.failed`。首次心跳之前到达的 HTTP 错误可继续使用原 HTTP 状态。心跳不计入模型首字时间，也不延长上游响应头、首输出或读空闲超时。上游代理自行返回的 524 和已经输出后的上游断流，仍按对应失败处理。
+
 ### 流式输出与重试窗口
 
 流式响应有一个不可逆的时间点。调用上游前记录 `ResponseWriter` 已写出的字节数；如果本次 attempt 已经向客户端写出实际业务内容，就不能再换提供商，否则两个上游的响应会拼成一条损坏的流。以下内容不算业务输出，可以留在 attempt 缓冲里，为输出前的 failover 留出空间：旧版 Compact 桥接心跳、Responses 的 `response.created` 和 `response.in_progress` 前导事件、等待终态判定的可重试 `error` 帧。不可重试的错误按事件及时转发。实际输出开始后，错误只能按当前协议追加允许的流错误事件，或者直接结束连接。非流式请求在还没写响应时，才能进入下一次 failover。

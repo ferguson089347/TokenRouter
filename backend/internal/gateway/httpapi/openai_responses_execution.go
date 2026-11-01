@@ -31,7 +31,8 @@ import (
 // rejection marking refers to the same prepared entry that a repeated request
 // can present. HTTP exchange callbacks carry one token, fingerprint and route
 // preparation through the shared runner's local recovery and response-reading
-// phases.
+// phases. Configured SSE heartbeats cover response-header waits and stop before
+// the response reader takes over output and its own heartbeat policy.
 
 // OpenAIResponsesExecutor combines selected-attempt request, output, text and
 // lineage services for Responses forwarding. App assembly shares these
@@ -205,6 +206,10 @@ func (s *OpenAIResponsesExecutor) Forward(ctx context.Context, c *gin.Context, p
 			if provider.Record.ProxyID != nil && provider.Record.Proxy != nil {
 				proxyURL = provider.Record.Proxy.URL()
 			}
+			// Header waits precede the reader's heartbeat loop. End this controller
+			// before response processing so heartbeat writes cannot overlap reader metadata or output.
+			stop := s.Output.StartHeaderKeepalive(c, reqStream)
+			defer stop()
 			return s.Requests.Transport.DoWithTLS(request, proxyURL, provider.Record.ID, provider.Record.Concurrency, s.Requests.TLSProfile(provider, tlsRouterMatch))
 		},
 		Latency: func(elapsed time.Duration) {

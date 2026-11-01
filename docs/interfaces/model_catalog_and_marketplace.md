@@ -56,6 +56,8 @@ Claude Code、Codex、Gemini、Grok、OpenCode 和 CC Switch 的配置，按用�
 
 模型 ID 是客户端的请求键，display name 是展示信息，pricing model 是解析价格用的键，三者可以不同。Key 级重定向和分组映射要让 `/v1/models`、`/models`、实际调度和响应模型恢复保持一致；目标无法请求的别名，不应该只出现在列表里。
 
+插件客户端可以通过 `/v1/models?include=capabilities` 查询最终可见 ID 的协议和共同属性，包含别名与复合前缀。该参数不扩大模型可见范围，不改变默认响应；字段和继承规则见 [Magpie 插件模型发现](magpie_import.md#plugin_models)。
+
 ## 市场可见性
 
 公开市场只返回处于 active、非 exclusive、并且至少有一个 active 提供商的分组；解析后没有可请求模型的分组也会被隐藏。排序使用分组手动设置的顺序；市场不会按临时价格或实时错误重新排列。

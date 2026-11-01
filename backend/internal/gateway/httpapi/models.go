@@ -27,7 +27,8 @@ import (
 // Keys also require the selected subscription to cover each group. This
 // ordering keeps a displayed alias tied to one permitted target and group,
 // while deduplication retains the first occurrence. Metadata lookup supplies
-// display fields after eligibility has been established.
+// display fields after eligibility has been established. Clients requesting
+// capabilities receive protocols and attributes under those same public IDs.
 
 // ModelsBackend supplies request identity and model eligibility for HTTP
 // catalogue responses.
@@ -178,7 +179,8 @@ func customListEnabled(g *routing.Group) bool {
 // platform constrains ordinary-Key resolution and protocol presentation; an
 // unrestricted list uses the unified OpenAI envelope. An empty resolution
 // remains empty, so metadata lookup cannot introduce a model that failed
-// configured eligibility.
+// configured eligibility. The optional include=capabilities query preserves
+// this selection and adds metadata for protocol-aware clients.
 func (h *ModelsHandler) Models(c *gin.Context) {
 	done, accepted := h.BeginRequest(c, "openai")
 	if !accepted {
@@ -212,18 +214,24 @@ func (h *ModelsHandler) Models(c *gin.Context) {
 		DefaultOpenAIErrorOutput().WriteStreamingErrorWithCode(c, http.StatusServiceUnavailable, "api_error", "MODEL_ATTRIBUTES_UNAVAILABLE", resolution.Err.Error(), false, false)
 		return
 	}
-	h.captureModelAttributes(c, groupID, resolution.Models, "")
+	h.captureModelListMetadata(c, groupID, resolution.Models, "")
 	availableModels := routing.RequestableModelIDs(resolution.Models)
 	if apiKey != nil && apiKey.Group != nil && customListEnabled(apiKey.Group) {
 		// Intersect before adding aliases so their target needs to remain visible
 		// under both configured request eligibility and the group display selection.
 		availableModels = FilterModelsByCustomList(availableModels, nil, apiKey.Group.ModelsListConfig.Models)
 		availableModels = apikey.AppendAPIKeyModelAliases(availableModels, apiKey.ModelMapping)
+		if h.writeModelsWithCapabilities(c, availableModels) {
+			return
+		}
 		h.WriteCustomModelsList(c, platform, availableModels)
 		return
 	}
 	if apiKey != nil {
 		availableModels = apikey.AppendAPIKeyModelAliases(availableModels, apiKey.ModelMapping)
+	}
+	if h.writeModelsWithCapabilities(c, availableModels) {
+		return
 	}
 
 	// An unrestricted catalogue combines platforms in one OpenAI list envelope,
@@ -297,7 +305,8 @@ func (h *ModelsHandler) AntigravityModels(c *gin.Context) {
 // intersected with custom lists, and expanded with concrete Key aliases. The
 // binding prefix is added after these checks so one public name identifies
 // its group and eligible model. Duplicate prefixed IDs retain their first
-// occurrence in the aggregate.
+// occurrence in the aggregate. Capability queries retain each binding's
+// metadata under the same prefix before the final visible list is written.
 func (h *ModelsHandler) CompositeRequestableModels(c *gin.Context, apiKey *apikey.APIKey, requiredPlatform string) []string {
 	if h == nil || !h.backend.Available() || c == nil || c.Request == nil || apiKey == nil {
 		return nil
@@ -320,6 +329,9 @@ func (h *ModelsHandler) CompositeRequestableModels(c *gin.Context, apiKey *apike
 			DefaultOpenAIErrorOutput().WriteStreamingErrorWithCode(c, http.StatusServiceUnavailable, "api_error", "MODEL_ATTRIBUTES_UNAVAILABLE", resolution.Err.Error(), false, false)
 			c.Abort()
 			return nil
+		}
+		if c.Query("include") == "capabilities" {
+			h.captureModelListMetadata(c, &groupID, resolution.Models, binding.Prefix+"/")
 		}
 		available := routing.RequestableModelIDs(resolution.Models)
 		if customListEnabled(group) {
@@ -358,8 +370,12 @@ func (h *ModelsHandler) CompositePreferredSubscription(c *gin.Context, apiKey *a
 // WriteCompositeModelsList writes already-prefixed IDs in the OpenAI list
 // envelope. It uses the public ID as display name, TokenRouter ownership, and
 // empty or zero timestamps because group aggregation supplies no merged
-// vendor metadata.
+// vendor metadata. Capability queries instead use the metadata captured for
+// each binding while retaining the same authorized, prefixed IDs.
 func (h *ModelsHandler) WriteCompositeModelsList(c *gin.Context, modelIDs []string) {
+	if h.writeModelsWithCapabilities(c, modelIDs) {
+		return
+	}
 	models := make([]gin.H, 0, len(modelIDs))
 	for _, modelID := range modelIDs {
 		models = append(models, gin.H{

@@ -10,8 +10,8 @@ import (
 	"github.com/TokenFlux/TokenRouter/internal/upstream/openai"
 )
 
-// openai_response_protocol_helpers.go supplies image response timing,
-// diagnostic summaries and error delivery bindings.
+// openai_response_protocol_helpers.go supplies response waiting heartbeats,
+// image timing, diagnostic summaries and error delivery bindings.
 // Image response readers use separately configured idle and heartbeat
 // intervals, expressed as whole seconds. A no-output diagnostic can retain
 // structured event information while omitting body excerpts, and image error
@@ -23,6 +23,21 @@ import (
 // image output sizing also discounts the independent queue-heartbeat counter.
 // Baselines and later observations use the same total, keeping comments from
 // each stage distinct from delivered image content across provider attempts.
+
+// StartHeaderKeepalive maintains a streaming client's connection while the
+// selected Responses transport waits for upstream headers. Nonstreaming calls,
+// unconfigured output, and disabled heartbeat intervals return a no-op cleanup.
+// Callers stop the returned controller before processing response headers or
+// presenting a transport failure; body readers then own their heartbeat policy.
+// @project-doc docs/architecture/gateway_request_lifecycle.md#responses_header_keepalive
+func (p *OpenAIResponseOutput) StartHeaderKeepalive(c *gin.Context, stream bool) func() {
+	if !stream || p == nil || !p.Options.Configured || p.Options.StreamKeepaliveInterval <= 0 {
+		return func() {}
+	}
+	// Reuse request-level comment accounting so a header-wait heartbeat commits
+	// SSE framing while leaving permitted provider recovery eligible before semantic output.
+	return StartOpenAISSEKeepalive(c, time.Duration(p.Options.StreamKeepaliveInterval)*time.Second)
+}
 
 // OpenAIImagesAdjustedWrittenSize returns image output bytes after excluding
 // the selected JSON or SSE heartbeat format. Callers use this measure both

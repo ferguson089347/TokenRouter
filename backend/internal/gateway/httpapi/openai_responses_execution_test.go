@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -1240,38 +1241,105 @@ func (u *blockingOpenAIResponseHeaderUpstream) DoWithTLS(req *http.Request, _ st
 // TestOpenAIForwardFirstOutputTimeoutIncludesResponseHeaderWait delays
 // response headers beyond the configured first-output allowance. It checks
 // prompt typed timeout, cancelled upstream context and empty client body while
-// the transport fixture records cancellation.
+// virtual time isolates the header deadline from machine load during preparation.
 func TestOpenAIForwardFirstOutputTimeoutIncludesResponseHeaderWait(t *testing.T) {
-	upstream := &blockingOpenAIResponseHeaderUpstream{canceled: make(chan struct{})}
-	svc := newResponsesFixture(responsesFixtureInputs{options: &responsesFixtureOptions{Response: OpenAIResponseOptions{OpenAIFirstOutputTimeoutSeconds: 1, MaxLineSize: OpenAIResponseDefaultMaxLineSize}}, transport: upstream})
-	body := []byte(`{"model":"gpt-5.5","stream":true,"reasoning":{"effort":"low"},"input":"hello"}`)
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
-	provider := &gatewayprovider.ExecutionProvider{
-		Record: providercore.Record{
-			LoadLocation: time.LoadLocation, ID: 1, Name: "oauth-test", Platform: capability.PlatformOpenAI, Type: capability.ProviderTypeOAuth,
-			Status: billingcore.StatusActive, Schedulable: true, Concurrency: 1,
-			Credentials: map[string]any{"access_token": "test-token", "chatgpt_account_id": "test-provider"},
-		},
-	}
+	synctest.Test(t, func(t *testing.T) {
+		upstream := &blockingOpenAIResponseHeaderUpstream{canceled: make(chan struct{})}
+		svc := newResponsesFixture(responsesFixtureInputs{options: &responsesFixtureOptions{Response: OpenAIResponseOptions{OpenAIFirstOutputTimeoutSeconds: 1, MaxLineSize: OpenAIResponseDefaultMaxLineSize}}, transport: upstream})
+		body := []byte(`{"model":"gpt-5.5","stream":true,"reasoning":{"effort":"low"},"input":"hello"}`)
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+		provider := &gatewayprovider.ExecutionProvider{
+			Record: providercore.Record{
+				LoadLocation: time.LoadLocation, ID: 1, Name: "oauth-test", Platform: capability.PlatformOpenAI, Type: capability.ProviderTypeOAuth,
+				Status: billingcore.StatusActive, Schedulable: true, Concurrency: 1,
+				Credentials: map[string]any{"access_token": "test-token", "chatgpt_account_id": "test-provider"},
+			},
+		}
 
-	started := time.Now()
-	_, err := svc.Forward(context.Background(), c, provider, body)
+		started := time.Now()
+		_, err := svc.Forward(context.Background(), c, provider, body)
 
-	require.Error(t, err)
-	var failoverErr *forwardcore.UpstreamFailoverError
-	require.ErrorAs(t, err, &failoverErr)
-	require.Equal(t, http.StatusGatewayTimeout, failoverErr.StatusCode)
-	require.Contains(t, string(failoverErr.ResponseBody), "first_output_timeout")
-	require.True(t, failoverErr.SafeToFailoverAfterWrite)
-	// Leave two hundred milliseconds before the fixture guard timeout.
-	require.Less(t, time.Since(started), 1300*time.Millisecond)
-	require.Empty(t, rec.Body.String())
-	select {
-	case <-upstream.canceled:
-	default:
-		t.Fatal("response-header timeout did not cancel the upstream request context")
+		require.Error(t, err)
+		var failoverErr *forwardcore.UpstreamFailoverError
+		require.ErrorAs(t, err, &failoverErr)
+		require.Equal(t, http.StatusGatewayTimeout, failoverErr.StatusCode)
+		require.Contains(t, string(failoverErr.ResponseBody), "first_output_timeout")
+		require.True(t, failoverErr.SafeToFailoverAfterWrite)
+		// Leave two hundred milliseconds before the fixture guard timeout.
+		require.Less(t, time.Since(started), 1300*time.Millisecond)
+		require.Empty(t, rec.Body.String())
+		select {
+		case <-upstream.canceled:
+		default:
+			t.Fatal("response-header timeout did not cancel the upstream request context")
+		}
+	})
+}
+
+// TestOpenAIResponsesHeartbeatCoversHeaderWait delays native and passthrough
+// response headers beyond an ingress idle budget. Comments reach the client
+// while successful output and recoverable failures retain their separate rules.
+func TestOpenAIResponsesHeartbeatCoversHeaderWait(t *testing.T) {
+	for _, passthrough := range []bool{false, true} {
+		for _, rejected := range []bool{false, true} {
+			t.Run(fmt.Sprintf("passthrough=%t/rejected=%t", passthrough, rejected), func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					body := []byte(`{"model":"gpt-6.1-sol","stream":true,"instructions":"draw","input":"draw"}`)
+					rec := httptest.NewRecorder()
+					c, _ := gin.CreateTestContext(rec)
+					c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+					upstream := &auxiliaryHTTPRecorder{onRequest: func(req *http.Request) (*http.Response, error) {
+						// Cross the observed ingress deadline while the upstream has not
+						// supplied any headers, so body-reader heartbeats cannot protect this wait.
+						time.Sleep(130 * time.Second)
+						synctest.Wait()
+						require.Contains(t, rec.Body.String(), ": keepalive\n\n")
+						require.NotContains(t, rec.Body.String(), "data:")
+						require.False(t, OpenAIStreamClientOutputStarted(c, false))
+						require.NoError(t, req.Context().Err())
+						if rejected {
+							return newOpenAIRejectedFieldTestResponse(524, `{"error":{"type":"server_error","message":"upstream timed out"}}`), nil
+						}
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Header:     http.Header{"Content-Type": {"text/event-stream"}},
+							Body:       io.NopCloser(strings.NewReader("data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_draw\",\"status\":\"completed\",\"model\":\"gpt-6.1-sol\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"finished\"}]}],\"usage\":{\"input_tokens\":3,\"output_tokens\":4}}}\n\n")),
+						}, nil
+					}}
+					svc := newResponsesFixture(responsesFixtureInputs{transport: upstream, options: &responsesFixtureOptions{
+						Response: OpenAIResponseOptions{StreamKeepaliveInterval: 10, MaxLineSize: OpenAIResponseDefaultMaxLineSize},
+					}})
+					provider := openAIFailoverCachedBodyTestProvider(1, "native", nil)
+					if passthrough {
+						provider = newOpenAIRejectedFieldTestProvider()
+						provider.Record.Extra["openai_passthrough"] = true
+					}
+					require.Equal(t, passthrough, openAIForwardProfile(provider).Passthrough)
+					result, err := svc.Forward(c.Request.Context(), c, provider, body)
+					if rejected {
+						var failure *forwardcore.UpstreamFailoverError
+						require.ErrorAs(t, err, &failure)
+						require.Equal(t, 524, failure.StatusCode)
+						require.False(t, OpenAIStreamClientOutputStarted(c, false))
+						DefaultOpenAIErrorOutput().StreamError(c, http.StatusBadGateway, "upstream_error", "upstream timed out", false)
+						require.Equal(t, 1, strings.Count(rec.Body.String(), "event: response.failed"))
+					} else {
+						require.NoError(t, err)
+						require.NotNil(t, result)
+						require.Equal(t, 4, result.Usage.OutputTokens)
+						require.Contains(t, rec.Body.String(), "response.completed")
+					}
+					// The returned response has taken over output. Advancing the clock
+					// after completion must not allow a header controller to append another comment.
+					size := rec.Body.Len()
+					time.Sleep(30 * time.Second)
+					synctest.Wait()
+					require.Equal(t, size, rec.Body.Len())
+				})
+			})
+		}
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 
 	"github.com/TokenFlux/TokenRouter/internal/apikey"
 	"github.com/TokenFlux/TokenRouter/internal/identity"
@@ -48,6 +49,73 @@ func TestModelsBoundEmptyDoesNotFallBackOrConsume(t *testing.T) {
 	require.Equal(t, 200, w.Code)
 	require.JSONEq(t, `{"object":"list","data":[]}`, w.Body.String())
 	require.Empty(t, p.paths)
+}
+
+// TestModelsCapabilitiesPreserveVisibilityAndAliases requests metadata for a
+// custom model list with one Key alias. Hidden candidates remain excluded and
+// the alias inherits only its eligible target's protocol permissions.
+func TestModelsCapabilitiesPreserveVisibilityAndAliases(t *testing.T) {
+	p := &modelsBackendStub{key: prefaceKey(), result: routing.RequestableModelsResult{Models: []routing.RequestableModel{
+		{ID: "target", Protocols: []protocol.ProtocolID{protocol.ProtocolAnthropicMessages}, NativeProtocols: []protocol.ProtocolID{protocol.ProtocolAnthropicMessages}},
+		{ID: "hidden", Protocols: []protocol.ProtocolID{protocol.ProtocolOpenAIResponses}},
+	}}}
+	p.key.Group.ModelsListConfig = routing.GroupModelsListConfig{Enabled: true, Models: []string{"target"}}
+	p.key.ModelMapping = map[string]string{"custom-alias": "target", "forbidden": "missing"}
+	c, w := modelsContext()
+	c.Request.URL.RawQuery = "include=capabilities"
+	NewModelsHandler(p, &modelsCatalogStub{}).Models(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	data := gjson.GetBytes(w.Body.Bytes(), "data").Array()
+	require.Len(t, data, 2)
+	require.Equal(t, "target", data[0].Get("id").String())
+	require.Equal(t, "custom-alias", data[1].Get("id").String())
+	require.Equal(t, "anthropic_messages", data[1].Get("protocols.0").String())
+	require.Equal(t, "anthropic_messages", data[1].Get("native_protocols.0").String())
+	require.JSONEq(t, `{}`, data[1].Get("attributes").Raw)
+	require.NotContains(t, w.Body.String(), "hidden")
+	require.NotContains(t, w.Body.String(), "forbidden")
+	require.Equal(t, 1, p.resolveCalls)
+	require.Empty(t, p.paths)
+}
+
+// TestModelsCapabilitiesKeepCompositeBindingsSeparate resolves the same model
+// under two authorized prefixes with different protocols. Disabled bindings
+// disappear, and each alias retains its own group's permitted entry point.
+func TestModelsCapabilitiesKeepCompositeBindingsSeparate(t *testing.T) {
+	groups := []*routing.Group{
+		{ID: 1, Status: "active"},
+		{ID: 2, Status: "active"},
+		{ID: 3, Status: "disabled"},
+	}
+	p := &modelsBackendStub{key: &apikey.APIKey{
+		IsComposite:  true,
+		User:         &identity.User{ID: 7},
+		ModelMapping: map[string]string{"alias": "same-model"},
+		CompositeGroups: []apikey.APIKeyCompositeGroup{
+			{GroupID: 1, Prefix: "first", Group: groups[0]},
+			{GroupID: 2, Prefix: "second", Group: groups[1]},
+			{GroupID: 3, Prefix: "disabled", Group: groups[2]},
+		},
+	}, byGroup: map[int64]routing.RequestableModelsResult{
+		1: {Models: []routing.RequestableModel{{ID: "same-model", Protocols: []protocol.ProtocolID{protocol.ProtocolAnthropicMessages}}}},
+		2: {Models: []routing.RequestableModel{{ID: "same-model", Protocols: []protocol.ProtocolID{protocol.ProtocolOpenAIResponses}}}},
+	}}
+	c, w := modelsContext()
+	c.Request.URL.RawQuery = "include=capabilities"
+	NewModelsHandler(p, &modelsCatalogStub{}).Models(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	data := gjson.GetBytes(w.Body.Bytes(), "data").Array()
+	require.Len(t, data, 4)
+	protocols := make(map[string]string, len(data))
+	for _, item := range data {
+		protocols[item.Get("id").String()] = item.Get("protocols.0").String()
+	}
+	require.Equal(t, "anthropic_messages", protocols["first/alias"])
+	require.Equal(t, "openai_responses", protocols["second/alias"])
+	require.NotContains(t, w.Body.String(), "disabled")
+	require.Equal(t, 2, p.resolveCalls)
 }
 
 // TestGeminiModelsEmptyCapabilityDoesNotQueryUpstream supplies an empty
