@@ -478,7 +478,8 @@ func (s *IntelligenceService) finish(ctx context.Context, run *IntelligenceRun, 
 
 // execute advances a claimed run using its current durable submission state. A
 // queued job validates its current configuration, Key, group and DNS before
-// persisting submitting and attempting one chargeable generation request.
+// persisting submitting and its chargeable generation attempt count. Drawing
+// failures can requeue within the task's persisted attempt budget.
 // Recovery marks interrupted generation unknown when neither a remote task ID
 // nor a completed local document was saved, since repeating it could incur costs.
 //
@@ -533,6 +534,7 @@ func (s *IntelligenceService) execute(ctx context.Context, run *IntelligenceRun)
 		if c.Benchmark == "drawing" {
 			run.LocalGeneration = true
 			run.Phase = "generating"
+			run.GenerationAttempts++
 		}
 		run.UpdatedAt = time.Now().UTC()
 		ok, err := s.repo.SaveRun(ctx, run, time.Now().UTC(), true)
@@ -694,8 +696,11 @@ func (s *IntelligenceService) applyResult(ctx context.Context, run *Intelligence
 	if result.Terminal() {
 		run.Status = "completed"
 		if run.Verdict == "error" || run.Verdict == "unknown" {
-			// A finished generation can lack a recognized assessment; retain the unknown
-			// verdict so users can distinguish incomplete evaluation.
+			// Failed classification can reuse locally saved artwork. Retry evaluation
+			// before publishing a terminal diagnostic so the task retains one result identity.
+			if s.retryDrawingAssessment(ctx, run, result.Error) {
+				return
+			}
 			run.Status = run.Verdict
 			run.ErrorMessage = intelligenceResultMessage(result, run.Verdict)
 		}

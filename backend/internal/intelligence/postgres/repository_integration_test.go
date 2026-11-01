@@ -253,6 +253,63 @@ func TestIntelligencePostgresHistoryAndArtifactRetention(t *testing.T) {
 	require.ErrorIs(t, err, intelligence.ErrIntelligenceNotFound)
 }
 
+// TestIntelligencePostgresRetriesAndDiagnosticHistory seeds assessed results
+// followed by execution failures. Diagnostic retention cannot evict assessed
+// history, and private generation attempts survive the claimed task's round trip.
+func TestIntelligencePostgresRetriesAndDiagnosticHistory(t *testing.T) {
+	db, repo, config := intelligenceFixture(t)
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, `INSERT INTO intelligence_test_runs(id,config_id,status,record,created_at,updated_at)
+SELECT 'assessed-'||i,$1,'completed',jsonb_build_object('id','assessed-'||i,'verdict',CASE WHEN i=65 THEN 'failed' ELSE 'passed' END),NOW()-INTERVAL '2 days'+i*INTERVAL '1 second',NOW()
+FROM generate_series(1,65) AS i`, config.ID)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO intelligence_test_runs(id,config_id,status,record,created_at,updated_at)
+SELECT 'diagnostic-'||i,$1,CASE WHEN i%2=0 THEN 'error' ELSE 'unknown' END,jsonb_build_object('id','diagnostic-'||i,'verdict','error'),NOW()-INTERVAL '1 day'+i*INTERVAL '1 second',NOW()
+FROM generate_series(1,65) AS i`, config.ID)
+	require.NoError(t, err)
+	_, err = repo.CreateRun(ctx, config.ID, time.Now().UTC())
+	require.NoError(t, err)
+	run, err := repo.ClaimRun(ctx, time.Now().UTC(), time.Now().UTC().Add(time.Minute), "retry-fixture-lease")
+	require.NoError(t, err)
+	require.NotNil(t, run)
+	run.GenerationAttempts = 2
+	run.Status = "submitting"
+	ok, err := repo.SaveRun(ctx, run, time.Now().UTC(), true)
+	require.NoError(t, err)
+	require.True(t, ok)
+	stored, err := repo.GetRun(ctx, run.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, stored.GenerationAttempts)
+	raw, err := json.Marshal(stored)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), "generation_attempts")
+	run.Status = "error"
+	run.Verdict = "error"
+	ok, err = repo.SaveRun(ctx, run, time.Now().UTC(), false)
+	require.NoError(t, err)
+	require.True(t, ok)
+	history, err := repo.ListRuns(ctx, config.ID)
+	require.NoError(t, err)
+	require.Len(t, history, 60)
+	require.Equal(t, "failed", history[0].Verdict)
+	for _, result := range history {
+		require.Equal(t, "completed", result.Status)
+	}
+	var assessed, diagnostic int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT count(*) FILTER(WHERE status='completed'),count(*) FILTER(WHERE status IN ('error','unknown')) FROM intelligence_test_runs WHERE config_id=$1`, config.ID).Scan(&assessed, &diagnostic))
+	require.Equal(t, 60, assessed)
+	require.Equal(t, 60, diagnostic)
+	stored, err = repo.GetRun(ctx, run.ID)
+	require.NoError(t, err)
+	require.Equal(t, "error", stored.Status)
+	active, err := repo.CreateRun(ctx, config.ID, time.Now().UTC())
+	require.NoError(t, err)
+	history, err = repo.ListRuns(ctx, config.ID)
+	require.NoError(t, err)
+	require.Equal(t, active.ID, history[0].ID)
+	require.Equal(t, "queued", history[0].Status)
+}
+
 // TestIntelligencePostgresLargePayloadDoesNotExpandListRecord stores large
 // drawing and answer content in a real migrated database. List queries return
 // bounded summary records, while full detail reads reconstruct the complete

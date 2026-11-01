@@ -24,10 +24,10 @@ import (
 // Each claim records a token and expiry. Result updates compare both values
 // before changing any observation or applying retention. Small summaries stay
 // separate from question, answer, assessment, and HTML payloads, letting list
-// queries avoid large stored values. Completed history is bounded to sixty
-// records and ten retained drawing bodies. PNG snapshots stay in private
-// payload fields, survive worker updates, and follow the sixty-record history
-// lifetime even after full HTML is removed.
+// queries avoid large stored values. Assessed history and internal diagnostic
+// tasks each retain sixty terminal records, while display queries return active
+// tasks and assessed results. Ten drawing bodies retain HTML. PNG snapshots stay
+// in private payload fields and survive worker writes and HTML pruning.
 
 // intelligenceConfigColumns fixes the joined column order shared by configuration
 // listing, row locking and scanners, keeping persisted and display identities aligned.
@@ -58,6 +58,9 @@ type intelligenceRunPayload struct {
 	// process restarts and worker replacements.
 	LocalGeneration    bool `json:"local_generation,omitempty"`    // local artwork ownership
 	AssessmentAttempts int  `json:"assessment_attempts,omitempty"` // HTML submission attempt count
+	// GenerationAttempts survives requeueing so a replacement worker cannot
+	// reset the per-task limit on chargeable gateway generation requests.
+	GenerationAttempts int `json:"generation_attempts,omitempty"` // gateway generation attempt count
 }
 
 // NewIntelligenceRepository constructs persistence using the caller's shared
@@ -366,6 +369,7 @@ func marshalIntelligenceRun(run *intelligence.IntelligenceRun) ([]byte, []byte, 
 		AssessmentReason:   run.AssessmentReason,
 		LocalGeneration:    run.LocalGeneration,
 		AssessmentAttempts: run.AssessmentAttempts,
+		GenerationAttempts: run.GenerationAttempts,
 	})
 	return record, payload, err
 }
@@ -395,12 +399,14 @@ func scanIntelligenceRun(row intelligenceScanner) (*intelligence.IntelligenceRun
 	var private struct {
 		LocalGeneration    bool `json:"local_generation"`    // local artwork ownership
 		AssessmentAttempts int  `json:"assessment_attempts"` // HTML submission attempt count
+		GenerationAttempts int  `json:"generation_attempts"` // gateway generation attempt count
 	}
 	if err := json.Unmarshal(raw, &private); err != nil {
 		return nil, err
 	}
 	run.LocalGeneration = private.LocalGeneration
 	run.AssessmentAttempts = private.AssessmentAttempts
+	run.GenerationAttempts = private.GenerationAttempts
 	run.Status = status
 	run.RemoteID = remote
 	run.LeaseToken = lease
@@ -442,8 +448,9 @@ RETURNING (r.record||r.payload),r.status,r.remote_id,r.lease_token`, now, until,
 // precedes remote creation.
 //
 // Releasing a lease and trimming older payloads occur in one transaction. Ten
-// newest artifacts retain HTML and sixty newest runs retain history; active
-// runs survive historical pruning. A successful commit returns true.
+// newest artifacts retain HTML. Assessed results and diagnostic tasks each
+// retain sixty terminal rows, so failed attempts cannot displace valid history.
+// Active tasks survive historical pruning. A successful commit returns true.
 func (r *intelligenceRepository) SaveRun(ctx context.Context, run *intelligence.IntelligenceRun, next time.Time, keepLease bool) (bool, error) {
 	raw, payload, err := marshalIntelligenceRun(run)
 	if err != nil {
@@ -478,7 +485,14 @@ WHERE config_id=$1 AND record->>'has_artifact'='true'
 ORDER BY created_at DESC,id DESC OFFSET 10)`, run.ConfigID); err != nil {
 			return false, err
 		}
-		if _, err = tx.ExecContext(ctx, `DELETE FROM intelligence_test_runs WHERE config_id=$1 AND status NOT IN ('queued','submitting','running') AND id IN(SELECT id FROM intelligence_test_runs WHERE config_id=$1 ORDER BY created_at DESC,id DESC OFFSET 60)`, run.ConfigID); err != nil {
+		if _, err = tx.ExecContext(ctx, `DELETE FROM intelligence_test_runs WHERE id IN (
+SELECT id FROM (
+SELECT id,row_number() OVER (
+PARTITION BY (status='completed' AND COALESCE(record->>'verdict' IN ('passed','failed'),false))
+ORDER BY created_at DESC,id DESC) AS position
+FROM intelligence_test_runs
+WHERE config_id=$1 AND status NOT IN ('queued','submitting','running')
+) retained WHERE position>60)`, run.ConfigID); err != nil {
 			return false, err
 		}
 	}
@@ -526,10 +540,13 @@ func (r *intelligenceRepository) SaveThumbnail(ctx context.Context, id string, p
 	return err
 }
 
-// ListRuns returns the sixty newest lightweight summaries for one
-// configuration.
+// ListRuns returns the sixty newest active tasks or assessed results for one
+// configuration. Error and unknown tasks remain available through GetRun for
+// diagnostics while history displays retain completed passed and failed verdicts.
 func (r *intelligenceRepository) ListRuns(ctx context.Context, id int64) ([]intelligence.IntelligenceRun, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT record,status,remote_id,lease_token FROM intelligence_test_runs WHERE config_id=$1 ORDER BY created_at DESC,id DESC LIMIT 60`, id)
+	rows, err := r.db.QueryContext(ctx, `SELECT record,status,remote_id,lease_token FROM intelligence_test_runs
+WHERE config_id=$1 AND (status IN ('queued','submitting','running') OR (status='completed' AND record->>'verdict' IN ('passed','failed')))
+ORDER BY created_at DESC,id DESC LIMIT 60`, id)
 	if err != nil {
 		return nil, err
 	}

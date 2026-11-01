@@ -197,3 +197,30 @@ func TestParseGenerationCompletionBoundaries(t *testing.T) {
 	require.Equal(t, "<html><body>art</body></html>", result.HTML)
 	require.Nil(t, result.OutputTokens)
 }
+
+// TestGenerationStreamFailureKeepsSafeDiagnostic receives failures after SSE
+// heartbeats have committed HTTP success. Structured causes survive for retry
+// classification while arbitrary supplier text and credentials are discarded.
+func TestGenerationStreamFailureKeepsSafeDiagnostic(t *testing.T) {
+	for _, scenario := range []struct {
+		name     string // fixture envelope description
+		payload  string // structured gateway failure
+		category string // expected safe diagnostic category
+		status   int    // explicitly observed HTTP code
+	}{
+		{"response terminal", `{"type":"response.failed","response":{"error":{"code":"timeout","message":"HTTP 524 timeout sk-private-secret"}}}`, "timeout", 524},
+		{"top level", `{"error":{"code":"insufficient_quota","message":"sk-private-secret"}}`, "quota", 0},
+		{"bare event", `{"type":"error","code":"server_error","message":"service unavailable sk-private-secret"}`, "upstream", 0},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			raw := ": keepalive\n\ndata: " + scenario.payload + "\n\n"
+			result, err := parseGeneration([]byte(raw), "responses")
+			require.Nil(t, result)
+			var failure *remote.HTTPError
+			require.ErrorAs(t, err, &failure)
+			require.Equal(t, scenario.status, failure.StatusCode)
+			require.Equal(t, scenario.category, failure.Diagnostic.Code)
+			require.NotContains(t, failure.Diagnostic.SafeMessage(), "sk-private-secret")
+		})
+	}
+}

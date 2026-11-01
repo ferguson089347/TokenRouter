@@ -30,6 +30,8 @@ import (
 // artwork, even when the partial text happens to contain closing HTML tags.
 // Arrival timing is observed as event lines are read, before complete output
 // parsing, so the first token delay stays separate from total generation time.
+// Structured gateway failures are reduced to fixed diagnostic categories and
+// recognized HTTP codes before the worker decides whether generation may retry.
 
 // generationMaxOutputTokens bounds output and reasoning work requested from
 // either gateway protocol so one drawing uses a predictable generation budget.
@@ -215,6 +217,9 @@ func parseGeneration(raw []byte, protocol string) (*remote.DrawingResult, error)
 	complete := false
 	if json.Valid(raw) {
 		data := gjson.ParseBytes(raw)
+		if failure := data.Get("error"); failure.Exists() && failure.Type != gjson.Null {
+			return nil, generationFailure(failure)
+		}
 		usage = data.Get("usage")
 		if protocol == "chat_completions" {
 			_, _ = text.WriteString(data.Get("choices.0.message.content").String())
@@ -240,7 +245,7 @@ func parseGeneration(raw []byte, protocol string) (*remote.DrawingResult, error)
 			}
 			event := gjson.Parse(data)
 			if event.Get("error").Type != gjson.Null {
-				return nil, remote.ErrInvalidResponse
+				return nil, generationFailure(event.Get("error"))
 			}
 			if protocol == "chat_completions" {
 				for _, choice := range event.Get("choices").Array() {
@@ -270,7 +275,11 @@ func parseGeneration(raw []byte, protocol string) (*remote.DrawingResult, error)
 					text.Reset()
 					_, _ = text.WriteString(output)
 				}
-			case "response.failed", "response.incomplete", "error":
+			case "response.failed":
+				return nil, generationFailure(event.Get("response.error"))
+			case "error":
+				return nil, generationFailure(event)
+			case "response.incomplete":
 				return nil, remote.ErrInvalidResponse
 			}
 		}
@@ -299,6 +308,20 @@ func parseGeneration(raw []byte, protocol string) (*remote.DrawingResult, error)
 		result.ReasoningTokens = generationToken(usage.Get("output_tokens_details.reasoning_tokens"))
 	}
 	return result, nil
+}
+
+// generationFailure reduces a gateway error to an allowlisted diagnostic for
+// retry and display decisions. Missing or invalid error values retain the generic
+// invalid-response result; arbitrary upstream text is discarded during decoding.
+func generationFailure(value gjson.Result) error {
+	if !value.Exists() || value.Type == gjson.Null {
+		return remote.ErrInvalidResponse
+	}
+	var diagnostic remote.RemoteError
+	if json.Unmarshal([]byte(value.Raw), &diagnostic) != nil || diagnostic.Code == "" {
+		return remote.ErrInvalidResponse
+	}
+	return &remote.HTTPError{StatusCode: diagnostic.HTTPStatus, Diagnostic: &diagnostic}
 }
 
 // responseOutput joins assistant output text from a completed Responses object.

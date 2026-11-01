@@ -59,6 +59,7 @@ func TestCommunityAdmissionSeparatesSourcesAndSerializesWork(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, claimed)
 	claimed.Status = "completed"
+	claimed.Verdict = "passed"
 	ok, err := repo.SaveRun(ctx, claimed, time.Now().UTC(), false)
 	require.NoError(t, err)
 	require.True(t, ok)
