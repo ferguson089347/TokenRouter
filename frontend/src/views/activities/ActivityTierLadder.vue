@@ -1,5 +1,10 @@
 <template>
-  <div role="group" :aria-label="t('rechargeBonus.tierLadder')" data-testid="activity-tier-ladder">
+  <div
+    class="min-w-0"
+    role="group"
+    :aria-label="t('rechargeBonus.tierLadder')"
+    data-testid="activity-tier-ladder"
+  >
     <div
       class="flex gap-2 overflow-x-auto pb-2 sm:grid sm:gap-2 sm:overflow-visible sm:pb-0"
       :style="desktopColumns"
@@ -8,7 +13,7 @@
         v-for="(tier, index) in tiers"
         :key="tier.min_amount"
         type="button"
-        class="relative flex min-w-[104px] shrink-0 snap-start flex-col gap-1 rounded-control border px-3 py-3 text-left transition sm:min-w-0 sm:shrink sm:border-0 sm:px-2 sm:pb-0 sm:text-center"
+        class="relative flex min-w-[104px] shrink-0 snap-start flex-col gap-1 rounded-control border px-3 py-3 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-w-0 sm:shrink sm:border-0 sm:px-2 sm:pb-0 sm:text-center"
         :class="nodeClass(tier.min_amount)"
         :disabled="disabled || isReached(tier.min_amount)"
         :aria-pressed="isSelected(tier.min_amount)"
@@ -26,7 +31,7 @@
         />
         <span
           aria-hidden="true"
-          class="relative mx-auto hidden h-3 w-3 rounded-full border-2 bg-white sm:block dark:bg-dark-950"
+          class="relative mx-auto hidden h-3 w-3 rounded-full border-2 sm:block"
           :class="dotClass(tier.min_amount)"
         />
         <span class="text-xs text-gray-500 dark:text-dark-300">{{
@@ -39,8 +44,13 @@
           t('rechargeBonus.reached')
         }}</span>
         <span
-          v-else-if="isNext(tier.min_amount)"
+          v-else-if="isSelected(tier.min_amount)"
           class="text-xs font-medium text-primary-600 dark:text-primary-500"
+          >{{ t('rechargeBonus.previewTier') }}</span
+        >
+        <span
+          v-else-if="isNext(tier.min_amount)"
+          class="text-xs text-gray-500 dark:text-dark-300"
           >{{ t('rechargeBonus.nextStep') }}</span
         >
       </button>
@@ -55,14 +65,15 @@ import type { RechargeBonusTier } from '@/api/payment.types'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
 
 // ActivityTierLadder.vue renders the activity's fixed reward thresholds as one
-// track, replacing the separate chip list and reward cards that repeated the same
-// numbers. Reached thresholds fill the connector and use the brand color, the next
-// threshold carries a ring and a hint, and the remaining thresholds stay neutral.
-// Clicking a threshold asks the page to raise the purchase amount to that
+// track with payment targets and their fixed rewards. Confirmed thresholds fill
+// the connector and use the brand color. The preview's selected threshold carries
+// the ring and its own estimate label;
+// the next threshold remains neutral and identifies the next available reward.
+// Clicking a threshold asks the page to fill the purchase amount for that
 // threshold; a threshold already covered by earlier payments is disabled because
-// it would add no reward. Threshold states derive from the buyer's confirmed
-// cumulative credit, so guests and buyers with failed progress reads compare
-// amounts in the same layout while their quotes stay gated by the page.
+// it would add no reward. Confirmed progress and the selected estimate remain
+// distinct states, so editing an amount cannot imply that its reward has already
+// been delivered. Failed progress reads keep selection gated by the parent page.
 //
 // Mobile presents the thresholds as horizontally scrolling cards with no
 // connector, because a seven-column track leaves too little room for two lines of
@@ -108,21 +119,26 @@ function isSelected(minimum: number): boolean {
 
 /** nodeClass selects the card border on mobile, where each threshold is a card. */
 function nodeClass(minimum: number): string {
-  if (isReached(minimum)) return 'border-primary-600 bg-primary-50 dark:bg-primary-500/8'
-  if (isNext(minimum)) return 'border-primary-600'
+  if (isReached(minimum) || isSelected(minimum)) {
+    return 'border-primary-600 bg-primary-50 dark:bg-primary-500/8'
+  }
   return 'border-gray-200 dark:border-dark-600'
 }
 
-/** dotClass colors the desktop dot for reached, next, and remaining thresholds. */
+/** dotClass marks the selected estimate and confirmed thresholds in brand color. */
 function dotClass(minimum: number): string {
-  if (isReached(minimum)) return 'border-primary-600 bg-primary-600'
-  if (isNext(minimum)) return 'border-primary-600 ring-4 ring-primary-500/20'
-  return 'border-gray-300 dark:border-dark-600'
+  if (isSelected(minimum)) {
+    return 'border-primary-600 bg-primary-600 ring-4 ring-primary-500/20 dark:border-primary-500 dark:bg-primary-500'
+  }
+  if (isReached(minimum)) {
+    return 'border-primary-600 bg-primary-600 dark:border-primary-500 dark:bg-primary-500'
+  }
+  return 'border-gray-300 bg-white dark:border-dark-600 dark:bg-dark-950'
 }
 
-/** giftClass emphasizes rewards the buyer earns or can still reach. */
+/** giftClass emphasizes confirmed rewards and the currently selected preview tier. */
 function giftClass(minimum: number): string {
-  return isReached(minimum) || isNext(minimum)
+  return isReached(minimum) || isSelected(minimum)
     ? 'text-primary-600 dark:text-primary-500'
     : 'text-gray-950 dark:text-white'
 }

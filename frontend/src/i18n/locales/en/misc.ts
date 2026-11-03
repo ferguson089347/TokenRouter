@@ -1005,6 +1005,13 @@ export default {
     },
   },
   rechargeBonus: {
+    activeOffer: 'Recharge bonus',
+    previewTier: 'Estimated tier',
+    presetOffer: 'Bonus {amount}',
+    accumulationOnly: 'Counts toward tiers',
+    accumulationHint:
+      'This payment counts toward your campaign total. Rewards arrive when you reach a tier.',
+    amountOffer: 'Estimated bonus {gift}, total credit {total}.',
     extraPreview: 'Scheduled extra preview',
     scheduledOnly: 'Available on the specified dates; add it to your estimate',
     addToPreview: 'Add to estimate',

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import PaymentView from '../PaymentView.vue'
 import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/utils/payment/paymentFlow'
@@ -1402,5 +1402,178 @@ describe('PaymentView payment help text', () => {
     expect(help.find('strong').text()).toBe('发票说明')
     expect(help.find('a').attributes('href')).toBe('https://example.com/invoice')
     expect(help.html()).not.toContain('<script>')
+  })
+})
+
+describe('PaymentView recharge amount offers', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-02T02:05:00Z'))
+    routeState.path = '/purchase'
+    routeState.query = {}
+    window.localStorage.clear()
+    activeSubscriptionsState.value = []
+    getCheckoutInfo.mockReset()
+    translate.mockImplementation((key: string, values?: Record<string, unknown>) => {
+      return values ? `${key} ${JSON.stringify(values)}` : key
+    })
+  })
+
+  afterEach(() => {
+    translate.mockImplementation((key: string) => key)
+    vi.useRealTimers()
+  })
+
+  // mountRechargeOffers renders real amount inputs with one buyer's campaign progress.
+  // Supplied overrides alter clock, rewards, or conversion without exposing merchant
+  // configuration; callers unmount the returned page to release its live clock.
+  async function mountRechargeOffers(overrides: Partial<CheckoutInfoResponse> = {}) {
+    getCheckoutInfo.mockResolvedValue(
+      checkoutInfoFixture({
+        server_time: '2026-11-02T02:05:00Z',
+        recharge_bonus_tiers: [
+          { min_amount: 100, bonus_amount: 11 },
+          { min_amount: 300, bonus_amount: 33 },
+          { min_amount: 500, bonus_amount: 66 },
+          { min_amount: 1000, bonus_amount: 121 },
+        ],
+        recharge_bonus_activity: {
+          campaign_id: 'double11-2026',
+          page_enabled: true,
+          slug: 'double11-2026',
+          title: 'Recharge event',
+          subtitle: '',
+          timezone: 'Asia/Shanghai',
+          starts_at: '2026-11-02T02:00:00Z',
+          ends_at: '2026-11-11T16:00:00Z',
+          time_windows: [
+            {
+              enabled: true,
+              starts_at: '2026-11-10T16:00:00Z',
+              ends_at: '2026-11-11T16:00:00Z',
+              bonus_percent: 5,
+            },
+          ],
+          rules: '',
+          faqs: [],
+        },
+        recharge_bonus_progress: {
+          campaign_id: 'double11-2026',
+          cumulative_amount: 0,
+          tier_reward_total: 0,
+        },
+        ...overrides,
+      }),
+    )
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          MotionTransition: motionTransitionStub,
+          AppLayout: { template: '<main><slot /></main>' },
+          AmountInput: false,
+          RechargeBonusBreakdown: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+    return wrapper
+  }
+
+  // A campaign buyer has no prior rewards and inspects payment presets before choosing.
+  // Gift labels and custom-entry totals must agree with the real summary while selecting preserves the payment principal.
+  it('shows each preset gift and updates the inline offer after custom entry', async () => {
+    const wrapper = await mountRechargeOffers()
+    try {
+      const presets = wrapper.findAll('[data-testid="payment-preset-amount"]')
+      expect(wrapper.find('[data-testid="payment-active-bonus"]').exists()).toBe(true)
+      expect(presets[0]!.text()).toContain('rechargeBonus.accumulationOnly')
+      expect(presets[3]!.text()).toContain('"amount":"$11.00"')
+      expect(presets[5]!.text()).toContain('"amount":"$66.00"')
+      await presets[3]!.trigger('click')
+      expect((wrapper.get('#payment-custom-amount').element as HTMLInputElement).value).toBe('100')
+      expect(wrapper.get('[data-testid="payment-amount-bonus-hint"]').text()).toContain(
+        '"total":"$111.00"',
+      )
+      await wrapper.get('#payment-custom-amount').setValue('700')
+      expect(wrapper.get('[data-testid="payment-amount-bonus-hint"]').text()).toContain(
+        '"gift":"$66.00","total":"$766.00"',
+      )
+      expect(wrapper.get('[data-testid="recharge-bonus-total"]').text()).toBe('$766.00')
+      await wrapper.get('#payment-custom-amount').setValue('')
+      expect(wrapper.find('[data-testid="payment-amount-bonus-hint"]').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  // This buyer already received the first reward and uses a two-times credit multiplier.
+  // Preset gifts subtract prior rewards while selecting still fills the original payment amount.
+  it('uses prior awards and the recharge multiplier in amount badges', async () => {
+    const wrapper = await mountRechargeOffers({
+      balance_recharge_multiplier: 2,
+      recharge_bonus_progress: {
+        campaign_id: 'double11-2026',
+        cumulative_amount: 100,
+        tier_reward_total: 11,
+      },
+    })
+    try {
+      const presets = wrapper.findAll('[data-testid="payment-preset-amount"]')
+      expect(presets[0]!.text()).toContain('rechargeBonus.accumulationOnly')
+      expect(presets[3]!.text()).toContain('"amount":"$22.00"')
+      await presets[3]!.trigger('click')
+      expect((wrapper.get('#payment-custom-amount').element as HTMLInputElement).value).toBe('100')
+      expect(wrapper.get('[data-testid="payment-amount-bonus-hint"]').text()).toContain(
+        '"total":"$222.00"',
+      )
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  // The same hundred-unit payment is viewed immediately before and during Double 11.
+  // Only its active date adds the five-percent gift to the displayed tier reward.
+  it.each([
+    ['2026-11-10T15:59:59Z', '$11.00'],
+    ['2026-11-10T16:00:00Z', '$16.00'],
+  ])('quotes scheduled gifts on preset amounts at %s', async (server_time, gift) => {
+    const wrapper = await mountRechargeOffers({ server_time })
+    try {
+      const presets = wrapper.findAll('[data-testid="payment-preset-amount"]')
+      expect(presets[3]!.text()).toContain(`"amount":"${gift}"`)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  // Offers outside the campaign period or without matching personal progress cannot promise unused rewards.
+  // The ordinary amount buttons remain selectable and promotion labels stay absent.
+  it.each([
+    { server_time: '2026-11-02T01:59:59Z' },
+    { server_time: '2026-11-11T16:00:00Z' },
+    { recharge_bonus_progress: undefined },
+    {
+      recharge_bonus_progress: {
+        campaign_id: 'other-campaign',
+        cumulative_amount: 0,
+        tier_reward_total: 0,
+      },
+    },
+    { recharge_bonus_activity: undefined },
+  ])('hides amount offers for an ineligible preview: %j', async (overrides) => {
+    const wrapper = await mountRechargeOffers(overrides)
+    try {
+      expect(wrapper.find('[data-testid="payment-active-bonus"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="payment-preset-bonus"]').exists()).toBe(false)
+      const presets = wrapper.findAll('[data-testid="payment-preset-amount"]')
+      expect(presets).toHaveLength(9)
+      await presets[3]!.trigger('click')
+      expect((wrapper.get('#payment-custom-amount').element as HTMLInputElement).value).toBe('100')
+    } finally {
+      wrapper.unmount()
+    }
   })
 })

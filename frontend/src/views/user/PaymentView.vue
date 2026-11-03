@@ -236,16 +236,58 @@
 
                 <!-- Recharge amount selection. -->
                 <section v-else class="card p-4 sm:p-6">
-                  <h2 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{{
-                    t('payment.amountLabel')
-                  }}</h2>
+                  <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{
+                      t('payment.amountLabel')
+                    }}</h2>
+                    <span
+                      v-if="hasActiveRechargeBonus"
+                      class="inline-flex items-center gap-1 rounded-compact border border-primary-500 px-2 py-1 text-xs font-medium text-primary-600 dark:text-primary-400"
+                      data-testid="payment-active-bonus"
+                      ><Icon name="gift" size="sm" :animate-on-hover="false" />{{
+                        t('rechargeBonus.activeOffer')
+                      }}</span
+                    >
+                  </div>
                   <AmountInput
                     v-model="amount"
-                    :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
+                    :amounts="rechargeAmounts"
                     :min="globalMinAmount"
                     :max="globalMaxAmount"
                     :currency="selectedCurrency"
-                  />
+                  >
+                    <template
+                      v-if="hasActiveRechargeBonus"
+                      #amount-extra="{ amount: presetAmount }"
+                    >
+                      <span
+                        class="text-xs leading-5 text-primary-600 dark:text-primary-400"
+                        data-testid="payment-preset-bonus"
+                        >{{ rechargeAmountOffers[presetAmount] }}</span
+                      >
+                    </template>
+                    <template v-if="hasActiveRechargeBonus && validAmount > 0" #hint>
+                      <p
+                        class="mt-3 text-sm leading-6 text-primary-600 dark:text-primary-400"
+                        role="status"
+                        aria-live="polite"
+                        data-testid="payment-amount-bonus-hint"
+                      >
+                        {{
+                          rechargeQuote.bonus_amount > 0
+                            ? t('rechargeBonus.amountOffer', {
+                                gift: formatBalanceAmount(rechargeQuote.bonus_amount, {
+                                  fractionDigits: 2,
+                                }),
+                                total: formatBalanceAmount(rechargeQuote.amount, {
+                                  fractionDigits: 2,
+                                }),
+                              })
+                            : t('rechargeBonus.accumulationHint')
+                        }}
+                      </p>
+                    </template>
+                  </AmountInput>
                   <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{
                     amountError
                   }}</p>
@@ -644,6 +686,9 @@ import { usePaymentSelection } from './payment/usePaymentSelection'
  * authorization handling. Subscription fee previews apply the configured USD-to-CNY rate
  * only when enabled. Form validation and display remain on this page so launch operations
  * receive the same billing values the user reviewed.
+ * Recharge presets and custom entry show gifts from the same campaign quote as the
+ * order summary. Promotion labels require matching personal progress and a current
+ * campaign period, so earlier rewards and scheduled extras affect every amount label.
  */
 
 // Page dependencies supply account state, localization, route intent, and checkout feedback
@@ -777,15 +822,65 @@ const validAmount = computed(() => amount.value ?? 0)
 // for the mounted purchase page. Order creation recalculates the accepted terms.
 const bonusClock = useNow({ interval: 1000 })
 const bonusClockOffset = ref(0)
-const rechargeQuote = computed(() =>
-  quoteRechargeBonus(
+const rechargeQuote = computed(() => quoteRechargeAmount(validAmount.value))
+// Recharge amount choices stay in payment units; each label quotes that choice
+// independently against the same confirmed progress used by the order summary.
+const rechargeAmounts = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
+const hasActiveRechargeBonus = computed(() => {
+  const activity = checkout.value.recharge_bonus_activity
+  const progress = checkout.value.recharge_bonus_progress
+  const at = bonusClock.value.getTime() + bonusClockOffset.value
+  if (
+    !activity?.campaign_id ||
+    progress?.campaign_id !== activity.campaign_id ||
+    !Number.isFinite(progress.cumulative_amount) ||
+    progress.cumulative_amount < 0 ||
+    !Number.isFinite(progress.tier_reward_total) ||
+    progress.tier_reward_total < 0 ||
+    (activity.starts_at && !(at >= Date.parse(activity.starts_at))) ||
+    (activity.ends_at && !(at < Date.parse(activity.ends_at)))
+  ) {
+    return false
+  }
+  return (
+    checkout.value.recharge_bonus_tiers?.some((tier) => tier.bonus_amount > 0) ||
+    activity.time_windows.some(
+      (window) =>
+        window.enabled &&
+        window.bonus_percent > 0 &&
+        at >= Date.parse(window.starts_at) &&
+        at < Date.parse(window.ends_at),
+    )
+  )
+})
+const rechargeAmountOffers = computed(() =>
+  Object.fromEntries(
+    rechargeAmounts.map((principal) => {
+      const quote = quoteRechargeAmount(principal)
+      return [
+        principal,
+        quote.bonus_amount > 0
+          ? t('rechargeBonus.presetOffer', {
+              amount: formatBalanceAmount(quote.bonus_amount, { fractionDigits: 2 }),
+            })
+          : t('rechargeBonus.accumulationOnly'),
+      ]
+    }),
+  ),
+)
+
+// quoteRechargeAmount estimates a payment using this buyer's current campaign progress.
+// Preset labels, custom entry, and the summary share the server-adjusted clock
+// and credit multiplier; successful payment determines the final awarded amounts.
+function quoteRechargeAmount(principal: number) {
+  return quoteRechargeBonus(
     checkout.value,
-    validAmount.value,
+    principal,
     balanceRechargeMultiplier.value,
     bonusClock.value.getTime() + bonusClockOffset.value,
     checkout.value.recharge_bonus_progress,
-  ),
-)
+  )
+}
 const balanceRechargeMultiplier = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
   return multiplier > 0 ? multiplier : 1

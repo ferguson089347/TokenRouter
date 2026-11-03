@@ -111,6 +111,27 @@ beforeEach(() => {
 })
 
 describe('RechargeActivityView', () => {
+  // A guest selects the 5000-credit tier while the next reward remains at 10000.
+  // The selected estimate receives the visible marker and the next tier stays unselected.
+  it('marks the clicked tier as the estimate instead of emphasizing the next tier', async () => {
+    const { wrapper } = await mountActivity()
+    try {
+      const nodes = wrapper.findAll('[data-testid="activity-tier-node"]')
+      await nodes[5]!.trigger('click')
+      expect(nodes[5]!.attributes('aria-pressed')).toBe('true')
+      expect(nodes[5]!.text()).toContain('rechargeBonus.previewTier')
+      expect(nodes[6]!.attributes('aria-pressed')).toBe('false')
+      expect(nodes[6]!.text()).toContain('rechargeBonus.nextStep')
+      expect(nodes[6]!.text()).not.toContain('rechargeBonus.previewTier')
+      await wrapper.get('[data-testid="activity-recharge-amount"]').setValue(700)
+      expect(nodes[2]!.attributes('aria-pressed')).toBe('true')
+      expect(nodes[2]!.text()).toContain('rechargeBonus.previewTier')
+      expect(nodes[5]!.attributes('aria-pressed')).toBe('false')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   // A guest starts with fixed rewards and manually adds or removes a dated extra.
   // That choice changes the estimate while the login link retains only the purchase amount.
   it('requires a manual extra selection and retains the amount through login', async () => {

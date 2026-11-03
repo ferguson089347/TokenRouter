@@ -163,8 +163,8 @@
             }}</button>
           </div>
 
-          <div class="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div>
+          <div class="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div class="min-w-0">
               <label for="activity-recharge-amount" class="input-label"
                 >{{ t('rechargeBonus.amount') }}
                 <span v-if="paymentCurrency" class="font-normal text-gray-500 dark:text-dark-300"

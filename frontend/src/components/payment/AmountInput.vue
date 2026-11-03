@@ -6,16 +6,21 @@
         v-for="amt in filteredAmounts"
         :key="amt"
         type="button"
+        data-testid="payment-preset-amount"
         :aria-pressed="modelValue === amt"
         :class="[
-          'h-9 rounded-control border px-3 text-center text-sm font-medium tabular-nums transition-colors',
+          'rounded-control border px-3 text-center text-sm font-medium tabular-nums transition-colors',
+          $slots['amount-extra']
+            ? 'flex min-h-16 flex-col items-center justify-center gap-1 py-2'
+            : 'h-9',
           modelValue === amt
             ? 'border-primary-500 bg-primary-500/8 text-primary-600 ring-1 ring-primary-500 dark:text-primary-400'
             : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-dark-600 dark:bg-dark-950 dark:text-dark-100 dark:hover:border-dark-500',
         ]"
         @click="selectAmount(amt)"
       >
-        {{ amt }}
+        <span>{{ amt }}</span>
+        <slot name="amount-extra" :amount="amt" />
       </button>
     </div>
 
@@ -44,6 +49,7 @@
           @input="handleInput"
         />
       </div>
+      <slot name="hint" />
     </div>
   </div>
 </template>
@@ -64,6 +70,9 @@ import { currencySymbol } from '@/utils/payment/currency'
  * the text when they contain a different nonnull value, while a null model leaves the
  * current editing text intact. Input precision is limited to two decimal places by this
  * control.
+ * The optional amount-extra slot receives each preset's payment principal and adds a
+ * second row inside its button. The hint slot follows custom entry; checkout owns the
+ * reward calculations and their configured balance-unit formatting in both slots.
  */
 
 const props = withDefaults(

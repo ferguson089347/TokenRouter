@@ -955,6 +955,12 @@ export default {
     },
   },
   rechargeBonus: {
+    activeOffer: '活动加赠',
+    previewTier: '本笔预计达成',
+    presetOffer: '送 {amount}',
+    accumulationOnly: '计入活动累计',
+    accumulationHint: '本笔计入活动累计，达档后自动赠送。',
+    amountOffer: '本笔预计赠送 {gift}，合计到账 {total}。',
     extraPreview: '时段加赠试算',
     scheduledOnly: '仅指定日期有效，试算可手动加入',
     addToPreview: '加入试算',
